@@ -1,3 +1,7 @@
+// Thin loader over adapters/<tool>.mjs — the per-tool renderers live THERE
+// (one module per tool; contract: adapters/README.md). This file only:
+// loads workflows, substitutes config vars, prepends the resolved model-routing
+// block, delegates to the tool module, and writes the results.
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -12,6 +16,15 @@ const NO_SUBAGENT_NOTE = `> **Adapter note:** this tool has no native subagent s
 > run sequentially. Every gate and card requirement holds unchanged.
 
 `;
+
+async function loadAdapter(tool) {
+  if (!TOOLS.includes(tool)) throw new Error(`unknown tool ${tool}`);
+  return import(path.join(pkgRoot, "adapters", `${tool}.mjs`));
+}
+
+export async function adapterMarker(tool) {
+  return (await loadAdapter(tool)).marker;
+}
 
 /** The tier→model table for this tool, resolved by model_route.py from the
  * data file — so every rendered workflow tells its agent EXACTLY which model
@@ -38,68 +51,29 @@ function workflows() {
   const dir = path.join(pkgRoot, "core", "workflows");
   return fs.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => {
     const { meta, body } = parseFrontmatter(fs.readFileSync(path.join(dir, f), "utf8"));
-    return { file: f, meta, body };
+    return { meta, body };
   });
 }
 
 /** Render all workflows for one tool into the target repo. Returns written paths. */
-export function renderTool(tool, root, cfg) {
-  const written = [];
+export async function renderTool(tool, root, cfg) {
+  const adapter = await loadAdapter(tool);
   const routing = routingBlock(tool, root);
-  for (const wf of workflows()) {
-    const name = wf.meta.name;
-    // guidelines is method-only — no agents spawned, no routing block needed
-    const body = (name === "guidelines" ? "" : routing) + render(wf.body, cfg);
-    const desc = render(wf.meta.description || "", cfg);
-    let out, text;
-    switch (tool) {
-      case "claude-code":
-        out = path.join(root, ".claude", "skills", name, "SKILL.md");
-        text = `---\nname: ${name}\ndescription: "${desc.replace(/"/g, "'")}"\n` +
-          (wf.meta.args ? `argument-hint: "${wf.meta.args.replace(/"/g, "'")}"\n` : "") +
-          `---\n\n${body}`;
-        break;
-      case "cursor":
-        out = path.join(root, ".cursor", "commands", `${name}.md`);
-        text = NO_SUBAGENT_NOTE + body;
-        break;
-      case "windsurf":
-        out = path.join(root, ".windsurf", "workflows", `${name}.md`);
-        text = `---\ndescription: ${desc.slice(0, 250)}\n---\n\n` + NO_SUBAGENT_NOTE + body;
-        break;
-      case "codex":
-        out = path.join(root, ".codex", "prompts", `${name}.md`);
-        text = NO_SUBAGENT_NOTE + body;
-        break;
-      case "copilot":
-        out = path.join(root, ".github", "prompts", `${name}.prompt.md`);
-        text = `---\ndescription: ${desc.slice(0, 250)}\n---\n\n` + NO_SUBAGENT_NOTE + body;
-        break;
-      default:
-        throw new Error(`unknown tool ${tool}`);
-    }
-    writeFile(out, text);
-    written.push(path.relative(root, out));
+  const ctx = { root, cfg, noSubagentNote: NO_SUBAGENT_NOTE };
+  const written = [];
+  for (const raw of workflows()) {
+    const name = raw.meta.name;
+    const wf = {
+      name,
+      description: render(raw.meta.description || "", cfg),
+      args: raw.meta.args || "",
+      // guidelines is method-only — no agents spawned, no routing block needed
+      body: (name === "guidelines" ? "" : routing) + render(raw.body, cfg),
+    };
+    const out = adapter.render(wf, ctx);
+    writeFile(path.join(root, out.path), out.text);
+    written.push(out.path);
   }
-  // pointer files so agents discover the framework
-  if (tool === "codex") {
-    const agents = path.join(root, "AGENTS.md");
-    const pointer = "\n## vteam\n\nThis repo runs the vteam virtual-team framework. " +
-      "Workflows: .codex/prompts/ (team, pm, ba, dev, qa, verify). Config: vteam.config.yaml. " +
-      "Doctrine: the team docs directory named in the config.\n";
-    if (!fs.existsSync(agents) || !fs.readFileSync(agents, "utf8").includes("## vteam")) {
-      fs.appendFileSync(agents, pointer);
-      written.push("AGENTS.md (pointer appended)");
-    }
-  }
-  if (tool === "copilot") {
-    const ci = path.join(root, ".github", "copilot-instructions.md");
-    const pointer = "\n## vteam\n\nThis repo runs the vteam virtual-team framework. " +
-      "Prompt files: .github/prompts/*.prompt.md. Config: vteam.config.yaml.\n";
-    if (!fs.existsSync(ci) || !fs.readFileSync(ci, "utf8").includes("## vteam")) {
-      fs.appendFileSync(ci, pointer);
-      written.push(".github/copilot-instructions.md (pointer appended)");
-    }
-  }
+  if (adapter.pointers) written.push(...adapter.pointers(root));
   return written;
 }

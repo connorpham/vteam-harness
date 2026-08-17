@@ -140,7 +140,7 @@ Working and end-to-end tested (fresh-repo install → doctor green; dogfooded ag
 
 ```
 core/        tool-agnostic source: doctrine, workflows, gates, templates, locales
-adapters/    rendered per tool at install time (claude-code, cursor, windsurf, codex, copilot)
+adapters/    one renderer module per tool (claude-code, cursor, windsurf, codex, copilot) — see adapters/README.md to add yours
 profiles/    stack profiles for the verification gate (nextjs-prisma, node, python, generic)
 providers/   tracker + design-source adapters (jira, markdown / figma, none)
 bin/, src/   the npx installer CLI (init · doctor · update · doctor --migrate)
