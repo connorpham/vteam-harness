@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# vteam repo fence — all work reaches main through a branch + PR.
+# Install once per clone:  git config core.hooksPath .githooks
+# Deliberate bypass (leaves you accountable): ALLOW_PUSH_MAIN=1 git push origin main
+set -uo pipefail
+ZERO="0000000000000000000000000000000000000000"
+while read -r _lref lsha rref _rsha; do
+  [[ "$lsha" == "$ZERO" ]] && continue
+  if [[ "${rref#refs/heads/}" == "main" && "${ALLOW_PUSH_MAIN:-}" != "1" ]]; then
+    echo "❌ No direct pushes to main — branch + PR (the rule this repo ships to others applies to itself)."
+    echo "   git checkout -b <feat|fix|chore|docs>/<slug> && git push -u origin <branch>"
+    echo "   Deliberate exception: ALLOW_PUSH_MAIN=1 git push origin main"
+    exit 1
+  fi
+done
+exit 0
