@@ -81,7 +81,23 @@ exit 0 with preflight GREEN. `doctor --migrate` ships with Phase 6.
   without touching user ledgers
 - Adapters: claude-code first; cursor, windsurf, codex, copilot as thin renderers
 
-## Phase 6 — Prove it
+## Phase 6 — Prove it ✅ (except npm publish — owner-gated)
+Shipped: the three nextjs-prisma stack plugins (token_check with its fixtures
+self-check; ui-evidence + ui_fidelity on a pluggable auth strategy, no default
+password shipped); `vteam doctor --migrate [--apply]` (legacy sentinel
+rewriter — results, verdicts, decision statuses, manifest sentinels, [R1]..[R7]
+markers, ISO dates incl. day ranges; prose untouched; dry-run default).
+E2E: blank-repo init → doctor exit 0 (Phase 5).
+Dogfood (source project, evaluation branch `chore/vteam-dogfood`): installed
+with jira+figma+nextjs-prisma, migrated 18 real files (~139 rewrites), then —
+against REAL artifacts — log_check green on the 41-row ledger, verbatim_gate
+green on 503 coded rows / 10 shards, review_check green on a migrated dossier,
+jira provider ping green on the live project, figma leg correctly reporting a
+429 rate limit. DB leg red only because the worktree had no node_modules.
+Remaining: a full /team session on the dogfood branch (separate session), and
+`npm publish vteam@0.1.0` — waiting for the owner (external action).
+
+### Original Phase 6 scope (for reference)
 - E2E: `init` into a blank fixture repo (markdown tracker, generic profile) and
   run a scripted workday
 - Dogfood: install vteam into shop_xoai (`vteam doctor --migrate` rewrites old

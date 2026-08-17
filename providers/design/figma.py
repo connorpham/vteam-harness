@@ -45,8 +45,12 @@ class Provider(Design):
             return False, f"token invalid ({exc})"
         try:
             meta = self._get(f"/v1/files/{self.key}?depth=1")
-        except Exception:
-            return False, f"file {self.key} unreadable — wrong key or no view permission"
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                return False, f"file {self.key}: HTTP 429 rate-limited — token is fine, retry later"
+            return False, f"file {self.key}: HTTP {e.code} — wrong key or no view permission"
+        except Exception as exc:
+            return False, f"file {self.key} unreadable ({exc})"
         return True, f"file “{meta.get('name')}” readable as {me.get('email', '?')}"
 
     def node_link(self, node_id: str) -> str:

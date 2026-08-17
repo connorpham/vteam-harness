@@ -66,7 +66,8 @@ export async function doctor(flags) {
   if (pf.status !== 0) miss++;
 
   if (flags.migrate) {
-    warn("--migrate (legacy sentinel rewriter) ships with the dogfood milestone — not yet implemented");
+    const { migrate } = await import("./migrate.mjs");
+    migrate(flags);
   }
 
   process.exit(miss ? 1 : 0);

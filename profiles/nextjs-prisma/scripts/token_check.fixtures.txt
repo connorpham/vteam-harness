@@ -1,0 +1,60 @@
+# Extractor test matrix for the token gate — each line: <EXPECT> <TAB> <code snippet>
+#
+# Why this file exists: the token gate was born to catch silent failures, and
+# THREE consecutive review rounds showed IT was silently leaking — round 1 found
+# 2 spots, round 2 five more, round 3 eight false positives. Hand-auditing never
+# converges. This matrix turns "known limitations" into "known AND guarded".
+#
+# It checks EXACTLY ONE thing: does the extractor FIND a class written this way.
+# Whether that class is valid is decided by comparison against the emitted CSS —
+# never by a list (the first version used an ignore-list, wrong in both
+# directions).
+#
+# FOUND = the extractor MUST find a class here.
+# NONE  = nothing to find (or deliberately out of scope).
+#
+# THIS MATRIX'S OWN LIMIT: it only covers the EXTRACTION layer. The "misspelled
+# variant on a valid base name" class of bug (`hoverr:text-ink`) lives in the
+# CSS-comparison layer — guard that with a real mutation + build, not here.
+
+# --- position in string ---
+FOUND	className="text-ink"
+FOUND	className="px-4 text-ink"
+FOUND	"text-ink min-h-12 items-center " + "px-6"
+FOUND	className={`${BTN} border-accent`}
+FOUND	cond ? "border-accent bg-accent" : ""
+FOUND	clsx("bg-page", other)
+FOUND	const A = ["text-muted", "px-2"]
+FOUND	className={{ base: "bg-card" }}
+
+# --- variants: any prefix chain, not a hardcoded list ---
+FOUND	className="hover:text-ink"
+FOUND	className="xl:text-ink"
+FOUND	className="2xl:bg-page"
+FOUND	className="group-focus:text-ink"
+FOUND	className="focus-within:border-accent"
+FOUND	className="peer-checked:bg-page"
+FOUND	className="data-[open]:text-ink"
+FOUND	className="max-md:bg-page"
+FOUND	className="dark:hover:text-ink"
+FOUND	className="!text-ink"
+FOUND	className="md:!border-accent"
+
+# --- structural utilities: real Tailwind classes, the CSS comparison decides ---
+FOUND	className="bg-cover bg-contain bg-no-repeat"
+FOUND	className="bg-clip-text border-collapse bg-fixed"
+FOUND	className="decoration-wavy text-shadow-sm"
+FOUND	className="text-sm border-2 shadow-none"
+FOUND	className="outline-offset-2 border-b text-xs"
+FOUND	className="text-left text-center border-solid"
+
+# --- names sharing prefixes with the old ignore-list: must be found, never swallowed ---
+FOUND	className="text-topaz"
+FOUND	className="border-startline"
+FOUND	className="bg-clipboard"
+FOUND	className="text-endorsed"
+
+# --- nothing to find ---
+NONE	const x = 1;
+NONE	// a comment mentioning color #0F172A
+NONE	className={`text-${role}`}
