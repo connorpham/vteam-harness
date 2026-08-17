@@ -55,6 +55,29 @@ Definition-of-Ready checks, review-dossier enforcement at `git push`, evidence v
 
 A decision queue (nothing needing you is ever scattered), a dispatch ledger (machine-checked, append-only), session minutes, an acceptance dossier (the ONE file you read to sign off), and a knowledge base with **graduation rules** — lessons don't accumulate, they turn into gates and then get deleted.
 
+### Performance & cost management (who did what, on which model, at what price)
+
+The ledger convention pays off because a machine reads it. `perf_report.py` turns it into answers:
+
+- **Who did what** — per-lane items, outcomes, token totals and medians.
+- **Was the model choice sane** — tier usage checked against the routing table, with flags: `frontier` used without an owner-approved escalation trail · a cheap lookup model doing DEV work · finished work with no model recorded. History written before vteam still reads (legacy model names are mapped; pre-adoption rows are grandfathered, never flagged unfairly).
+- **Where the tokens went** — outliers >2× the median (usually extra review rounds), a monthly trend, and a rough cost band priced from the model data file — honestly labelled an estimate.
+
+Flags land in every desk report; the full report is a mandatory input of the 14-day framework review — **routing changes get argued from this report, never from vibes**.
+
+### Model routing that reaches your tool
+
+Doctrine speaks in abstract tiers so it never rots (`frontier / workhorse / standard / utility` — expensive brains for expensive-if-wrong decisions, cheap brains for checklist work, and **never a downgrade at a quality gate**). One data file, `model-routing.data.yaml`, is the machine home: role→tier routing, high-stakes overrides (a diff touching money bumps the second reviewer up a tier), prices, and **the exact model name each tool wants**.
+
+Every rendered workflow carries the resolved table for *its* tool — a Claude Code agent knows exactly what to pass as the subagent `model` parameter; Cursor/Windsurf users get "switch your model picker to X for this pass"; tools you haven't configured show a visible SET-ME banner instead of a silently wrong default. Runtime resolution:
+
+```bash
+python3 .vteam/scripts/model_route.py dev-r2 --tool claude-code                # → sonnet
+python3 .vteam/scripts/model_route.py dev-r2 --tool claude-code --high-stakes # → opus
+```
+
+When providers change models or prices, you edit ONE data file and run `vteam update` — doctrine, workflows and reports all follow.
+
 ---
 
 ## What's in it for your project
@@ -65,7 +88,7 @@ A decision queue (nothing needing you is ever scattered), a dispatch ledger (mac
 
 **If you're a team:** work-in-progress is limited by design (one coding item at a time — Little's Law is enforced, not quoted), crashed sessions can't orphan tickets (claims have timestamps and TTLs), two sessions can't grab the same work, and the sprint plan is a structured file a script measures — *"we're on schedule"* is a computed number, never a hand-written sentence.
 
-**If you care about cost:** token discipline is a first-class rule set. Model routing sends expensive models only to expensive-if-wrong decisions (architecture, money logic, first reviewer) and cheap models to checklist work. The ledger records tokens per ticket so the routing gets tuned with data.
+**If you care about cost:** token discipline is a first-class rule set. Model routing sends expensive models only to expensive-if-wrong decisions (architecture, money logic, first reviewer) and cheap models to checklist work — resolved to concrete model names per tool, not left as prose. The ledger records tokens and the tier per ticket, and `perf_report.py` turns that into per-lane spend, routing-violation flags, outliers and a cost estimate — so the routing gets tuned with data, and overspend has nowhere to hide.
 
 ---
 
