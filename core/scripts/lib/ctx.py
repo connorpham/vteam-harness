@@ -155,8 +155,17 @@ def _selftest():
          if (p / "core" / "templates" / "vteam.config.example.yaml").exists()),
         None,
     )
-    assert example, "selftest: example config not found"
-    cfg = parse_config(example.read_text(encoding="utf-8"))
+    if example is not None:
+        sample = example.read_text(encoding="utf-8")
+    else:  # installed repos don't carry the package templates — embedded sample
+        sample = (
+            "version: 1\nproject:\n  key: PROJ\npaths:\n  pm: docs/pm\n"
+            "git:\n  branch_pattern: \"^(feat|fix)/{key}-[0-9]+-\"\n"
+            "tracker:\n  done_statuses: [Done, Closed, Resolved]\n"
+            "autonomy:\n  exemptions:\n    - real-money\n"
+            "team:\n  capacity_per_day: 0.8\nreview:\n  high_stakes_paths: []\n"
+        )
+    cfg = parse_config(sample)
     assert cfg["version"] == 1
     assert cfg["project"]["key"] == "PROJ"
     assert cfg["paths"]["pm"] == "docs/pm"

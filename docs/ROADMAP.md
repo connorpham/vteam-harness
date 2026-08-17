@@ -59,7 +59,19 @@ ui-evidence, ui_fidelity) — ported against the real app they instrument.
   tolerance tables) + `none`
 - `github`/`linear` tracker providers: v1.1
 
-## Phase 5 — Installer CLI
+## Phase 5 — Installer CLI ✅
+Shipped: `npx vteam init` (interactive or fully flag-driven with --yes; writes
+config, .vteam runtime, docs skeletons never clobbering ledgers, rendered
+doctrine, managed hooks + hooksPath, .gitignore evidence rules, CI workflow,
+adapters), `vteam doctor` (config parse via the gates' own parser, runtime
+integrity, hooksPath, model-routing staleness, all 9 gate selftests, provider
+preflight), `vteam update` (refreshes framework files, provably leaves ledgers
+untouched). Adapters: claude-code, cursor, windsurf, codex (+AGENTS.md
+pointer), copilot (+instructions pointer) — non-Claude tools get the
+no-subagent adapter note. E2E-proven in a fresh repo: init → commit → doctor
+exit 0 with preflight GREEN. `doctor --migrate` ships with Phase 6.
+
+### Original Phase 5 scope (for reference)
 - `npx vteam init`: prompts (stack, tracker, tool(s), language, autonomy) →
   writes vteam.config.yaml, `.vteam/scripts/`, docs skeletons, hooks, CI snippet,
   tool adapters

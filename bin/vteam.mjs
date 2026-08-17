@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+import { parseArgs } from "../src/cli/util.mjs";
+
+const HELP = `vteam — a virtual AI team (PM·BA·SA·DEV·QA) for any repo, any agent tool.
+
+Usage:
+  npx vteam init      install into the current repo (interactive; --yes for defaults)
+  npx vteam doctor    preflight + install integrity + gate selftests
+  npx vteam update    refresh framework files (never touches your ledgers/config)
+
+init flags (all optional; any given flag skips its prompt):
+  --yes                      accept defaults for everything not flagged
+  --name <str> --key <PROJ> --language <en|vi|…>
+  --profile <generic|node|python|nextjs-prisma>
+  --tracker <markdown|jira>  --design <none|figma>
+  --autonomy <off|assisted|full>
+  --tools <csv of: claude-code,cursor,windsurf,codex,copilot>
+
+doctor flags: --backend (design legs warn only) · --migrate (legacy artifacts; TBD)
+`;
+
+const { flags, positional } = parseArgs(process.argv.slice(2));
+const cmd = positional[0];
+
+try {
+  if (cmd === "init") {
+    const { init } = await import("../src/cli/init.mjs");
+    await init(flags);
+  } else if (cmd === "doctor") {
+    const { doctor } = await import("../src/cli/doctor.mjs");
+    await doctor(flags);
+  } else if (cmd === "update") {
+    const { update } = await import("../src/cli/update.mjs");
+    await update(flags);
+  } else {
+    console.log(HELP);
+    process.exit(cmd ? 1 : 0);
+  }
+} catch (e) {
+  console.error(`vteam: ${e.message}`);
+  process.exit(1);
+}
