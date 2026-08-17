@@ -47,6 +47,12 @@ class Tracker:
     def attach(self, key: str, path: Path): raise NotImplementedError
     def link(self, blocker: str, blocked: str) -> None: raise NotImplementedError
     def worklog(self, key: str, minutes: int) -> bool: return False
+    def ping(self) -> tuple[bool, str]: return True, "no ping implemented"
+    def judged_at(self, key: str):
+        """(iso_timestamp, description) of the last move into a judged status, or
+        None when the provider keeps no changelog (callers must then rely on the
+        pinned COMMIT sha)."""
+        return None
 
     # -- shared helpers --------------------------------------------------------
     def status_category(self, status: str) -> str:
@@ -86,6 +92,11 @@ class MarkdownTracker(Tracker):
 
     def _file(self, key: str) -> Path:
         return self.dir / f"{key.upper()}.md"
+
+    def ping(self) -> tuple[bool, str]:
+        if self.dir.is_dir():
+            return True, f"backlog dir {self.dir.relative_to(self.c.root)} ({len(list(self.dir.glob('*.md')))} tickets)"
+        return False, f"backlog dir {self.dir.relative_to(self.c.root)} missing — mkdir it or set paths.backlog"
 
     def _parse(self, key: str, text: str) -> dict:
         def field(name, default=""):
@@ -180,8 +191,13 @@ def load(c: Ctx) -> Tracker:
         return MarkdownTracker(c)
     mod_path = c.root / ".vteam" / "providers" / f"tracker_{name}.py"
     if not mod_path.is_file():
-        raise SystemExit(f"tracker: provider {name!r} not installed ({mod_path} missing) — "
-                         f"run `npx vteam init` or switch tracker.provider to 'markdown'")
+        # framework-repo dev fallback: providers/tracker/<name>.py next to core/
+        dev = Path(__file__).resolve().parents[3] / "providers" / "tracker" / f"{name}.py"
+        if dev.is_file():
+            mod_path = dev
+        else:
+            raise SystemExit(f"tracker: provider {name!r} not installed ({mod_path} missing) — "
+                             f"run `npx vteam init` or switch tracker.provider to 'markdown'")
     spec = importlib.util.spec_from_file_location(f"tracker_{name}", mod_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore[union-attr]

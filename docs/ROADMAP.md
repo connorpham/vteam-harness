@@ -40,7 +40,18 @@ ui-evidence, ui_fidelity).
   node, python, generic (each step present or loudly skipped)
 - Pre-push hook template + CI snippet generator
 
-## Phase 4 — Providers
+## Phase 4 — Providers ✅
+Shipped: jira tracker provider (ADF flattening, v2-comments quirk, attach/link
+with read-back, changelog judged_at, honest ping); figma design provider
+(frames/match/node_link, learn_styles → design-language with file-version,
+check_version); design interface with built-in `none`; the four
+tracker-coupled gates — comment_check ([R1]..[R7]), stale_verdict_check
+(pinned-COMMIT-first), schedule_check (plan.yaml contract), preflight
+(provider pings, hooksPath check, declared-or-warned DB leg).
+Deferred to Phase 6 dogfood: nextjs-prisma stack plugins (token_check,
+ui-evidence, ui_fidelity) — ported against the real app they instrument.
+
+### Original Phase 4 scope (for reference)
 - Tracker interface + `jira` (port jira-api recipes, ADF flattening, v2-comments
   quirk, attach read-back) + `markdown` (offline backlog — enables zero-service
   demo + e2e)
