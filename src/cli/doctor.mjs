@@ -51,7 +51,7 @@ export async function doctor(flags) {
   // 5. selftests — every gate must still prove it can go red
   const selftests = ["log_check.py", "verbatim_gate.py", "review_check.py", "evd_check.py",
     "evd_ui_check.py", "dor_check.py", "comment_check.py", "schedule_check.py",
-    "perf_report.py", "lib/ctx.py"];
+    "perf_report.py", "model_route.py", "lib/ctx.py"];
   let stFail = 0;
   for (const s of selftests) {
     const r = spawnSync("python3", [path.join(root, ".vteam/scripts", s), "--selftest"],

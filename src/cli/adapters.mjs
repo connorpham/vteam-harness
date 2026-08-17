@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { pkgRoot, render, parseFrontmatter, writeFile } from "./util.mjs";
 
 export const TOOLS = ["claude-code", "cursor", "windsurf", "codex", "copilot"];
@@ -12,6 +13,27 @@ const NO_SUBAGENT_NOTE = `> **Adapter note:** this tool has no native subagent s
 
 `;
 
+/** The tier→model table for this tool, resolved by model_route.py from the
+ * data file — so every rendered workflow tells its agent EXACTLY which model
+ * each role runs on, instead of leaving "workhorse" abstract. */
+function routingBlock(tool, root) {
+  const script = [path.join(root, ".vteam/scripts/model_route.py"),
+                  path.join(pkgRoot, "core/scripts/model_route.py")].find(fs.existsSync);
+  if (!script) return "";
+  const r = spawnSync("python3", [script, "--table", "--tool", tool],
+    { cwd: root, encoding: "utf8" });
+  if (r.status !== 0) {
+    console.log(`⚠ ${tool}: model routing table unavailable (${(r.stderr || "").trim().slice(0, 120)}) — ` +
+      `set this tool's models in model-routing.data.yaml, then re-run vteam update`);
+    return "";
+  }
+  const usage = tool === "claude-code"
+    ? "> Spawning a subagent: pass the resolved name as the Agent tool's `model` parameter.\n"
+    : "> This tool has no subagent spawning: before each reviewer/challenger pass, switch\n" +
+      "> your model picker to the resolved name, run the pass in a fresh chat, then switch back.\n";
+  return r.stdout.trimEnd() + "\n" + usage + "\n";
+}
+
 function workflows() {
   const dir = path.join(pkgRoot, "core", "workflows");
   return fs.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => {
@@ -23,9 +45,11 @@ function workflows() {
 /** Render all workflows for one tool into the target repo. Returns written paths. */
 export function renderTool(tool, root, cfg) {
   const written = [];
+  const routing = routingBlock(tool, root);
   for (const wf of workflows()) {
     const name = wf.meta.name;
-    const body = render(wf.body, cfg);
+    // guidelines is method-only — no agents spawned, no routing block needed
+    const body = (name === "guidelines" ? "" : routing) + render(wf.body, cfg);
     const desc = render(wf.meta.description || "", cfg);
     let out, text;
     switch (tool) {

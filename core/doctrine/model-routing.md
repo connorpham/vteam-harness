@@ -20,10 +20,16 @@ vteam routes by **tier**, not by model name — model names and prices rot:
 | `standard` | Near-workhorse quality at a fraction of the price | Checklist reviews, drafts, coordination |
 | `utility` | Cheap and fast | Mechanical lookup/extraction subagents |
 
-The tier → concrete-model mapping and price snapshot live in
+The tier → concrete-model mapping, the role → tier routing table, the
+high-stakes overrides AND the per-tool model names all live in
 [`model-routing.data.yaml`](model-routing.data.yaml) — a **data file with a
-staleness date**, not doctrine. When providers change prices or release models,
-update the data file first; only then reconsider the routing below.
+staleness date** and the MACHINE HOME of the mapping (one rule, one home:
+edit values there; the table below is the annotated rationale). Resolution is
+mechanical: `python3 .vteam/scripts/model_route.py <role> --tool <tool>
+[--high-stakes]` — adapters embed the resolved table into every rendered
+workflow, so no agent ever has to guess what "workhorse" means on its tool.
+When providers change prices or release models, update the data file first;
+only then reconsider the routing below.
 
 ## 2. Subagent routing (workflows apply this without asking)
 
