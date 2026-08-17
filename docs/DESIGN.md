@@ -1,10 +1,16 @@
 # vteam — Architecture & Extraction Design
 
-Source: the Shop Xoài harness (`.claude/skills/{team,pm-task,ba-task,lam-task,
-qa-verify-ticket,run-test,karpathy-guidelines}` + `docs/team/` + gate scripts),
-inventoried 2026-08-17. This document records how that harness becomes a portable,
-multi-tool framework. Decisions here are the house of record for the extraction;
-code comments point here.
+Source: a production harness built inside the framework's first adopter
+(six pipelines + team doctrine + gate scripts), inventoried 2026-08-17.
+This document records how that harness became a portable, multi-tool framework;
+decisions here are the house of record for the extraction — code comments point here.
+
+**Design boundary (standing rule):** the framework repo contains ZERO
+project specifics — no adopter names, keys, domains, accounts, or dates-as-law.
+Everything project-shaped lives in the TARGET repo's `vteam.config.yaml`,
+profiles, providers and ledgers. Adaptation is configuration, never forking;
+improvement flows back as generic gates/doctrine via the 14-day framework
+review. A PR that hardcodes any adopter detail into core is rejected on sight.
 
 ## 1. Layer model
 
@@ -49,13 +55,13 @@ step, provider method, or template variable. Canonical example:
 ```yaml
 version: 1
 project:
-  name: Shop Xoai
-  key: XOAI                  # ticket prefix; replaces the XOAI-\d+ regexes
+  name: My Project
+  key: PROJ                  # ticket prefix; replaces hardcoded key regexes
   language: vi               # owner-facing output locale; framework stays EN
-  go_live: 2027-01-08
+  go_live: 2027-01-01
   adopted: 2026-08-17        # anchor for date-grandfathered rules (§5)
 paths:                       # all ledger/oracle locations, no more literals
-  specs: docs/srs
+  specs: docs/specs
   pm: docs/pm
   qa: docs/qa
   adr: docs/adr
@@ -83,7 +89,7 @@ autonomy:
   exemptions: [real-money, legal, purchasing, credentials, data-deletion]
 review:
   high_stakes_paths: ["prisma/schema.prisma", "src/lib/"]
-  high_stakes_terms: [wallet, topup, refund, balance, priceAtTime]  # project vocab
+  high_stakes_terms: [wallet, topup, refund, balance]  # the project's own risk vocabulary
 models:
   routing: default           # points at a data file, not doctrine (§6)
 ```
@@ -133,7 +139,7 @@ around them is localized via `locales/*.yml`.
 - The 7-part ticket-comment markers become locale-keyed headings with stable
   sentinel ids (`[V1]…[V7]`), so `comment_check` checks ids, prose stays localized.
 
-Migration note for shop_xoai (first adopter): this is a breaking change to
+Migration note for the first adopter: this is a breaking change to
 existing artifacts; the installer's `vteam doctor --migrate` rewrites old markers.
 
 ## 5. Dates-as-law → config anchors

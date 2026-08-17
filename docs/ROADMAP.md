@@ -1,6 +1,6 @@
 # vteam — Build roadmap
 
-Extraction from the Shop Xoài harness, phased so every phase leaves the repo in a
+Extraction from the source harness (the first adopter's), phased so every phase leaves the repo in a
 usable state. Source of truth for scope: [DESIGN.md](DESIGN.md).
 
 ## Phase 0 — Foundation ✅ (this commit)
@@ -100,7 +100,7 @@ Remaining: a full /team session on the dogfood branch (separate session), and
 ### Original Phase 6 scope (for reference)
 - E2E: `init` into a blank fixture repo (markdown tracker, generic profile) and
   run a scripted workday
-- Dogfood: install vteam into shop_xoai (`vteam doctor --migrate` rewrites old
+- Dogfood: install vteam into the source project (`vteam doctor --migrate` rewrites old
   sentinels), run one real /team session, diff outcomes vs the legacy harness
 - npm publish `vteam@0.1.0`
 
