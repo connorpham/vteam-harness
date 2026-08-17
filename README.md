@@ -1,60 +1,126 @@
 # vteam
 
-**One command puts a whole virtual AI team to work on your repo.**
-
-vteam is an agent-agnostic orchestration framework — in the family of BMAD Method,
-SpecKit, OpenSpec and Superpowers — extracted from a production harness that ran a
-real project autonomously (37+ PRs, 113+ confirmed review findings, 24/7 scheduled
-sessions). It installs a virtual team (PM · BA · SA · DEV · QA) into any repository,
-for any AI coding tool.
+**One command puts a whole virtual AI team to work on your repository — a PM, a BA, an architect, a developer, and a QA that ship real tickets with real evidence, on any AI coding tool.**
 
 ```bash
-npx vteam init
+npx vteam init     # install into any repo (Claude Code, Cursor, Windsurf, Codex, Copilot)
+/team              # then start a full "workday" in your agent tool
 ```
 
-The installer asks a few questions (stack, issue tracker, language, autonomy level)
-and generates:
+vteam belongs to the same family as **BMAD Method, SpecKit, OpenSpec and Superpowers** — but it was not designed on a whiteboard. It was **extracted from a production harness that ran a real project autonomously**: 37+ merged PRs, 113+ confirmed review findings, 24/7 scheduled sessions, a single human owner spending ~15 minutes a day. Every rule in this framework exists because something specific broke without it.
 
-- **Workflows** for your tool — Claude Code skills, Cursor rules, Windsurf workflows,
-  Codex AGENTS.md sections, Copilot instructions — all rendered from one core.
-- **Machine gates** — scripts that can actually go red: definition-of-ready checks,
-  evidence validation, review-card enforcement, ledger schema checks, verdict
-  staleness detection. Every gate ships with a mutation self-test.
-- **The paper trail** — decision queue, dispatch ledger, session minutes, acceptance
-  dossier, knowledge base with graduation rules.
-- **Doctrine** — reviewer standard, RACI, role playbooks, model routing, operating
-  cadence — each rule living in exactly one file.
+---
 
-## Why another framework?
+## The problem it solves
 
-Most spec-driven frameworks tell the agent *what to build*. vteam's core insight is
-about *how a team of agents stays honest*:
+AI agents are great at writing code and terrible at being **accountable** for it. Left alone, an agent will:
 
-1. **A gate that has never been red does not exist.** Every new gate must prove it
-   can fail before it ships.
-2. **Evidence that only exists in the session isn't evidence.** Everything durable
-   goes to a committed file or the tracker, and every outward write is re-read back.
-3. **Autonomy is a ladder, not a switch.** Quality gates never relax; only
-   wait-for-human gates flip — with a documented, reversible, labelled trail and a
-   hard exemption list (real money, legal, credentials, data deletion).
-4. **One rule, one home.** Changing a rule means deleting the old sentence in the
-   same commit. Everything else is a pointer.
-5. **Agents don't chat.** One brief → one card. Briefs are paths + scope, never
-   pasted content. Exactly one rebuttal round, paid for with evidence.
+- say *"done"* with nothing to prove it,
+- review its own work and approve it,
+- invent an answer when the spec is silent,
+- quietly skip the step that was inconvenient,
+- and produce reports that read well but point at nothing.
+
+Most frameworks solve the *"what to build"* side (specs, plans, task lists). **vteam solves the *"how a team of agents stays honest"* side** — and it does it with machinery, not prose:
+
+| Principle | What it means in practice |
+|---|---|
+| **A gate that has never been red does not exist** | Every quality check ships with a *mutation self-test*: feed it a violating input, watch it fail, prove it works. An always-green check is deleted or fixed. |
+| **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable goes to a committed file or the issue tracker. Every outward write is **read back** to confirm it landed. |
+| **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip — with a documented, reversible, labelled paper trail. Real money, legal, credentials and data deletion are **never** auto-decided. |
+| **One rule, one home** | Changing a rule means deleting the old sentence in the same commit. No framework rot, no two files disagreeing about the law. |
+| **Agents don't chat** | One brief → one card → done. Briefs are file paths + scope, never pasted walls of text. Exactly one rebuttal round, and it must be paid for with runnable evidence. Your token bill stays sane. |
+
+---
+
+## What you get after `npx vteam init`
+
+### The team (7 workflows, rendered for YOUR tool)
+
+| Command | Role | What it does |
+|---|---|---|
+| `/team` | Everyone | A full **workday**: clears your decision queue first, then works every unblocked item — dev tickets sequentially, BA drafts and architecture records in parallel background lanes, QA between dev tasks — until only *you* can move things forward. Ends with a one-page desk report. |
+| `/pm` | Project manager | Reads the tracker + sprint plan + decision queue, picks the highest-value unblocked work, dispatches it, and funnels everything that needs a human into ONE table. Never invents answers. |
+| `/ba` | Business analyst | Turns your spec into a runnable backlog: verbatim spec shards (byte-checked), user stories with *testable* Given/When/Then criteria, every gap becoming a structured question instead of a guess. Challenger-reviewed before tickets are filed. |
+| `/dev` | Developer | Ticket → branch → minimal implementation → verification gate → **self-review with machine-measured design fidelity** → two fresh reviewer agents (three on high-stakes diffs) → PR → a 7-part plain-language report on the ticket. |
+| `/qa` | QA engineer | Verify-only: derives expectations from the SPEC (never the ticket prose), runs 2–5 test cases headed in a real browser, collects annotated evidence, cross-checks every claim, gets a challenger sign-off, writes a report a non-programmer understands in 2 minutes. Never touches product code. |
+| `/verify` | The gate | Lint → types → unit → build → reality checks → integration → e2e, in a fixed cheapest-first order. Skipped steps must declare why — silent skips are a failure. |
+| `guidelines` | Method | Behavioral defaults that prevent classic LLM coding mistakes (think first, surgical diffs, red-first tests). |
+
+### The machinery (14 gates that can actually fail)
+
+Definition-of-Ready checks, review-dossier enforcement at `git push`, evidence validation (images must open, be readable, and **not be a blank/error page** — detected by pixel analysis), ledger schema checks, stale-verdict detection (*a verdict is valid only for the code it examined*), verbatim-spec guards, report-comment read-back, secret scanning with **no** escape hatch, and more. Every one carries `--selftest` mutation proof.
+
+### The paper trail (your project's memory)
+
+A decision queue (nothing needing you is ever scattered), a dispatch ledger (machine-checked, append-only), session minutes, an acceptance dossier (the ONE file you read to sign off), and a knowledge base with **graduation rules** — lessons don't accumulate, they turn into gates and then get deleted.
+
+---
+
+## What's in it for your project
+
+**If you're a solo owner / founder:** the team runs while you sleep. Your daily touchpoint is a 15-minute desk report: what got done (with live evidence links), what needs you (batched questions with ready-made proposals and reversal costs), what's at risk in the next 7 days. When the backlog drains, you read one acceptance file and sign off in batches.
+
+**If you're a developer:** you stop being the agent's babysitter. The DoR gate bounces underspecified tickets back to analysis before you waste a session. Reviews come from *fresh* agents with empty context, held to a written standard — an APPROVE without a "what I tried to break" list is invalid, and a fabricated finding voids the whole card. Your PRs carry committed review dossiers anyone can audit later.
+
+**If you're a team:** work-in-progress is limited by design (one coding item at a time — Little's Law is enforced, not quoted), crashed sessions can't orphan tickets (claims have timestamps and TTLs), two sessions can't grab the same work, and the sprint plan is a structured file a script measures — *"we're on schedule"* is a computed number, never a hand-written sentence.
+
+**If you care about cost:** token discipline is a first-class rule set. Model routing sends expensive models only to expensive-if-wrong decisions (architecture, money logic, first reviewer) and cheap models to checklist work. The ledger records tokens per ticket so the routing gets tuned with data.
+
+---
+
+## Works with your stack, not against it
+
+Everything project-specific lives in **one config file** — the framework itself contains zero assumptions about your project (that's a standing rule: adaptation is configuration, never forking).
+
+```yaml
+# vteam.config.yaml (generated by init, edited by you)
+project:  { name: My Project, key: PROJ, language: en }   # reports in en/vi/…
+stack:    { profile: nextjs-prisma }        # or node / python / generic
+tracker:  { provider: jira }                # or markdown — zero external services
+design:   { provider: figma }               # or none
+autonomy: { level: assisted }               # off / assisted / full
+review:   { high_stakes_paths: [...], high_stakes_terms: [wallet, refund] }
+```
+
+- **Agent tools:** Claude Code (native skills + subagents), Cursor, Windsurf, Codex, Copilot (with a documented sequential-review fallback for tools without subagents).
+- **Trackers:** Jira (every Atlassian quirk handled: ADF, attachment read-back, link-direction verification) or a **markdown backlog** — tickets as files, so the whole framework runs with *no external service at all*.
+- **Design source:** Figma (fidelity measured in numbers against the design's own node data — expected values come from the design, never from your code, because *measuring code with code is self-grading*) or none.
+- **Languages:** the framework speaks English internally; every owner-facing report speaks *your* language (`language: vi`, etc.). Machine-checked markers are locale-neutral sentinels, so gates work in any language.
+
+```bash
+npx vteam doctor    # health check: config, hooks, all gate selftests, live provider pings
+npx vteam update    # pull framework improvements — provably never touches your ledgers
+```
+
+---
+
+## How is this different from BMAD / SpecKit / OpenSpec / Superpowers?
+
+Those frameworks are strongest at the **front** of the lifecycle: turning an idea into specs, plans and tasks. vteam borrows gratefully where they lead (a change-ledger idea from OpenSpec, a scale-adaptive light path from BMAD, brief-writing and red-first testing standards from Superpowers) — and adds the part none of them enforce:
+
+> **the back of the lifecycle** — proof of done, adversarial review with teeth, evidence that survives the session, verdicts pinned to commits, autonomy with an audit trail, and a learning loop where every incident becomes a gate.
+
+Use them together if you like: vteam doesn't care where your spec came from, only that once it exists, nothing ships without proving itself against it.
+
+---
 
 ## Status
 
-Early extraction. See [docs/DESIGN.md](docs/DESIGN.md) for architecture and
-[docs/ROADMAP.md](docs/ROADMAP.md) for the build plan.
+Working and end-to-end tested (fresh-repo install → doctor green; dogfooded against the source project's real artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates). Pre-1.0: expect sharp edges. GitHub/Linear tracker providers and deeper multi-human team support are next.
+
+- Architecture & design decisions: [docs/DESIGN.md](docs/DESIGN.md)
+- Build history & roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
+- The incidents behind the rules: [core/doctrine/provenance.md](core/doctrine/provenance.md)
 
 ## Layout
 
 ```
-core/        tool-agnostic framework source (doctrine, workflows, gates, templates)
-adapters/    per-tool renderers (claude-code, cursor, windsurf, codex, copilot)
+core/        tool-agnostic source: doctrine, workflows, gates, templates, locales
+adapters/    rendered per tool at install time (claude-code, cursor, windsurf, codex, copilot)
 profiles/    stack profiles for the verification gate (nextjs-prisma, node, python, generic)
-providers/   tracker + design-source adapters (jira, github, linear, markdown / figma, none)
-bin/, src/   the npx installer CLI
+providers/   tracker + design-source adapters (jira, markdown / figma, none)
+bin/, src/   the npx installer CLI (init · doctor · update · doctor --migrate)
 ```
 
 ## License
