@@ -1,0 +1,25 @@
+# Tier → concrete model mapping + price snapshot.
+# DATA, not doctrine — update this file first when providers change models/prices,
+# then reconsider model-routing.md §2/§3. `vteam doctor` warns when snapshot_date
+# is older than 90 days.
+
+snapshot_date: 2026-08-17
+provider: anthropic
+
+tiers:
+  frontier:
+    model: claude-fable-5
+    input_per_mtok: 10
+    output_per_mtok: 50
+  workhorse:
+    model: claude-opus-5
+    input_per_mtok: 5
+    output_per_mtok: 25
+  standard:
+    model: claude-sonnet-5
+    input_per_mtok: 3
+    output_per_mtok: 15
+  utility:
+    model: claude-haiku-4-5
+    input_per_mtok: 1
+    output_per_mtok: 5
