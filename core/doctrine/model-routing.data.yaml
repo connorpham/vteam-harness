@@ -1,11 +1,13 @@
-# Tier → concrete model mapping + price snapshot.
-# DATA, not doctrine — update this file first when providers change models/prices,
-# then reconsider model-routing.md §2/§3. `vteam doctor` warns when snapshot_date
-# is older than 90 days.
+# Machine home of model routing. DATA, not doctrine — model-routing.md is the
+# annotated rationale; scripts and adapters read THIS file (model_route.py
+# resolves role → tier → concrete model per tool). Update this file first when
+# providers change models/prices; `vteam doctor` warns when snapshot_date is
+# older than 90 days.
 
 snapshot_date: 2026-08-17
 provider: anthropic
 
+# Tier economics (reference prices, $ per 1M tokens)
 tiers:
   frontier:
     model: claude-fable-5
@@ -23,3 +25,52 @@ tiers:
     model: claude-haiku-4-5
     input_per_mtok: 1
     output_per_mtok: 5
+
+# Role → tier (the routing table; rationale per role: model-routing.md §2)
+routing:
+  dev-r1: workhorse
+  dev-r2: standard
+  dev-r3: workhorse
+  ba-challenger: standard
+  qa-challenger: standard
+  sa-writer: workhorse
+  sa-challenger: workhorse
+  ba-draft: standard
+  sa-background: workhorse
+  explore: utility
+
+# High-stakes override (diff matches review.high_stakes_* → these roles bump)
+high_stakes:
+  dev-r1: workhorse
+  dev-r2: workhorse
+
+# Tier → the name each TOOL wants. Adapters embed this table into rendered
+# workflows; model_route.py resolves it at runtime. A value of SET-ME fails
+# LOUDLY — set your tool's real model names here (this is exactly the kind of
+# thing that rots, hence snapshot_date).
+tools:
+  claude-code:
+    frontier: fable
+    workhorse: opus
+    standard: sonnet
+    utility: haiku
+  cursor:
+    frontier: claude-fable-5
+    workhorse: claude-opus-5
+    standard: claude-sonnet-5
+    utility: claude-haiku-4.5
+  windsurf:
+    frontier: claude-fable-5
+    workhorse: claude-opus-5
+    standard: claude-sonnet-5
+    utility: claude-haiku-4.5
+  codex:
+    frontier: SET-ME
+    workhorse: SET-ME
+    standard: SET-ME
+    utility: SET-ME
+  copilot:
+    frontier: SET-ME
+    workhorse: SET-ME
+    standard: SET-ME
+    utility: SET-ME
