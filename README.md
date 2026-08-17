@@ -3,7 +3,7 @@
 **One command puts a whole virtual AI team to work on your repository — a PM, a BA, an architect, a developer, and a QA that ship real tickets with real evidence, on any AI coding tool.**
 
 ```bash
-npx vteam init     # install into any repo (Claude Code, Cursor, Windsurf, Codex, Copilot)
+npx vteam-harness init     # install into any repo (Claude Code, Cursor, Windsurf, Codex, Copilot)
 /team              # then start a full "workday" in your agent tool
 ```
 
@@ -33,7 +33,7 @@ Most frameworks solve the *"what to build"* side (specs, plans, task lists). **v
 
 ---
 
-## What you get after `npx vteam init`
+## What you get after `npx vteam-harness init`
 
 ### The team (7 workflows, rendered for YOUR tool)
 
@@ -112,8 +112,8 @@ review:   { high_stakes_paths: [...], high_stakes_terms: [wallet, refund] }
 - **Languages:** the framework speaks English internally; every owner-facing report speaks *your* language (`language: vi`, etc.). Machine-checked markers are locale-neutral sentinels, so gates work in any language.
 
 ```bash
-npx vteam doctor    # health check: config, hooks, all gate selftests, live provider pings
-npx vteam update    # pull framework improvements — provably never touches your ledgers
+npx vteam-harness doctor    # health check: config, hooks, all gate selftests, live provider pings
+npx vteam-harness update    # pull framework improvements — provably never touches your ledgers
 ```
 
 ---
