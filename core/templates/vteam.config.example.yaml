@@ -1,0 +1,59 @@
+# vteam.config.yaml — the single contract between your repo and the framework.
+# Every gate, workflow and adapter reads from here (via core/scripts/lib).
+# House of record for the schema: docs/DESIGN.md §2.
+
+version: 1
+
+project:
+  name: My Project
+  key: PROJ              # ticket prefix (PROJ-123); used by branch grammar, gates, ledgers
+  language: en           # owner-facing output locale (framework internals stay English)
+  # go_live: 2027-01-01  # optional; desk report leads with progress against it
+  adopted: 2026-01-01    # install date; grandfathering thresholds anchor here
+
+paths:
+  specs: docs/specs      # sharded requirement oracle + INDEX.md + changes.md
+  pm: docs/pm            # decisions.md, log.md, sessions/, acceptance.md, plan.yaml
+  qa: docs/qa            # knowledge-base.md, known-issues.md
+  adr: docs/adr
+  team: docs/team        # doctrine rendered at install time
+  design: docs/design
+  evidence: evd          # evd/<KEY>/ = QA lane · evd/<KEY>/dev/ = DEV lane
+
+stack:
+  profile: generic       # generic | node | python | nextjs-prisma  → profiles/<name>/gates.yaml
+  package_manager: npm
+
+git:
+  protected_branch: main
+  branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
+  hooks: managed         # managed: vteam owns .githooks/pre-push · external: repo has real branch protection
+
+tracker:
+  provider: markdown     # jira | github | linear | markdown (offline backlog, zero services)
+  done_statuses: [Done, Closed, Resolved]
+  review_status: In Review
+
+design:
+  provider: none         # figma | none
+
+team:
+  size: 1                # 1 is the documented sweet spot; >1 relaxes WIP/claim/ledger invariants
+  capacity_per_day: 0.8  # person-days of throughput per calendar working day
+
+autonomy:
+  level: assisted        # off: every gate waits for you · assisted: asks at merge/close · full: self-merge/self-close with paper trail
+  exemptions:            # NEVER auto-decided regardless of level
+    - real-money
+    - legal
+    - purchasing
+    - credentials
+    - data-deletion
+
+review:
+  reviewers: 2           # fresh reviewer agents per diff; +1 when high-stakes triggers hit
+  high_stakes_paths: []          # e.g. ["prisma/schema.prisma", "src/lib/"]
+  high_stakes_terms: []          # project vocabulary that means money/irreversibility
+
+models:
+  routing: default       # data file under core/doctrine/model-routing/; override with a path
