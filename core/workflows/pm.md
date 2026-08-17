@@ -290,6 +290,12 @@ capacity). Then exactly 3 sections, plain language:
 4. **Next session's model** — look at the next unblocked work, suggest
    `/model <tier>` per `model-routing.md` §3 (the machine suggests; the user
    types the command).
+5. **Team performance** — when this session added ledger rows, run
+   `python3 .vteam/scripts/perf_report.py --since <sprint start>` and paste its
+   "Routing & accounting flags" section (who ran on which tier, was it per the
+   routing table, where the tokens went). Any 🚩 flag is a desk-report line, not
+   a footnote. The FULL report (`perf_report.py` with no filter) is a mandatory
+   input of the 14-day framework review (`ops.md` §6).
 
 Before printing: update the ledger (+1 row per dispatched item). **Token
 accounting:** each row closes with `· tok ≈ <N>k` (main-loop estimate + subagent

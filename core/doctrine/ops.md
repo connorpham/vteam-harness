@@ -94,11 +94,20 @@ prose, and prose rules get skipped. Escape hatches exist by design, are named
 | Review / demo | Acceptance dossier (`{paths.pm}/acceptance.md` demo checklist + sign-off log) | When backlog drains | Yes |
 | Retrospective | **Framework review**: survey the process itself with its own data (ledger, minutes, KB, git history) — hunt for gates that cannot go red and rules being skipped | Every 14 days; the PM lane checks the date of the latest review file and treats an overdue retro as priority UNBLOCKED work | Yes |
 
-## 7. Token accounting
+## 7. Token accounting & team performance
 
-- Every ledger row closes with `· tok ≈ <N>k` (rows from `project.adopted` onward).
-- Read trends by WORK TYPE (schema groundwork vs screens vs docs), not per ticket —
-  the biggest variable is the number of review rounds.
-- After ~10 tickets of data, the desk report starts estimating "a ticket this size ≈
-  Yk tokens" so the owner can budget — combined with `model-routing.md`, the two
-  main cost levers.
+- Every ledger row closes with `· tok ≈ <N>k`, and DEV rows name the tier used
+  (`done (workhorse) · tok ≈ 90k`) — rows from `project.adopted` onward;
+  `log_check` enforces the format.
+- **The reader is `perf_report.py`** — the accounting convention only pays off
+  because a machine reads it: who did what per lane, tier usage vs the routing
+  table (frontier without escalation, utility on DEV work, unrecorded tiers —
+  all flagged), token outliers (>2× median = review-round eaters), monthly
+  trend, and a rough cost band from `model-routing.data.yaml` prices.
+- The desk report pastes the flags each session (pm P4.5); the full report is a
+  mandatory input of the 14-day framework review — routing table changes are
+  argued FROM this report, never from vibes.
+- Read trends by WORK TYPE (schema groundwork vs screens vs docs), not per
+  ticket — the biggest variable is the number of review rounds. After ~10
+  tickets, the desk report starts estimating "a ticket this size ≈ Yk tokens"
+  so the owner can budget.
