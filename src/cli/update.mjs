@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pkgRoot, repoRoot, copyDir, render } from "./util.mjs";
-import { TOOLS, renderTool } from "./adapters.mjs";
+import { TOOLS, renderTool, adapterMarker } from "./adapters.mjs";
 
 /** Refresh framework-owned files from the package. NEVER touches user ledgers
  * (docs/pm, docs/qa, docs/specs, docs/backlog, evd/) or vteam.config.yaml. */
@@ -50,17 +50,10 @@ export async function update(_flags) {
   }
   console.log(`✓ doctrine refreshed in ${cfg.paths.team}`);
 
-  // re-render adapters for every tool already present
+  // re-render adapters for every tool already present (marker from the adapter module)
   for (const tool of TOOLS) {
-    const marker = {
-      "claude-code": ".claude/skills/team/SKILL.md",
-      cursor: ".cursor/commands/team.md",
-      windsurf: ".windsurf/workflows/team.md",
-      codex: ".codex/prompts/team.md",
-      copilot: ".github/prompts/team.prompt.md",
-    }[tool];
-    if (fs.existsSync(path.join(root, marker))) {
-      renderTool(tool, root, cfg);
+    if (fs.existsSync(path.join(root, await adapterMarker(tool)))) {
+      await renderTool(tool, root, cfg);
       console.log(`✓ ${tool} workflows re-rendered`);
     }
   }

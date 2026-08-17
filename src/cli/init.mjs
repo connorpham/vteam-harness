@@ -174,7 +174,7 @@ jobs:
 
   // ---- adapters -----------------------------------------------------------------
   for (const tool of tools) {
-    const written = renderTool(tool, root, cfg);
+    const written = await renderTool(tool, root, cfg);
     console.log(`✓ ${tool}: ${written.length} workflow files`);
   }
 
