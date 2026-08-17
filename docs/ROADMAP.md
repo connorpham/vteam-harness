@@ -22,7 +22,16 @@ usable state. Source of truth for scope: [DESIGN.md](DESIGN.md).
   provenance; replace literals with `{config}` template vars
 - Frontmatter schema for the adapter contract (DESIGN §8)
 
-## Phase 3 — Gates
+## Phase 3 — Gates ✅ (core set)
+Shipped: ctx/vocab/tracker lib (markdown provider built in), log_check,
+verbatim_gate, review_check, evd_check, evd_ui_check, dor_check, annotate,
+docs_shrink_check, gate.py driver + gate.sh, 4 profile manifests, pre-push
+template, locales en/vi. All checking gates carry `--selftest` mutation proof.
+Deferred to Phase 4 (tracker/design-coupled): schedule_check, stale_verdict_check,
+comment_check, preflight; and the nextjs-prisma stack plugins (token_check,
+ui-evidence, ui_fidelity).
+
+### Original Phase 3 scope (for reference)
 - Port scripts to `core/scripts/` on top of ctx lib; neutral sentinels
   (DESIGN §4) + `locales/{en,vi}.yml`
 - Every gate keeps/gains `--selftest` (mutation self-test is a ship requirement:

@@ -1,0 +1,19 @@
+# generic profile — the stack-agnostic floor.
+# Order philosophy (verify workflow, principle 4): cheapest and most
+# blind-spot-covering first — ledgers before everything, because they catch the
+# damage every later step is blind to.
+steps:
+  docs-shrink:
+    run: "bash .vteam/scripts/docs_shrink_check.sh"
+  ledger:
+    run: "python3 .vteam/scripts/log_check.py"
+  verbatim:
+    run: "python3 .vteam/scripts/verbatim_gate.py"
+  test:
+    run: "bash .vteam/test.sh"
+    requires: ".vteam/test.sh"
+    skip_reason: "no project test entrypoint declared — create .vteam/test.sh running your suite"
+  build:
+    run: "bash .vteam/build.sh"
+    requires: ".vteam/build.sh"
+    skip_reason: "no project build entrypoint declared — create .vteam/build.sh if the project builds"

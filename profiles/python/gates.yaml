@@ -1,0 +1,21 @@
+# python profile.
+steps:
+  docs-shrink:
+    run: "bash .vteam/scripts/docs_shrink_check.sh"
+  ledger:
+    run: "python3 .vteam/scripts/log_check.py"
+  verbatim:
+    run: "python3 .vteam/scripts/verbatim_gate.py"
+  lint:
+    run: "ruff check ."
+    requires: "pyproject.toml"
+    skip_reason: "no pyproject.toml — configure your linter in .vteam/profiles overrides"
+  types:
+    run: "mypy ."
+    requires: "mypy.ini"
+    skip_reason: "no mypy.ini — type checking not configured"
+  unit:
+    run: "pytest -q"
+  e2e:
+    run: "pytest -q -m e2e"
+    tail: true

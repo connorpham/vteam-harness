@@ -1,0 +1,23 @@
+# node profile — npm-based projects without a specific framework profile.
+steps:
+  docs-shrink:
+    run: "bash .vteam/scripts/docs_shrink_check.sh"
+  ledger:
+    run: "python3 .vteam/scripts/log_check.py"
+  verbatim:
+    run: "python3 .vteam/scripts/verbatim_gate.py"
+  lockfile:
+    run: "bash -c 'ls pnpm-lock.yaml yarn.lock bun.lockb 2>/dev/null && { echo \"second package manager lockfile present — one repo, one package manager\"; exit 1; } || true'"
+  lint:
+    run: "npm run lint --if-present"
+  types:
+    run: "npx tsc --noEmit"
+    requires: "tsconfig.json"
+    skip_reason: "no tsconfig.json — plain JS project"
+  unit:
+    run: "npm test"
+  build:
+    run: "npm run build --if-present"
+  e2e:
+    run: "npm run test:e2e"
+    tail: true
