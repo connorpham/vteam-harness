@@ -20,6 +20,10 @@ are still guesses.
 touches `vteam.config.yaml` (it PROPOSES a patch, the owner applies it), never
 files tickets, and never turns an inference into a fact by rewording it.
 
+**Lane boundaries:** this lane needs CODE to read. A project with neither code
+nor docs → `/plan` (the greenfield interview); a spec document already in hand
+→ `/ba` shards it directly.
+
 **Immutable principles:**
 1. **Read before asking.** D0 runs to completion before the first question. A
    question the code already answers wastes the owner's only scarce resource, and

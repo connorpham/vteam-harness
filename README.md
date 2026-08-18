@@ -39,6 +39,8 @@ Claude Code users can install through the plugin instead of the terminal:
 
 **Working in a mature repo with no documentation?** Run `/docs` first. It reads your codebase, asks you one batched round of questions, and writes the spec shards, decision records and known-issues the other lanes assume already exist — marking every sentence `DRAFT-FROM-CODE` or `OWNER-CONFIRMED`, so nothing it inferred can be mistaken for something you confirmed.
 
+**Starting from nothing — no code, no docs, just an idea?** Run `/plan`. It interviews you section by section (Why, Capabilities, Constraints, Non-goals, Success signal — with a one-round steering menu after every drafted section), then writes a brief, a PRD whose requirement rows carry machine-checkable codes, and an architecture spine when the answers earn one. The PRD registers as a source document, so the verbatim gate guards everything `/ba` later shards from it — planning output that is load-bearing, not decorative.
+
 ---
 
 ## Requirements
@@ -93,6 +95,7 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 | `/dev` | Developer | Ticket → branch → minimal implementation → verification gate → self-review with machine-measured design fidelity → two fresh reviewer agents (three on high-stakes diffs) → PR → a 7-part plain-language report on the ticket. |
 | `/qa` | QA engineer | Verify-only: derives expectations from the SPEC, never the ticket prose; runs 2–5 test cases in a real browser; collects annotated evidence; cross-checks every claim; gets a challenger sign-off; writes a report a non-programmer understands in two minutes. Never touches product code. |
 | `/docs` | Docs bootstrapper | Reads the codebase, interviews you once in a batched table, writes spec shards, decision seeds, known-issues and a **proposed** config patch — split `DRAFT-FROM-CODE` vs `OWNER-CONFIRMED`, and it never edits your config itself. |
+| `/plan` | Greenfield intake | For projects with neither code nor docs: interviews you through a five-field kernel with a steering menu per section, writes brief → coded PRD → optional architecture spine, challenger-reviewed, and arms the verbatim gate by registering the PRD as a source document. Never invents a requirement — unanswered questions go to the decision queue. |
 | `/verify` | The gate | Lint → types → unit → build → reality checks → integration → e2e, cheapest-first. A skipped step must declare why; a silent skip is a failure. |
 | `guidelines` | Method | Behavioural defaults that prevent classic LLM coding mistakes: think first, surgical diffs, red-first tests. |
 
