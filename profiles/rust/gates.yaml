@@ -1,0 +1,23 @@
+# rust profile — Cargo.toml projects (field-trial finding #19).
+steps:
+  docs-shrink:
+    run: "bash .vteam/scripts/docs_shrink_check.sh"
+  ledger:
+    run: "python3 .vteam/scripts/log_check.py"
+  verbatim:
+    run: "python3 .vteam/scripts/verbatim_gate.py"
+  fmt:
+    run: "cargo fmt --check"
+    requires: "Cargo.toml"
+    skip_reason: "no Cargo.toml — wrong profile?"
+  clippy:
+    run: "cargo clippy --all-targets -- -D warnings"
+    requires: "Cargo.toml"
+    skip_reason: "no Cargo.toml — wrong profile?"
+  unit:
+    run: "cargo test"
+    requires: "Cargo.toml"
+    skip_reason: "no Cargo.toml — wrong profile?"
+  build:
+    run: "cargo build --release"
+    tail: true

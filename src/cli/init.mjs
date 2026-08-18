@@ -6,7 +6,7 @@ import { parseConfig } from "./config.mjs";
 import { ManifestGuard, walkFiles } from "./manifest.mjs";
 import { TOOLS, renderTool } from "./adapters.mjs";
 
-const PROFILES = ["generic", "node", "python", "nextjs-prisma"];
+const PROFILES = ["generic", "node", "python", "nextjs-prisma", "go", "rust"];
 const TRACKERS = ["markdown", "jira", "github"];
 const DESIGNS = ["none", "figma"];
 const AUTONOMY = ["off", "assisted", "full"];
@@ -93,7 +93,7 @@ export async function init(flags) {
   const name = await get("name", "Project name", path.basename(root));
   const keyRaw = await get("key", "Ticket key prefix (e.g. PROJ)", "PROJ");
   const language = await get("language", "Owner-facing output language (en, vi, …)", "en");
-  const profile = await getChoice("profile", "Stack profile", PROFILES, "generic");
+  const profile = await getChoice("profile", "Stack profile", PROFILES, detectProfile(root));
   const tracker = await getChoice("tracker", "Issue tracker", TRACKERS, "markdown");
   const design = await getChoice("design", "Design source", DESIGNS, "none");
   const autonomy = await getChoice("autonomy", "Autonomy level (quality gates never relax; this only flips wait-for-human gates)", AUTONOMY, "assisted");
@@ -118,6 +118,9 @@ export async function init(flags) {
   }
   const nameYaml = yamlStr(name, "--name");
   const today = new Date().toISOString().slice(0, 10);
+  const codePaths = deriveCodePaths(root);
+  const pkgManager = detectPackageManager(root);
+  console.log(`✓ code_paths derived from this repo: [${codePaths.join(", ")}] — review in vteam.config.yaml (the review fence watches ONLY these)`);
 
   // hooks safety: NEVER silently disable an existing hook manager (husky, lefthook,
   // populated .git/hooks). If one is present, ship the fence but leave wiring manual.
@@ -169,7 +172,7 @@ docs:
 
 stack:
   profile: ${profile}
-  package_manager: npm
+  package_manager: ${pkgManager}
 
 git:
   protected_branch: main
@@ -179,7 +182,11 @@ git:
   # rebase DISCARD branch shas, so QA verdicts anchor by VERIFIED-AT (qa workflow)
   # and stale_verdict_check falls back to it; set this to match your repo.
   hooks: ${hooksMode}
-  code_paths: [src/, prisma/]
+  # Derived from THIS repo's layout at init time (field-trial finding #17: a
+  # hardcoded [src/, prisma/] default silently lost the review fence on repos
+  # whose code lives in lib/, app/ or root files). Review it — the review fence
+  # and stale-verdict gate only watch what is listed here.
+  code_paths: [${codePaths.join(", ")}]
 
 tracker:
   provider: ${tracker}
@@ -316,4 +323,53 @@ export function pkgVersion() {
   try {
     return JSON.parse(fs.readFileSync(path.join(pkgRoot, "package.json"), "utf8")).version ?? "0";
   } catch { return "0"; }
+}
+
+/** Where does product code actually live HERE? (field-trial finding #17 — a
+ * hardcoded default silently lost the review fence on non-src/ layouts).
+ * Heuristic: conventional source dirs that exist and contain source files,
+ * plus root-level source files, plus prisma/ when present. Falls back to the
+ * old default so an empty scan never ships an empty fence. */
+function deriveCodePaths(root) {
+  const SRC_EXT = /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|rb|php|java|kt|swift|c|cc|cpp|h|cs|vue|svelte)$/;
+  const CANDIDATE_DIRS = ["src", "lib", "app", "apps", "packages", "cmd", "pkg", "internal", "server", "api", "core"];
+  const out = [];
+  const hasSource = (dir, depth = 0) => {
+    if (depth > 2) return false;
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return false; }
+    return entries.some((e) => e.isFile() ? SRC_EXT.test(e.name)
+      : (e.isDirectory() && !e.name.startsWith(".") && e.name !== "node_modules" &&
+         hasSource(path.join(dir, e.name), depth + 1)));
+  };
+  for (const d of CANDIDATE_DIRS) {
+    if (fs.existsSync(path.join(root, d)) && hasSource(path.join(root, d))) out.push(`${d}/`);
+  }
+  if (fs.existsSync(path.join(root, "prisma"))) out.push("prisma/");
+  for (const e of fs.readdirSync(root, { withFileTypes: true })) {
+    if (e.isFile() && SRC_EXT.test(e.name) && !/\.(config|test|spec)\./.test(e.name)) out.push(e.name);
+  }
+  return out.length ? [...new Set(out)] : ["src/", "prisma/"];
+}
+
+/** Detect the stack profile from the repo instead of defaulting blind
+ * (field-trial finding #19: a Go repo on `generic` went green running nothing). */
+function detectProfile(root) {
+  const has = (f) => fs.existsSync(path.join(root, f));
+  if (has("go.mod")) return "go";
+  if (has("Cargo.toml")) return "rust";
+  if (has("prisma/schema.prisma") && has("package.json")) return "nextjs-prisma";
+  if (has("package.json")) return "node";
+  if (has("pyproject.toml") || has("setup.py") || has("requirements.txt")) return "python";
+  return "generic";
+}
+
+/** Detect the package manager from the lockfile actually present — a pnpm repo
+ * initialized as npm makes lockfile_check flag the repo's OWN lockfile. */
+function detectPackageManager(root) {
+  const has = (f) => fs.existsSync(path.join(root, f));
+  if (has("pnpm-lock.yaml")) return "pnpm";
+  if (has("yarn.lock")) return "yarn";
+  if (has("bun.lockb") || has("bun.lock")) return "bun";
+  return "npm";
 }

@@ -180,8 +180,12 @@ Every TC on this branch needs all four, recorded in
    be wrong.
 
 `evd_check.py` accepts a TC without images when its `manifest.md` declares
-`TYPE: NON-UI` — but then `db_verify.md` is MANDATORY. No images and no data
-check is not verification.
+`TYPE: NON-UI` — but then a verification file is MANDATORY: `db_verify.md`
+(read-only data checks) for anything with a database, or `cmd_verify.md`
+(real command + real output pairs — test runs, direct invocations) for pure
+libraries and CLIs that have no database to check. No images and no
+db/cmd verification is not verification. Never stuff command transcripts into
+db_verify.md to satisfy the gate — the file names must stay honest.
 
 ## V4 — RUN THE VERIFICATION, HEADED (the actual test)
 
