@@ -232,6 +232,7 @@ Fixed template:
 ```markdown
 # Verification report <TICKET> — <verdict, large: PASS / FAIL / PARTIAL / NEW-BUG / BLOCKED / UNCLEAR>
 COMMIT: <sha verified — HEAD of the code the TCs ran on; the verdict binds to the code, evd_check requires it>
+VERIFIED-AT: <ISO 8601 timestamp of the run — on squash/rebase repos the pinned SHA dies with the branch, and this is the fallback anchor stale_verdict_check compares post-verdict commits against>
 
 ## 1. What does this ticket ask for? (told as a user)
 On screen <name>, when <the user does what>, the system must <the right outcome —
@@ -337,7 +338,7 @@ verify-sheet · spec §/schema citations · debate.md · remaining evidence file
       cleaned up
 - [ ] V5 table: every ticket/dev claim mapped to an evidence file
 - [ ] `evd_check.py --expect-tcs <N>` green; REPORT.md follows the template
-      (with the COMMIT: line), jargon-free body
+      (with the COMMIT: and VERIFIED-AT: lines), jargon-free body
 - [ ] QA images attached with read-back + TRACKER ATTACHMENTS section in the manifest
 - [ ] V1: change ledger filtered for this ticket's shard/screen
 - [ ] Failing verdict: every finding carries Severity + Origin (DEV / BA-spec) —

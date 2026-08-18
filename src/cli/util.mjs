@@ -44,10 +44,10 @@ export async function askChoice(question, options, def) {
 }
 
 // ---- rendering -------------------------------------------------------------
-/** Substitute {paths.x}, {project.x}, {team.x}, {review.x}, {git.x} and
- * {stack.x} template vars from the config object. Unknown vars stay verbatim. */
+/** Substitute {paths.x}, {project.x}, {team.x}, {review.x}, {git.x}, {stack.x}
+ * and {autonomy.x} template vars from the config object. Unknown vars stay verbatim. */
 export function render(text, cfg) {
-  return text.replace(/\{(paths|project|team|review|git|stack)\.([a-z_]+)\}/g, (m, group, key) => {
+  return text.replace(/\{(paths|project|team|review|git|stack|autonomy)\.([a-z_]+)\}/g, (m, group, key) => {
     const v = cfg[group]?.[key];
     return v === undefined ? m : String(v);
   });

@@ -73,12 +73,20 @@ paths:                       # all ledger/oracle locations, no more literals
   evidence: evd
 specs:
   sources: []                # original docs verbatim_gate compares shards against
+docs:
+  task_context: {always: [], by_label: {}}  # per-ticket background reading;
+                             # /dev T1 resolves always + the ticket's labels/type;
+                             # populated by /docs, applied by the owner
 stack:
   profile: nextjs-prisma     # selects profiles/<name>/gates.yaml
   package_manager: npm
 git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
+  merge_strategy: merge      # squash/rebase discard branch shas -> verdicts pin TWO
+                             # anchors: COMMIT (code) + VERIFIED-AT (clock); the stale
+                             # gate falls back to the clock, and an unanchorable
+                             # verdict is RED, never a warning
   hooks: managed             # managed | external (repo has real branch protection)
   code_paths: [src/]         # "product code" for the review fence + stale scans
 tracker:
@@ -92,6 +100,7 @@ team:
   capacity_per_day: 0.8
 autonomy:
   level: full                # off | assisted | full
+  self_merge: true           # per-project off switch for agent-merged PRs (level: full only)
   exemptions: [real-money, legal, purchasing, credentials, data-deletion]
 review:
   reviewers: 2               # fresh reviewer agents per diff (+1 high-stakes)

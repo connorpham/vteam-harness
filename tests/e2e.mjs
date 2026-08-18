@@ -298,5 +298,63 @@ console.log("14. SessionStart doctrine re-injection");
     /gate|evidence|done/i.test(hk.stdout), hk.stdout + hk.stderr);
 }
 
+// ── 15. board: read-only dashboard over the proof trail ─────────────────────
+console.log("15. board — read-only dashboard");
+{
+  const st = run("node", [path.join(PKG, "src", "cli", "board.mjs"), "--selftest"]);
+  check("board --selftest green (parses + 405/404/warning mutations red)", st.status === 0,
+    st.stdout + st.stderr);
+
+  // boot the real board against the installed t1 repo on an ephemeral port and
+  // probe it out-of-process: the routing table and the read-only fence, live.
+  fs.writeFileSync(path.join(repo, "docs", "backlog", "DEMO-1.md"),
+    "# DEMO-1: e2e ticket\n- status: In Progress\n- labels: e2e\n");
+  const probe = `
+    import http from "node:http";
+    import { createServer } from ${JSON.stringify(path.join(PKG, "src", "cli", "board.mjs"))};
+    const get = (port, p, method = "GET") => new Promise((res, rej) => {
+      const r = http.request({ host: "127.0.0.1", port, path: p, method }, (x) => {
+        let b = ""; x.setEncoding("utf8"); x.on("data", (d) => b += d);
+        x.on("end", () => res({ status: x.statusCode, body: b }));
+      }); r.on("error", rej); r.end();
+    });
+    const srv = createServer(process.cwd());
+    await new Promise((d) => srv.listen(0, "127.0.0.1", d));
+    const port = srv.address().port;
+    const out = {
+      bind: srv.address().address,
+      page: (await get(port, "/")).status,
+      state: await get(port, "/api/state"),
+      post: (await get(port, "/api/state", "POST")).status,
+      traversal: (await get(port, "/../etc/passwd")).status,
+      dotenv: (await get(port, "/.env")).status,
+    };
+    out.state = { status: out.state.status, json: JSON.parse(out.state.body) };
+    await new Promise((d) => srv.close(d));
+    console.log(JSON.stringify(out));
+  `;
+  const p = run("node", ["--input-type=module", "-e", probe], { cwd: repo });
+  let o = null;
+  try { o = JSON.parse(String(p.stdout).trim().split("\n").pop()); } catch { /* reported below */ }
+  if (check("board serves / and /api/state from an installed repo",
+    !!o && o.page === 200 && o.state.status === 200, p.stdout + p.stderr)) {
+    check("binds loopback only (private project data never hits the LAN)",
+      o.bind === "127.0.0.1", o.bind);
+    check("state reports the installed config (no env values)",
+      o.state.json.config.key === "DEMO" && o.state.json.config.autonomy === "assisted" &&
+      !JSON.stringify(o.state.json).includes("PATH="), JSON.stringify(o.state.json.config));
+    check("state reads the markdown backlog", o.state.json.tickets.tickets.some((t) =>
+      t.key === "DEMO-1" && t.status_category === "in_progress"),
+      JSON.stringify(o.state.json.tickets));
+    check("state names the ledger it read", o.state.json.ledger.source === "docs/pm/log.md" &&
+      o.state.json.ledger.exists, JSON.stringify(o.state.json.ledger).slice(0, 200));
+    check("no mutating endpoint: POST → 405", o.post === 405, String(o.post));
+    check("no static serving: /../etc/passwd and /.env → 404",
+      o.traversal === 404 && o.dotenv === 404, `${o.traversal} / ${o.dotenv}`);
+    check("doctor panel is cache-only (the server runs nothing)",
+      o.state.json.doctor.exists === false, JSON.stringify(o.state.json.doctor));
+  }
+}
+
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);
 process.exit(failed === 0 ? 0 : 1);

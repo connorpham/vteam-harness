@@ -171,6 +171,65 @@ competitor occupies (verified against live GitHub/npm/PyPI data, 2026-08-18).
   evidence post (screenshots to capture), X launch thread (GIF to record), npm
   publish of the release carrying all of the above.
 
+## Phase 9 — Per-project customization ✅ (first-adopter feedback round)
+A real adopter audited vteam against four mature repos and rejected it on FIT,
+not value — every objection was a wrong assumption baked into install time.
+This phase answers the ones that are configuration, and records the ones that
+are not (below).
+- `git.merge_strategy` (merge|squash|rebase) + dual verdict anchors: `COMMIT:`
+  for the code, `VERIFIED-AT:` for the clock. Adversarial review found the
+  structural bug this closes — on squash/rebase repos the pinned branch sha is
+  discarded at merge, and `stale_verdict_check` warn-and-continued, making the
+  framework's marquee gate a PERMANENTLY GREEN no-op on the most common merge
+  strategy in the industry. An unanchorable verdict is now RED with
+  instructions; "cannot verify" and "verified clean" are different verdicts.
+- `autonomy.self_merge`: per-project off switch for agent-merged PRs (honored
+  at `level: full` only), rendered into the team workflow and the ops table.
+- `/docs` — the read-then-ask documentation bootstrapper for
+  mature-but-undocumented repos: reads the codebase first (inferences marked
+  `⚠ UNVERIFIED`), interviews the owner in ONE batched question table, writes
+  spec shards split `DRAFT-FROM-CODE` vs `OWNER-CONFIRMED` plus decision/KB/
+  known-issues seeds, and PROPOSES a config patch it never applies. Kills the
+  "vteam requires pre-existing documentation" objection: it creates the oracle.
+- `docs.task_context` (`always:` + `by_label:`): per-ticket background reading
+  for /dev T1; a mapped-but-missing file is reported loudly, never guessed.
+- `vteam board`: read-only local dashboard over the proof trail (ticket columns,
+  ledger badges + token accounting, evidence verdicts, decision queue).
+  Read-only by CONSTRUCTION — loopback bind only, exactly `GET /` and
+  `GET /api/state`, 405 on any write, 404 on everything else, no static
+  serving: a board that could transition a ticket would be a second write path
+  around the gates. Own `--selftest` with 14 red mutations.
+- E2E 73 → 82 checks.
+
+## Phase 10 — Compatibility as machinery (NEXT, not yet done)
+The honest finding behind Phase 9: **vteam has never been run against a repo
+that isn't its own or its first adopter's.** The e2e suite builds synthetic
+repos using vteam's own defaults — it proves vteam agrees with itself, not that
+it fits the world, while the README says "any repo". Known open items, by damage:
+- `init` must DETECT then PROPOSE (dry-run by default on a repo with history):
+  print the config it inferred, the collisions it found, and the file list it
+  would write — approval before the first byte.
+- BUG: `.claude/skills/<name>/SKILL.md` is force-written; a repo-level skill of
+  the same name is silently overwritten (reproduced 2026-08-18). Same
+  writeIfAbsent + `*.new` + loud rule the doctrine files already follow.
+- `--gates-only` install mode: the back half without the team doctrine, for
+  repos that already have their own role agents.
+- A compatibility fixture matrix: gitflow+squash+GitLab+Python, trunk-based,
+  monorepo, husky-managed hooks, existing `.claude/agents`, no tests, `develop`
+  default branch — each asserting either "works" or "refuses clearly". Silence
+  or false green is a failure.
+- Undeclared prerequisites: README documents none, while 13 gates need python3,
+  4 need bash, and 3 need Pillow (non-stdlib). A JS/TS team on Windows without
+  WSL cannot run this today.
+- No `vteam uninstall` — ~30 files, a rewritten core.hooksPath, appended
+  .gitignore and a merged settings.json, with no way back. People do not try
+  what they cannot undo.
+- `team.size` claims (DESIGN §7) have zero consumers in machinery — multi-human
+  support is documentation, not mechanism. Either implement or say so plainly.
+- Providers: GitLab CI profile, Trello tracker; committed-evidence is legally
+  impossible for regulated data (PII in git forever) and needs a documented
+  answer, not a config flag.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)

@@ -8,8 +8,12 @@ Usage:
   npx vteam init      install into the current repo (interactive; --yes for defaults)
   npx vteam doctor    preflight + install integrity + gate selftests
   npx vteam update    refresh framework files (never touches your ledgers/config)
+  npx vteam board     read-only local dashboard: tickets, ledger, evidence verdicts, decision queue
 
 audit flags:  --json  machine-readable {score, grade, dimensions} on stdout
+
+board flags:  --port <n>  listen port (default 4177; 127.0.0.1 only — never exposed off-host)
+              read-only by construction: GET / and GET /api/state, no write endpoint at all
 
 init flags (all optional; any given flag skips its prompt):
   --yes                      accept defaults for everything not flagged
@@ -38,6 +42,9 @@ try {
   } else if (cmd === "doctor") {
     const { doctor } = await import("../src/cli/doctor.mjs");
     await doctor(flags);
+  } else if (cmd === "board") {
+    const { board } = await import("../src/cli/board.mjs");
+    await board(flags);
   } else if (cmd === "update") {
     const { update } = await import("../src/cli/update.mjs");
     await update(flags);
