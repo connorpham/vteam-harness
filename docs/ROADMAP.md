@@ -97,8 +97,9 @@ green on 503 coded rows / 10 shards, review_check green on a migrated dossier,
 jira provider ping green on the live project, figma leg correctly reporting a
 429 rate limit. DB leg red only because the worktree had no node_modules.
 Remaining: a full /team session on the dogfood branch (separate session).
-npm publish: DONE — published as `vteam-harness@0.1.0` (npm blocked the name
-`vteam` for similarity; the bin command stays `vteam`).
+npm publish: DONE — first published as `vteam-harness@0.1.0` (npm blocked the
+name `vteam` for similarity; the bin command stays `vteam`); `0.2.0` is the
+Phase 7 hardening release.
 
 ### Original Phase 6 scope (for reference)
 - E2E: `init` into a blank fixture repo (markdown tracker, generic profile) and
