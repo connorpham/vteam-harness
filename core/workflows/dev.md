@@ -35,6 +35,8 @@ args: "<TICKET: {project.key}-nnn | tracker URL> [assignee=<name>] [branch=feat|
    report/summary must pass the bar: **a non-programmer understands it** (jargon
    goes in an appendix, never the body).
 
+Tempted to skip a step? Find your excuse in `red-flags.md` first — if it's listed, the answer is already no, and a gate fires anyway.
+
 Method authority: the `guidelines` workflow. Tracker recipes: the configured
 tracker provider (`providers/tracker/<name>`). Schema: read the project's schema
 file for real field names — never guess. Framework docs: read the in-repo

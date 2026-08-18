@@ -11,4 +11,5 @@ jobs:
         with: { node-version: 20 }
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
+      - run: pip install pillow   # evd_ui_check's pixel analysis — its selftest refuses to pretend without it
       - run: npm test

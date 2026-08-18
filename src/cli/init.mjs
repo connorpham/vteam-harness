@@ -7,7 +7,7 @@ import { ManifestGuard, walkFiles } from "./manifest.mjs";
 import { TOOLS, renderTool } from "./adapters.mjs";
 
 const PROFILES = ["generic", "node", "python", "nextjs-prisma"];
-const TRACKERS = ["markdown", "jira"];
+const TRACKERS = ["markdown", "jira", "github"];
 const DESIGNS = ["none", "figma"];
 const AUTONOMY = ["off", "assisted", "full"];
 const VALUE_FLAGS = ["name", "key", "language", "profile", "tracker", "design", "autonomy", "tools"];
@@ -291,6 +291,7 @@ models:
 vteam installed. Next steps:
   1. Review vteam.config.yaml (high-stakes paths/terms, code_paths, capacity).
   2. ${tracker === "jira" ? "Add JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN to .env (gitignored)." :
+       tracker === "github" ? "Add GITHUB_TOKEN to .env (gitignored); repo auto-detected from origin or set GITHUB_REPO=owner/repo." :
        "Tickets live in docs/backlog/*.md (markdown tracker — zero services)."}
   ${design === "figma" ? "3. Add FIGMA_ACCESS_TOKEN / FIGMA_FILE_KEY to .env (gitignored).\n  4." : "3."} Run: npx vteam doctor
   Then start a workday with /team in your agent tool.`);

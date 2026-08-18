@@ -203,5 +203,100 @@ console.log("10. pre-push fence + secret scan");
     /SECRET in the outgoing diff/.test(r2.stdout + r2.stderr), r2.stdout + r2.stderr);
 }
 
+// ── 11. audit: the zero-commitment grader (works with AND without vteam) ─────
+console.log("11. audit — grade with and without vteam installed");
+{
+  // installed repo (t1) scores high through the same rubric as everyone else
+  const r1 = vteam(repo, "audit", "--json");
+  check("audit --json exits 0", r1.status === 0, r1.stdout + r1.stderr);
+  let a1 = null;
+  try { a1 = JSON.parse(r1.stdout); } catch { /* checked below */ }
+  check("audit --json is valid JSON on stdout", a1 !== null, r1.stdout.slice(0, 400));
+  check("installed repo scores ≥ 70", a1 !== null && a1.score >= 70,
+    JSON.stringify(a1?.dimensions ?? a1));
+  check("dimensions carry the rubric shape", a1 !== null && Array.isArray(a1.dimensions) &&
+    a1.dimensions.length === 6 && a1.dimensions.reduce((s, d) => s + d.max, 0) === 100 &&
+    a1.dimensions.every((d) => d.name && "points" in d && "max" in d && d.fix &&
+      Array.isArray(d.found) && Array.isArray(d.missing)), r1.stdout.slice(0, 400));
+  // bare repo: the accountability gap in numbers
+  const bare = path.join(TMP, "t11-bare");
+  fs.mkdirSync(bare);
+  run("git", ["init", "-q", "-b", "main", bare]);
+  const r2 = vteam(bare, "audit", "--json");
+  let a2 = null;
+  try { a2 = JSON.parse(r2.stdout); } catch { /* checked below */ }
+  check("bare repo scores < 30", r2.status === 0 && a2 !== null && a2.score < 30, r2.stdout);
+  // human report prints the grade banner and the funnel
+  const r3 = vteam(bare, "audit");
+  check("terminal report prints the grade banner", r3.status === 0 &&
+    /\/100 · grade/.test(r3.stdout), r3.stdout + r3.stderr);
+  check("low score funnels to init", /vteam-harness init/.test(r3.stdout), r3.stdout);
+  // the grader proves ITSELF: fixture ordering + manifest mutation red
+  const st = run("node", [path.join(PKG, "src", "cli", "audit.mjs"), "--selftest"]);
+  check("audit --selftest green", st.status === 0, st.stdout + st.stderr);
+}
+
+// ── 12. doctor --json: machine shape, same checks, same exit codes ───────────
+console.log("12. doctor --json");
+{
+  const r = vteam(repo, "doctor", "--json");
+  let d = null;
+  try { d = JSON.parse(r.stdout); } catch { /* checked below */ }
+  check("doctor --json is valid JSON on stdout (nothing else)", d !== null, r.stdout.slice(0, 400));
+  check("doctor --json ok mirrors the exit code", d !== null && d.ok === (r.status === 0),
+    `status=${r.status} ok=${d?.ok}`);
+  check("checks carry name/status/detail", d !== null && Array.isArray(d.checks) &&
+    d.checks.length > 0 && d.checks.every((c) => c.name && c.status && "detail" in c),
+    r.stdout.slice(0, 400));
+}
+
+// ── 13. github tracker: installs, hints, and proves itself offline ───────────
+console.log("13. init --tracker github");
+{
+  const dir = freshRepo("t13");
+  const r = vteam(dir, "init", "--yes", "--tracker", "github", "--design", "none",
+    "--profile", "generic", "--tools", "claude-code");
+  check("init --tracker github exits 0", r.status === 0, r.stdout + r.stderr);
+  check("github provider installed", fs.existsSync(
+    path.join(dir, ".vteam", "providers", "tracker_github.py")));
+  check("next steps mention GITHUB_TOKEN", /GITHUB_TOKEN/.test(r.stdout), r.stdout);
+  const st = run("python3", [path.join(dir, ".vteam", "providers", "tracker_github.py"),
+    "--selftest"], { cwd: dir });
+  check("github provider --selftest green from the installed repo", st.status === 0,
+    st.stdout + st.stderr);
+}
+
+// ── 14. SessionStart hook: wired on fresh install, merges without clobbering ─
+console.log("14. SessionStart doctrine re-injection");
+{
+  check("t1 got the hook script",
+    fs.existsSync(path.join(repo, ".claude", "hooks", "vteam-session-start.sh")));
+  const s = JSON.parse(fs.readFileSync(path.join(repo, ".claude", "settings.json"), "utf8"));
+  check("t1 settings.json carries the SessionStart entry",
+    Array.isArray(s.hooks?.SessionStart) && s.hooks.SessionStart.some((e) =>
+      e.hooks?.some((h) => String(h.command).includes("vteam-session-start"))),
+    JSON.stringify(s).slice(0, 300));
+  // pre-existing settings must survive the merge byte-meaningfully
+  const dir = freshRepo("t14");
+  const settings = path.join(dir, ".claude", "settings.json");
+  fs.mkdirSync(path.dirname(settings), { recursive: true });
+  fs.writeFileSync(settings, JSON.stringify({ env: { MY_VAR: "keep-me" },
+    hooks: { PreToolUse: [{ matcher: "Bash", hooks: [] }] } }, null, 2));
+  const r = vteam(dir, "init", "--yes", "--tracker", "markdown", "--design", "none",
+    "--profile", "generic", "--tools", "claude-code");
+  check("init over existing settings.json exits 0", r.status === 0, r.stdout + r.stderr);
+  const merged = JSON.parse(fs.readFileSync(settings, "utf8"));
+  check("user env survived the merge", merged.env?.MY_VAR === "keep-me",
+    JSON.stringify(merged).slice(0, 300));
+  check("user PreToolUse hook survived", Array.isArray(merged.hooks?.PreToolUse));
+  check("SessionStart entry added alongside", Array.isArray(merged.hooks?.SessionStart) &&
+    merged.hooks.SessionStart.length === 1);
+  // hook script actually runs and echoes doctrine
+  const hk = run("bash", [path.join(dir, ".claude", "hooks", "vteam-session-start.sh")],
+    { cwd: dir, env: { ...ENV, CLAUDE_PROJECT_DIR: dir } });
+  check("hook script runs and injects the non-negotiables", hk.status === 0 &&
+    /gate|evidence|done/i.test(hk.stdout), hk.stdout + hk.stderr);
+}
+
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);
 process.exit(failed === 0 ? 0 : 1);

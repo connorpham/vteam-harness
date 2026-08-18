@@ -1,0 +1,11 @@
+{
+  "name": "vteam",
+  "description": "Bootstrap vteam proof-of-done in the current repo: /vteam:setup explains the harness, grades the repo, then walks `npx vteam-harness init` and `doctor`. The plugin bootstraps; the installer is the npm package.",
+  "author": {
+    "name": "Connor Pham",
+    "url": "https://github.com/connorpham"
+  },
+  "homepage": "https://github.com/connorpham/vteam-harness#readme",
+  "repository": "https://github.com/connorpham/vteam-harness",
+  "license": "MIT"
+}
