@@ -6,18 +6,36 @@
 > through automated security scanning; acceptance into the official list is
 > curated at Anthropic's discretion.
 >
-> **Pre-flight before submitting:**
-> 1. The marketplace must be live on the default branch:
->    `.claude-plugin/marketplace.json` at the repo root and
->    `plugins/vteam/.claude-plugin/plugin.json` — both already pass
->    `claude plugin validate` (one advisory warning: optional `version` omitted on
->    purpose so git-sourced installs track the resolved commit).
-> 2. Test the install path yourself, from a clean machine if possible:
->    `/plugin marketplace add connorpham/vteam-harness` then
->    `/plugin install vteam@vteam-harness` then `/vteam:setup`.
-> 3. Note the community list already contains plugins named "adversarial-review" /
->    "adversarial-spec" — the verification-framework position is worth claiming
->    promptly.
+## This is the channel that is open TODAY
+
+Unlike awesome-claude-code (which auto-rejected attempt 1 on a 14-day/100-star
+ground rule — see the sibling draft), the plugin directory has **no age and no
+popularity gate**. Its published criteria are all things vteam can satisfy now:
+a public repo, `claude plugin validate` passing, a manifest that follows the
+spec with every referenced file present, a plugin that does not reach outside
+its own directory, clear skill instructions, and a README that explains install
+and usage. Submissions pass an automated security screen; a stricter review
+earns the separate "Anthropic Verified" badge.
+
+**Pre-flight — verified 2026-08-18, all green:**
+
+| Check | Status |
+|---|---|
+| `claude plugin validate .` | ✔ passed (1 advisory: `version` omitted on purpose so git-sourced installs track the resolved commit) |
+| `marketplace.json` + `plugin.json` + `skills/setup/SKILL.md` reachable on `main` | ✔ HTTP 200 for all three |
+| Repo public, MIT `LICENSE` at root | ✔ |
+| npm package the plugin bootstraps | ✔ `vteam-harness@0.3.0` live |
+| "no access outside its own directory" | ✔ the plugin ships only its own SKILL.md + README; it invokes the public `npx vteam-harness` CLI and the skill asks before that CLI writes, enumerating every path it touches |
+| Skill instructions clear / no faked success | ✔ `/vteam:setup` requires showing each command's real output and forbids claiming a step succeeded without it |
+
+Remaining owner step: run the install path once yourself
+(`/plugin marketplace add connorpham/vteam-harness` →
+`/plugin install vteam@vteam-harness` → `/vteam:setup`) so the submission
+describes something you have seen work, then submit the form.
+
+Note the community list already contains plugins named "adversarial-review" /
+"adversarial-spec" — the verification-framework position is worth claiming
+promptly.
 
 Paste-ready field content (adapt to the form's actual labels):
 
