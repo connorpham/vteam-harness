@@ -145,7 +145,7 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
         mtext = read(tc / "manifest.md").upper()
         non_ui = "TYPE: NON-UI" in mtext or "NON-UI" in mtext
         if not blocked and not pngs and not non_ui:
-            attached = re.findall(rf"{tc.name}/\S+\.png\s*·\s*md5\s+[0-9a-f]{{32}}\s*·",
+            attached = re.findall(rf"{re.escape(tc.name)}/\S+\.png\s*·\s*md5\s+[0-9a-f]{{32}}\s*·",
                                   root_manifest)
             if attached:
                 warns.append(f"{tc.name}: images absent on disk but the manifest holds "
@@ -166,7 +166,9 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
         if write_pat.search(mtext) and not (tc / "db_verify.md").is_file():
             errs.append(f"{tc.name}: a WRITE TC (per its manifest) without "
                         f"db_verify.md — writing without a read-back SELECT is not verification")
-        if text and not blocked and not re.search(rf"\b{tc.name}\b", sec3):
+        # tc.name is an on-disk directory name (agent-created): escape it, or a
+        # name carrying regex metacharacters crashes the gate / bends the match
+        if text and not blocked and not re.search(rf"\b{re.escape(tc.name)}\b", sec3):
             errs.append(f"REPORT.md §3 never mentions {tc.name} — orphan evidence")
     return errs, warns
 

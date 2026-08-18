@@ -1,4 +1,7 @@
 # node profile — npm-based projects without a specific framework profile.
+# TRUST BOUNDARY: every `run` below executes as a shell command from the repo
+# root (like package.json scripts). Repo write access = execute access here —
+# review changes to this file as code, high-stakes in PRs.
 steps:
   docs-shrink:
     run: "bash .vteam/scripts/docs_shrink_check.sh"
@@ -9,15 +12,15 @@ steps:
   lockfile:
     run: "bash -c 'ls pnpm-lock.yaml yarn.lock bun.lockb 2>/dev/null && { echo \"second package manager lockfile present — one repo, one package manager\"; exit 1; } || true'"
   lint:
-    run: "npm run lint --if-present"
+    run: "{package_manager} run lint --if-present"
   types:
     run: "npx tsc --noEmit"
     requires: "tsconfig.json"
     skip_reason: "no tsconfig.json — plain JS project"
   unit:
-    run: "npm test"
+    run: "{package_manager} test"
   build:
-    run: "npm run build --if-present"
+    run: "{package_manager} run build --if-present"
   e2e:
     run: "npm run test:e2e"
     tail: true

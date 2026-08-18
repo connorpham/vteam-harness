@@ -17,6 +17,7 @@ import base64
 import hashlib
 import json
 import mimetypes
+import re
 import urllib.parse
 import urllib.request
 import uuid
@@ -24,7 +25,22 @@ from pathlib import Path
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
-from tracker import Tracker  # noqa: E402
+from tracker import Tracker, valid_key  # noqa: E402
+
+
+class _RefuseRedirect(urllib.request.HTTPRedirectHandler):
+    """Basic auth must never be re-sent to a host we didn't choose: urllib's
+    default handler re-issues the original headers (Authorization included) to
+    the redirect target. Refuse loudly instead — a redirecting JIRA_BASE_URL
+    means the config points at the wrong host."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(
+            req.full_url, code,
+            f"redirect to {newurl} refused — credentials are never re-sent on a "
+            f"redirect; point JIRA_BASE_URL at the final API host", headers, fp)
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirect)
 
 
 def _adf_text(node) -> str:
@@ -53,6 +69,15 @@ class Provider(Tracker):
         email, token = c.env("JIRA_EMAIL"), c.env("JIRA_API_TOKEN")
         if not (self.base and email and token):
             raise SystemExit("tracker(jira): JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN missing from .env")
+        if not self.base.startswith("https://"):
+            # Basic auth over plain http mails the token to the network.
+            if self.base.startswith("http://") and c.env("JIRA_ALLOW_HTTP") == "1":
+                print("⚠️  tracker(jira): plain-http JIRA_BASE_URL allowed by "
+                      "JIRA_ALLOW_HTTP=1 — the API token travels UNENCRYPTED", file=sys.stderr)
+            else:
+                raise SystemExit("tracker(jira): JIRA_BASE_URL must be https:// "
+                                 "(Basic auth over http leaks the token; lab-only "
+                                 "override: JIRA_ALLOW_HTTP=1)")
         self._auth = base64.b64encode(f"{email}:{token}".encode()).decode()
 
     def _req(self, path: str, data=None, method="GET", headers=None, raw_body: bytes | None = None):
@@ -64,7 +89,7 @@ class Provider(Tracker):
             self.base + path,
             data=raw_body if raw_body is not None else (json.dumps(data).encode() if data is not None else None),
             headers=h, method=method)
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with _OPENER.open(req, timeout=60) as r:  # redirects refused, never re-authed
             text = r.read().decode()
         return json.loads(text) if text else {}
 
@@ -79,7 +104,7 @@ class Provider(Tracker):
                            f"link, not the API host (use https://<site>.atlassian.net)")
         key = str(self.c.cfg("project.key"))
         try:
-            proj = self._req(f"/rest/api/3/project/{key}")
+            proj = self._req(f"/rest/api/3/project/{urllib.parse.quote(key, safe='')}")
             if proj.get("key") != key:
                 return False, f"project {key} not found"
         except Exception:
@@ -87,6 +112,7 @@ class Provider(Tracker):
         return True, f"signed in, project {key} exists"
 
     def get_issue(self, key: str) -> dict:
+        key = valid_key(key)
         fields = "summary,description,status,assignee,labels,timetracking,issuelinks,attachment"
         d = self._req(f"/rest/api/3/issue/{key}?fields={fields}")
         f = d["fields"]
@@ -125,6 +151,7 @@ class Provider(Tracker):
         return out
 
     def transition(self, key: str, category: str) -> None:
+        key = valid_key(key)
         trs = self._req(f"/rest/api/3/issue/{key}/transitions")["transitions"]
         want = {"in_review": lambda n: "review" in n,
                 "in_progress": lambda n: "progress" in n,
@@ -139,6 +166,7 @@ class Provider(Tracker):
                   {"transition": {"id": target["id"]}}, "POST")
 
     def comment(self, key: str, body: str):
+        key = valid_key(key)
         self._req(f"/rest/api/2/issue/{key}/comment", {"body": body}, "POST")
         # read back — posting without read-back doesn't count as posted
         latest = self._req(f"/rest/api/2/issue/{key}/comment?orderBy=-created&maxResults=5")
@@ -148,26 +176,29 @@ class Provider(Tracker):
         return None
 
     def attach(self, key: str, path: Path):
+        key = valid_key(key)
         boundary = uuid.uuid4().hex
         data = path.read_bytes()
+        fname = re.sub(r'[\r\n"]', "_", path.name)  # multipart header: no CRLF/quote injection
         ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         body = ((f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
-                 f"filename=\"{path.name}\"\r\nContent-Type: {ctype}\r\n\r\n").encode()
+                 f"filename=\"{fname}\"\r\nContent-Type: {ctype}\r\n\r\n").encode()
                 + data + f"\r\n--{boundary}--\r\n".encode())
         uploaded = self._req(f"/rest/api/3/issue/{key}/attachments", method="POST",
                              raw_body=body,
                              headers={"X-Atlassian-Token": "no-check",
                                       "Content-Type": f"multipart/form-data; boundary={boundary}"})
-        url = next((a.get("content", "") for a in uploaded if a.get("filename") == path.name), "")
+        url = next((a.get("content", "") for a in uploaded if a.get("filename") == fname), "")
         # read back
         onit = self._req(f"/rest/api/3/issue/{key}?fields=attachment")
         names = {a["filename"] for a in onit["fields"].get("attachment", [])}
-        if path.name not in names:
+        if fname not in names:
             return None
-        return {"name": path.name, "md5": hashlib.md5(data).hexdigest(),
+        return {"name": fname, "md5": hashlib.md5(data).hexdigest(),
                 "url": url or "(see fields.attachment)"}
 
     def link(self, blocker: str, blocked: str) -> None:
+        blocker, blocked = valid_key(blocker), valid_key(blocked)
         # For `Blocks`, inwardIssue is the BLOCKING side.
         self._req("/rest/api/3/issueLink",
                   {"type": {"name": "Blocks"},
@@ -179,6 +210,7 @@ class Provider(Tracker):
                              f"show 'blocked by {blocker}'; check link direction")
 
     def worklog(self, key: str, minutes: int) -> bool:
+        key = valid_key(key)
         self._req(f"/rest/api/3/issue/{key}/worklog", {"timeSpent": f"{minutes}m"}, "POST")
         return True
 
@@ -187,7 +219,7 @@ class Provider(Tracker):
         """Last time the ticket moved into a judged status, from the changelog.
         Returns (iso_timestamp, description) or None."""
         judged = {s.lower() for s in self.c.cfg("tracker.done_statuses", ["Done", "Closed", "Resolved"])}
-        d = self._req(f"/rest/api/3/issue/{key}?expand=changelog&fields=status")
+        d = self._req(f"/rest/api/3/issue/{valid_key(key)}?expand=changelog&fields=status")
         best = None
         for entry in d.get("changelog", {}).get("histories", []):
             for item in entry.get("items", []):

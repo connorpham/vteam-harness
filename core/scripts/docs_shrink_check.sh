@@ -9,11 +9,47 @@
 # Law: the project's ledgers only GROW or get edited in place. Shrinking >20% of
 # lines in one change signals an accidental overwrite, not editing. Real deletions
 # declare intent:  ALLOW_DOCS_SHRINK=1 bash .vteam/scripts/docs_shrink_check.sh
+#
+# Selftest: --selftest (temp repo: grown ledger green + 2 shrink mutations red
+# + declared-intent hatch).
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/ctx.sh"
 
-PM_DIR=$(python3 .vteam/scripts/lib/ctx.py paths.pm 2>/dev/null || echo docs/pm)
-ADR_DIR=$(python3 .vteam/scripts/lib/ctx.py paths.adr 2>/dev/null || echo docs/adr)
+if [[ "${1:-}" == "--selftest" ]]; then
+  SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+  fail() { echo "docs_shrink_check selftest: FAIL — $1" >&2; exit 1; }
+  ( cd "$tmp" && git init -q . && git config user.email t@t.t && git config user.name t )
+  mkdir -p "$tmp/docs/pm" "$tmp/docs/adr"
+  seq 1 30 | sed 's/^/decision line /' > "$tmp/docs/pm/decisions.md"
+  seq 1 20 | sed 's/^/adr line /'      > "$tmp/docs/adr/0001.md"
+  ( cd "$tmp" && git add -A && git commit -qm init )
+  # green: a ledger that GROWS passes
+  seq 1 35 | sed 's/^/decision line /' > "$tmp/docs/pm/decisions.md"
+  ( cd "$tmp" && env -u GITHUB_BASE_REF bash "$SELF" ) >/dev/null \
+    || fail "grown ledger should pass"
+  # mutation 1: 30 → 5 lines in the pm ledger must RED
+  seq 1 5 | sed 's/^/decision line /' > "$tmp/docs/pm/decisions.md"
+  if ( cd "$tmp" && env -u GITHUB_BASE_REF bash "$SELF" ) >/dev/null; then
+    fail "83% shrink of the pm ledger should RED"
+  fi
+  ( cd "$tmp" && git checkout -q -- docs/pm/decisions.md )
+  # mutation 2: shrink in the ADR ledger must RED too
+  seq 1 2 | sed 's/^/adr line /' > "$tmp/docs/adr/0001.md"
+  if ( cd "$tmp" && env -u GITHUB_BASE_REF bash "$SELF" ) >/dev/null; then
+    fail "90% shrink of the adr ledger should RED"
+  fi
+  # declared intent: the hatch passes LOUDLY
+  ( cd "$tmp" && env -u GITHUB_BASE_REF ALLOW_DOCS_SHRINK=1 bash "$SELF" ) >/dev/null \
+    || fail "ALLOW_DOCS_SHRINK=1 should pass on declared intent"
+  echo "docs_shrink_check selftest: OK (grow green + 2 shrink mutations red + declared-intent hatch)"
+  exit 0
+fi
+
+cd "$(vteam_root)"
+
+PM_DIR=$(vteam_cfg paths.pm docs/pm)
+ADR_DIR=$(vteam_cfg paths.adr docs/adr)
 WATCH="^(${PM_DIR}|${ADR_DIR})/.*\.md$"
 THRESHOLD=20
 fail=0

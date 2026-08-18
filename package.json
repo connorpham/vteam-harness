@@ -19,6 +19,9 @@
   "engines": {
     "node": ">=20"
   },
+  "scripts": {
+    "test": "node tests/e2e.mjs"
+  },
   "keywords": [
     "ai",
     "agents",

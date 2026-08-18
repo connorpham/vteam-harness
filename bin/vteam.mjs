@@ -16,7 +16,9 @@ init flags (all optional; any given flag skips its prompt):
   --autonomy <off|assisted|full>
   --tools <csv of: claude-code,cursor,windsurf,codex,copilot>
 
-doctor flags: --backend (design legs warn only) · --migrate (legacy artifacts; TBD)
+doctor flags: --backend (design legs warn only)
+              --migrate  rewrite legacy pre-vteam sentinels in ledgers/evidence
+                         (dry-run by default; add --apply to write)
 `;
 
 const { flags, positional } = parseArgs(process.argv.slice(2));

@@ -1,4 +1,7 @@
 # python profile.
+# TRUST BOUNDARY: every `run` below executes as a shell command from the repo
+# root (like package.json scripts). Repo write access = execute access here —
+# review changes to this file as code, high-stakes in PRs.
 steps:
   docs-shrink:
     run: "bash .vteam/scripts/docs_shrink_check.sh"

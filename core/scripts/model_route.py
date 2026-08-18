@@ -3,8 +3,11 @@
 
 The routing doctrine (model-routing.md) speaks in abstract tiers so it never
 rots; this resolver turns a tier — or a pipeline role like `dev-r1` — into the
-exact model name for the agent tool in use, from model-routing.data.yaml
-(machine home of the mapping; docs/team copy first, package copy as fallback).
+exact model name for the agent tool in use, from the routing data file.
+Resolution is CONFIG-AWARE: <root>/<paths.team>/<models.routing file> first
+(both knobs from vteam.config.yaml; defaults docs/team and
+model-routing.data.yaml), package-relative core/doctrine/ as the
+framework-repo development fallback.
 
 Usage:
   model_route.py dev-r2 --tool claude-code            → sonnet
@@ -32,15 +35,37 @@ TIERS = ("frontier", "workhorse", "standard", "utility")
 
 
 def load_data(root: Path | None) -> dict:
-    from ctx import parse_config
+    """Resolve + parse the routing data file. Order (all config-aware, no
+    docs/team literal):
+      1. <root>/<paths.team>/<file> — paths.team from vteam.config.yaml
+         (default docs/team); <file> from models.routing ('default' →
+         model-routing.data.yaml, any other value → that filename, also tried
+         repo-root-relative). A custom models.routing that resolves nowhere is
+         a LOUD error, never a silent fallback.
+      2. package-relative core/doctrine/ — framework-repo development only
+         (installed repos keep the data in paths.team, not .vteam)."""
+    from ctx import CONFIG_NAME, parse_config
+    team, routing = "docs/team", "default"
+    if root is not None and (root / CONFIG_NAME).is_file():
+        cfg = parse_config((root / CONFIG_NAME).read_text(encoding="utf-8"))
+        team = str(cfg.get("paths", {}).get("team", team) or team)
+        routing = str(cfg.get("models", {}).get("routing", routing) or routing)
+    default_name = "model-routing.data.yaml"
+    fname = default_name if routing == "default" else routing
     cands = []
     if root is not None:
-        cands.append(root / "docs" / "team" / "model-routing.data.yaml")
-    cands.append(Path(__file__).resolve().parent.parent / "doctrine" / "model-routing.data.yaml")
+        cands.append(root / team / fname)
+        if fname != default_name:
+            cands.append(root / fname)  # models.routing may be a repo-relative path
+    if fname == default_name:  # the package fallback never masks a custom knob
+        cands.append(Path(__file__).resolve().parent.parent / "doctrine" / default_name)
     for c in cands:
         if c.is_file():
             return parse_config(c.read_text(encoding="utf-8"))
-    sys.exit("model_route: model-routing.data.yaml not found — broken install")
+    looked = "; ".join(str(c) for c in cands) or "(no repo root, no package data)"
+    sys.exit(f"model_route: {fname} not found — looked at: {looked}"
+             + (" — models.routing names a file that does not exist"
+                if fname != default_name else " — broken install"))
 
 
 def resolve(data: dict, what: str, tool: str, high_stakes: bool = False) -> str:
@@ -137,10 +162,49 @@ def _selftest():
             pass
     tbl = table(data, "claude-code")
     assert "**opus**" in tbl and "dev-r2: standard (high-stakes: workhorse)" in tbl, tbl
-    real = load_data(None)  # the shipped data file itself must resolve
-    assert resolve(real, "dev-r1", "claude-code") == "opus"
-    assert resolve(real, "qa-challenger", "cursor") == "claude-sonnet-5"
-    print("model_route selftest: OK (resolve + high-stakes bump + 3 loud failures + table + shipped data)")
+
+    # load_data end-to-end against an EMBEDDED fixture tree — install-layout
+    # independent (the old check read the shipped file via a package-relative
+    # path that only exists in the source repo, so doctor was red on every
+    # fresh install).
+    import tempfile
+    fixture_yaml = (
+        "snapshot_date: 2026-01-01\n"
+        "routing:\n  dev-r1: workhorse\n  dev-r2: standard\n"
+        "high_stakes:\n  dev-r2: workhorse\n"
+        "tools:\n  claude-code:\n    frontier: fable\n    workhorse: opus\n"
+        "    standard: sonnet\n    utility: haiku\n"
+    )
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        # 1. default layout, no config: <root>/docs/team/model-routing.data.yaml
+        (root / "docs" / "team").mkdir(parents=True)
+        (root / "docs" / "team" / "model-routing.data.yaml").write_text(fixture_yaml)
+        assert resolve(load_data(root), "dev-r1", "claude-code") == "opus"
+        # 2. paths.team knob: config moves the doctrine dir to docs/crew
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\npaths:\n  team: docs/crew\nmodels:\n  routing: default\n")
+        (root / "docs" / "crew").mkdir()
+        (root / "docs" / "crew" / "model-routing.data.yaml").write_text(fixture_yaml)
+        assert resolve(load_data(root), "dev-r2", "claude-code") == "sonnet"
+        # 3. models.routing knob: a custom filename in paths.team
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\npaths:\n  team: docs/crew\nmodels:\n  routing: alt.yaml\n")
+        (root / "docs" / "crew" / "alt.yaml").write_text(
+            fixture_yaml.replace("workhorse: opus", "workhorse: opus-alt"))
+        assert resolve(load_data(root), "dev-r1", "claude-code") == "opus-alt"
+        # mutation: a models.routing file that exists NOWHERE must red loudly,
+        # never fall back to the package copy
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\nmodels:\n  routing: ghost.yaml\n")
+        try:
+            load_data(root)
+            raise AssertionError("missing custom routing file should have exited")
+        except SystemExit as e:
+            assert "ghost.yaml" in str(e), e
+    print("model_route selftest: OK (resolve + high-stakes bump + 3 loud failures "
+          "+ table + fixture-tree load_data: default/paths.team/models.routing green, "
+          "missing custom file red)")
 
 
 if __name__ == "__main__":

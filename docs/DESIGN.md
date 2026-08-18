@@ -25,7 +25,9 @@ review. A PR that hardcodes any adopter detail into core is rejected on sight.
 │             roles/{pm,ba,sa,dev,qa,design,devops}           │
 │ workflows/  team, pm, ba, dev, qa, verify-gate, guidelines  │
 │ scripts/    gates (py/mjs/sh) + scripts/lib (ctx, config)   │
-│ templates/  decisions.md, log.md, acceptance.md, KB, evd/   │
+│ templates/  decisions.md, log.md, changes.md, KB,           │
+│             known-issues, plan.yaml, specs-INDEX            │
+│             (acceptance dossier: generated at runtime)      │
 │ locales/    en.yml, vi.yml (prose vocab for owner-facing    │
 │             output — gates use neutral sentinels, §4)       │
 ├─────────────────────────────────────────────────────────────┤
@@ -62,12 +64,15 @@ project:
   adopted: 2026-08-17        # anchor for date-grandfathered rules (§5)
 paths:                       # all ledger/oracle locations, no more literals
   specs: docs/specs
+  backlog: docs/backlog      # markdown-tracker tickets
   pm: docs/pm
   qa: docs/qa
   adr: docs/adr
   team: docs/team
   design: docs/design
   evidence: evd
+specs:
+  sources: []                # original docs verbatim_gate compares shards against
 stack:
   profile: nextjs-prisma     # selects profiles/<name>/gates.yaml
   package_manager: npm
@@ -75,6 +80,7 @@ git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
   hooks: managed             # managed | external (repo has real branch protection)
+  code_paths: [src/]         # "product code" for the review fence + stale scans
 tracker:
   provider: jira             # jira | github | linear | markdown
   done_statuses: [Done, Closed, Resolved]
@@ -88,6 +94,7 @@ autonomy:
   level: full                # off | assisted | full
   exemptions: [real-money, legal, purchasing, credentials, data-deletion]
 review:
+  reviewers: 2               # fresh reviewer agents per diff (+1 high-stakes)
   high_stakes_paths: ["prisma/schema.prisma", "src/lib/"]
   high_stakes_terms: [wallet, topup, refund, balance]  # the project's own risk vocabulary
 models:
@@ -137,7 +144,7 @@ around them is localized via `locales/*.yml`.
 - Hedge-phrase blacklist and write-verb patterns move into `locales/<lang>.yml`
   as per-language word lists; gates load the list for `project.language`.
 - The 7-part ticket-comment markers become locale-keyed headings with stable
-  sentinel ids (`[V1]…[V7]`), so `comment_check` checks ids, prose stays localized.
+  sentinel ids (`[R1]…[R7]`), so `comment_check` checks ids, prose stays localized.
 
 Migration note for the first adopter: this is a breaking change to
 existing artifacts; the installer's `vteam doctor --migrate` rewrites old markers.
@@ -210,7 +217,8 @@ is explicitly *best-effort* in v1 — stated in README, not hidden.
 ## 8. Adapter contract
 
 Core workflows are markdown with a small frontmatter schema (`name`,
-`description`, `triggers`, `args`, `phases`). Adapters only:
+`description`, `command`, `args`; `triggers`/`phases` are reserved for a
+future contract revision — no adapter maps them yet). Adapters only:
 
 1. render frontmatter to the tool's native metadata,
 2. rewrite `{paths.*}`/`{project.*}` template vars from config,

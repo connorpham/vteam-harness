@@ -13,12 +13,18 @@ project:
 
 paths:
   specs: docs/specs      # sharded requirement oracle + INDEX.md + changes.md
+  backlog: docs/backlog  # markdown-tracker tickets (one .md per ticket)
   pm: docs/pm            # decisions.md, log.md, sessions/, acceptance.md, plan.yaml
   qa: docs/qa            # knowledge-base.md, known-issues.md
   adr: docs/adr
   team: docs/team        # doctrine rendered at install time
   design: docs/design
   evidence: evd          # evd/<KEY>/ = QA lane · evd/<KEY>/dev/ = DEV lane
+
+specs:
+  sources: []            # the ORIGINAL spec documents BA shards from — verbatim_gate
+                         # compares shards in paths.specs against these; never point
+                         # it at paths.specs itself (self-comparison is self-grading)
 
 stack:
   profile: generic       # generic | node | python | nextjs-prisma  → profiles/<name>/gates.yaml
@@ -28,9 +34,11 @@ git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
   hooks: managed         # managed: vteam owns .githooks/pre-push · external: repo has real branch protection
+  code_paths: [src/]     # "product code" for the review fence + stale-verdict scans
 
 tracker:
-  provider: markdown     # jira | github | linear | markdown (offline backlog, zero services)
+  provider: markdown     # jira | markdown (offline backlog, zero services); github/linear: roadmap v1.1
+                         # init validates this — unshipped providers are rejected at install
   done_statuses: [Done, Closed, Resolved]
   review_status: In Review
 
@@ -56,4 +64,5 @@ review:
   high_stakes_terms: []          # project vocabulary that means money/irreversibility
 
 models:
-  routing: default       # data file under core/doctrine/model-routing/; override with a path
+  routing: default       # default → <paths.team>/model-routing.data.yaml; any other value
+                         # names an alternative data file in paths.team (or repo-relative)

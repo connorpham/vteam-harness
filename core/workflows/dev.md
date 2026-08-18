@@ -2,7 +2,7 @@
 name: dev
 command: /dev
 description: Ticket-driven DEV pipeline, end-to-end — preflight (tracker/design-source/git/DB pinged for real) → fetch the ticket → read spec + schema (the ticket is a claim, the spec is the spec) → UI tickets pull the design from the ticket's design link (design source = visual oracle; exact colors/spacing/text from node data) → implement on a feature branch → /verify gate + evidence → self-review with machine-measured design fidelity → TWO fresh review agents must approve (three on high-stakes diffs; committed review trail enforced at pre-push) → push + PR → mandatory 7-part plain-language report comment on the ticket, then transition to In Review (Done belongs to /qa). Runs the machine DoR gate and claims the ticket before coding.
-args: "<TICKET: {key}-nnn | tracker URL> [assignee=<name>] [branch=feat|fix]"
+args: "<TICKET: {project.key}-nnn | tracker URL> [assignee=<name>] [branch=feat|fix]"
 ---
 
 # /dev — implement a ticket, prove it before delivering
@@ -231,8 +231,9 @@ NOT DONE = NO REVIEWERS YET:
 
 ## T4b — TWO-AGENT REVIEW (mandatory gate BEFORE commit/push/PR/comment)
 
-No delivery until TWO fresh agents (spawned in the SAME message — parallel, empty
-context, never forked) have both reviewed the diff and approved. **Model routing
+No delivery until {review.reviewers} fresh agents (config `review.reviewers`;
+spawned in the SAME message — parallel, empty context, never forked) have all
+reviewed the diff and approved. **Model routing
 (`{paths.team}/model-routing.md`):** R1 = `workhorse`, R2 = `standard`; if the
 diff matches `review.high_stakes_terms` → BOTH `workhorse`. **Every reviewer
 brief MUST include `{paths.team}/review-standard.md`**: findings are

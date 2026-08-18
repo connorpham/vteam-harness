@@ -14,7 +14,26 @@ set -uo pipefail
 PROTECTED=$(python3 .vteam/scripts/lib/ctx.py git.protected_branch 2>/dev/null || echo main)
 PM_DIR=$(python3 .vteam/scripts/lib/ctx.py paths.pm 2>/dev/null || echo docs/pm)
 KEY=$(python3 .vteam/scripts/lib/ctx.py project.key 2>/dev/null || echo '[A-Z]+')
+# branch grammar comes from config (git.branch_pattern, {key} substituted) —
+# the pattern the docs promise is the pattern the fence enforces
+BRANCH_PATTERN=$(python3 .vteam/scripts/lib/ctx.py git.branch_pattern 2>/dev/null \
+  || echo '^(feat|fix)/{key}-[0-9]+-')
+BRANCH_PATTERN="${BRANCH_PATTERN//\{key\}/$KEY}"
 ZERO="0000000000000000000000000000000000000000"
+
+# scan_base <local_sha> — prints the diff base for outgoing-content checks.
+# FAIL CLOSED: when origin/<protected> is unavailable (first push, offline,
+# renamed default branch), fall back to the EMPTY TREE so the full content of
+# the push is scanned — never silently skip the secret scan.
+scan_base() {
+  git fetch -q origin "$PROTECTED" 2>/dev/null || true
+  if git rev-parse --verify -q "origin/$PROTECTED^{commit}" >/dev/null 2>&1; then
+    printf 'origin/%s...%s' "$PROTECTED" "$1"
+  else
+    echo "⚠️  origin/$PROTECTED unavailable — scanning the FULL outgoing content (fail closed, never open)" >&2
+    printf '%s %s' "$(git hash-object -t tree /dev/null)" "$1"
+  fi
+}
 
 log_hatch() { # <hatch name> <branch>
   local f="$PM_DIR/hatch-log.md"
@@ -30,8 +49,8 @@ while read -r _local_ref local_sha remote_ref _remote_sha; do
 
   # 0) SECRET SCAN — before every exit ramp: there is no legitimate secret push,
   #    even with the hatches on. High-precision token patterns only.
-  git fetch -q origin "$PROTECTED" 2>/dev/null || true
-  LEAK=$(git diff "origin/$PROTECTED...$local_sha" 2>/dev/null | grep -E '^\+' \
+  read -r -a DIFF_BASE <<< "$(scan_base "$local_sha")"
+  LEAK=$(git diff "${DIFF_BASE[@]}" | grep -E '^\+' \
     | grep -oE 'figd_[A-Za-z0-9_-]{20,}|ATATT[A-Za-z0-9_=-]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----' \
     | head -3 || true)
   if [[ -n "$LEAK" ]]; then
@@ -66,15 +85,15 @@ paths = Ctx().cfg("git.code_paths", ["src/", "prisma/"])
 print("^(" + "|".join(str(p) for p in paths) + ")")
 PY
 )
-  git fetch -q origin "$PROTECTED" 2>/dev/null || true
-  if git diff --name-only "origin/$PROTECTED...$local_sha" 2>/dev/null | grep -qE "$CODE_PATHS"; then
+  if git diff --name-only "${DIFF_BASE[@]}" | grep -qE "$CODE_PATHS"; then
     if [[ "${ALLOW_PUSH_NOREVIEW:-}" == "1" ]]; then
       echo "⚠️  ALLOW_PUSH_NOREVIEW=1 — passing on declared intent"
       log_hatch "ALLOW_PUSH_NOREVIEW" "$branch"
       continue
     fi
-    if [[ ! "$branch" =~ ^(feat|fix)/${KEY}-[0-9]+- ]]; then
-      echo "❌ Diff touches product code but branch '$branch' is not feat|fix/<TICKET>-…"
+    if [[ ! "$branch" =~ $BRANCH_PATTERN ]]; then
+      echo "❌ Diff touches product code but branch '$branch' does not match the"
+      echo "   configured branch grammar: $BRANCH_PATTERN (git.branch_pattern)"
       echo "   Product code travels on ticket-keyed branches (ticket↔code tracing, raci.md)."
       echo "   Rename: git branch -m feat/${KEY}-nn-<slug>. Hatch: ALLOW_PUSH_NOREVIEW=1 (logged)."
       exit 1

@@ -175,12 +175,14 @@ def build_report(rows: list[dict], prices: dict | None, period: str,
 
 
 def load_prices(root: Path) -> dict | None:
-    from ctx import parse_config
-    for cand in (root / "docs" / "team" / "model-routing.data.yaml",
-                 Path(__file__).resolve().parent.parent / "doctrine" / "model-routing.data.yaml"):
-        if cand.is_file():
-            return parse_config(cand.read_text(encoding="utf-8")).get("tiers", {})
-    return None
+    """Tier prices from the routing data file, resolved through model_route so
+    the paths.team / models.routing config knobs are honored (no docs/team
+    literal). Missing data stays non-fatal — this is a report, not a gate."""
+    import model_route
+    try:
+        return model_route.load_data(root).get("tiers", {})
+    except SystemExit:
+        return None
 
 
 def main() -> int:

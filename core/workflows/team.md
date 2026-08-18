@@ -55,7 +55,8 @@ contradiction.
 
 **The main track (sequential, on the working tree):** /pm P1 priority order —
 QA debt → the sprint's next DEV ticket → BA's next ticket batch → the SA ADR
-whose turn it is. DEV never runs 2 items at once (/pm principle #3).
+whose turn it is. The DEV WIP limit is `team.size` (config; default 1 — one
+coding item at a time, /pm principle #3).
 
 **Background lanes (parallel with the main track, when there's work):** while
 DEV codes, spawn background agents for work that does NOT touch the working

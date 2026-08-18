@@ -6,12 +6,18 @@ import { execSync } from "node:child_process";
 
 export const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-export function repoRoot() {
+/** Repo root via git, or null when not inside a git work tree (stderr suppressed). */
+export function gitRoot() {
   try {
-    return execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
+    return execSync("git rev-parse --show-toplevel",
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
-    return process.cwd();
+    return null;
   }
+}
+
+export function repoRoot() {
+  return gitRoot() ?? process.cwd();
 }
 
 // ---- prompts ---------------------------------------------------------------
@@ -38,9 +44,10 @@ export async function askChoice(question, options, def) {
 }
 
 // ---- rendering -------------------------------------------------------------
-/** Substitute {paths.x} and {project.x} template vars from the config object. */
+/** Substitute {paths.x}, {project.x}, {team.x}, {review.x}, {git.x} and
+ * {stack.x} template vars from the config object. Unknown vars stay verbatim. */
 export function render(text, cfg) {
-  return text.replace(/\{(paths|project)\.([a-z_]+)\}/g, (m, group, key) => {
+  return text.replace(/\{(paths|project|team|review|git|stack)\.([a-z_]+)\}/g, (m, group, key) => {
     const v = cfg[group]?.[key];
     return v === undefined ? m : String(v);
   });
@@ -85,6 +92,10 @@ export function writeFile(file, content) {
 }
 
 // ---- arg parsing -----------------------------------------------------------
+/** Flags that never take a value — the next token stays positional, so
+ * `vteam --yes init` runs init instead of swallowing it as --yes's value. */
+const BOOLEAN_FLAGS = new Set(["yes", "backend", "migrate", "apply", "help"]);
+
 export function parseArgs(argv) {
   const flags = {};
   const positional = [];
@@ -92,8 +103,9 @@ export function parseArgs(argv) {
     const a = argv[i];
     if (a.startsWith("--")) {
       const key = a.slice(2);
-      if (i + 1 < argv.length && !argv[i + 1].startsWith("--")) flags[key] = argv[++i];
-      else flags[key] = true;
+      if (!BOOLEAN_FLAGS.has(key) && i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
+        flags[key] = argv[++i];
+      } else flags[key] = true;
     } else positional.push(a);
   }
   return { flags, positional };

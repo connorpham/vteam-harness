@@ -1,6 +1,9 @@
 # nextjs-prisma profile — the source harness's native stack, ported step for step.
 # Ordering constraints are real: `typegen` must precede `types`; `token-check`
 # must FOLLOW `build` (it reads the built CSS chunks).
+# TRUST BOUNDARY: every `run` below executes as a shell command from the repo
+# root (like package.json scripts). Repo write access = execute access here —
+# review changes to this file as code, high-stakes in PRs.
 steps:
   docs-shrink:
     run: "bash .vteam/scripts/docs_shrink_check.sh"
@@ -15,21 +18,21 @@ steps:
     requires: "prisma/schema.prisma"
     skip_reason: "no prisma/schema.prisma — wrong profile? use `node`"
   lint:
-    run: "npm run lint"
+    run: "{package_manager} run lint"
   typegen:
     run: "npx next typegen"
   types:
     run: "npx tsc --noEmit"
   unit:
-    run: "npm test"
+    run: "{package_manager} test"
   build:
-    run: "npm run build"
+    run: "{package_manager} run build"
   token-check:
     run: "node .vteam/profiles/nextjs-prisma/scripts/token_check.mjs"
     requires: ".vteam/profiles/nextjs-prisma/scripts/token_check.mjs"
     skip_reason: "token_check plugin not installed (Tailwind v4 CSS reality check)"
   integration:
-    run: "npm run test:integration"
+    run: "{package_manager} run test:integration"
     tail: true
   e2e:
     run: "npm run test:e2e"
