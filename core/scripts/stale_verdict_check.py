@@ -23,6 +23,9 @@ Usage:
   stale_verdict_check.py PROJ-21         # one ticket
   stale_verdict_check.py --fix           # return hits to In Review + explanatory comment
 Exit 0 = no stale verdicts; 1 = stale found (and not --fix).
+
+Selftest: --selftest (temp repo: verdict-then-untouched green, verdict-then-code-
+changed red, --fix returns the ticket to In Review).
 """
 from __future__ import annotations
 
@@ -155,5 +158,82 @@ def main() -> int:
     return 0
 
 
+def _selftest():
+    """Mutation proof in a throwaway repo: a pinned verdict with no later code
+    is green; a commit touching code_paths and naming the ticket AFTER the pin
+    is red; --fix returns the ticket to In Review through the tracker."""
+    import os
+    import tempfile
+
+    self_path = Path(__file__).resolve()
+
+    def sh(cwd: Path, *args: str) -> str:
+        r = subprocess.run(list(args), cwd=cwd, capture_output=True, text=True)
+        assert r.returncode == 0, f"{args}: {r.stderr}"
+        return r.stdout.strip()
+
+    def run_gate(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, str(self_path), *args],
+                              cwd=cwd, capture_output=True, text=True)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        sh(root, "git", "init", "-q", ".")
+        sh(root, "git", "config", "user.email", "t@t.t")
+        sh(root, "git", "config", "user.name", "t")
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\nproject:\n  key: PROJ\n"
+            "paths:\n  evidence: evd\n  backlog: docs/backlog\n"
+            "git:\n  code_paths: [src/]\n"
+            "tracker:\n  provider: markdown\n  done_statuses: [Done]\n"
+            "  review_status: \"In Review\"\n", encoding="utf-8")
+        (root / "docs" / "backlog").mkdir(parents=True)
+        (root / "docs" / "backlog" / "PROJ-1.md").write_text(
+            "# PROJ-1: demo\n- status: Done\n\nbody\n", encoding="utf-8")
+        (root / "src").mkdir()
+        (root / "src" / "a.txt").write_text("v1\n", encoding="utf-8")
+        sh(root, "git", "add", "-A")
+        sh(root, "git", "commit", "-qm", "PROJ-1 implement")
+        sha = sh(root, "git", "rev-parse", "HEAD")
+        (root / "evd" / "PROJ-1").mkdir(parents=True)
+        (root / "evd" / "PROJ-1" / "REPORT.md").write_text(
+            f"VERDICT: PASS\nCOMMIT: {sha}\n", encoding="utf-8")
+
+        env = {**os.environ}
+        # green: nothing changed after the pinned commit
+        r = run_gate(root)
+        assert r.returncode == 0, f"untouched verdict should pass:\n{r.stdout}{r.stderr}"
+
+        # mutation: code naming the ticket lands AFTER the verdict → must RED
+        (root / "src" / "a.txt").write_text("v2\n", encoding="utf-8")
+        sh(root, "git", "add", "-A")
+        sh(root, "git", "commit", "-qm", "PROJ-1 rework the flow")
+        r = run_gate(root)
+        assert r.returncode == 1, f"post-verdict code change should RED:\n{r.stdout}{r.stderr}"
+        assert "PROJ-1" in r.stdout
+
+        # mutation: a post-verdict commit OUTSIDE code_paths must stay green
+        (root / "README.md").write_text("docs only\n", encoding="utf-8")
+        sh(root, "git", "add", "README.md")
+        sh(root, "git", "commit", "-qm", "PROJ-1 docs touch-up")
+        # (still red from src change — but prove the docs commit alone wouldn't flag:
+        #  the red listing must NOT include the docs-only commit)
+        r = run_gate(root)
+        assert "docs touch-up" not in r.stdout, "commit outside code_paths was flagged"
+
+        # --fix: ticket returns to In Review with a read-back-verified comment
+        r = run_gate(root, "--fix")
+        assert r.returncode == 0, f"--fix should exit 0:\n{r.stdout}{r.stderr}"
+        ticket = (root / "docs" / "backlog" / "PROJ-1.md").read_text(encoding="utf-8")
+        assert "- status: In Review" in ticket, ticket
+        assert "Auto-reopened" in ticket, "explanatory comment missing from ticket"
+        _ = env
+    print("stale_verdict_check selftest: OK (pinned verdict green + post-verdict "
+          "code change red + out-of-code-paths ignored + --fix reopens via tracker)")
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+        sys.exit(0)
     sys.exit(main())

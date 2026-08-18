@@ -2,7 +2,7 @@
 name: qa
 command: /qa
 description: VERIFY-ONLY QA pipeline for a ticket a dev claims done (the spec is the oracle). Reads the ticket + spec + schema to derive expected behavior → designs 2–5 test cases (exact repro, boundary, whole-screen sanity, read-only DB verify for writes) → self-provisions missing data through the REAL UI flow (write-gated) → runs them HEADED in the browser → collects evidence (named screenshots, annotated images with in-image captions) → cross-checks every ticket claim against an evidence file → machine gate (evd_check.py) → challenger sign-off → plain-language REPORT.md anyone can read → tracker comment posted once both machine gates are green, ticket transition per the full-auto policy. NO code change, NO fix — verification only.
-args: "<TICKET: {key}-nnn | tracker URL> [assignee=<name>] [base=<app URL>]"
+args: "<TICKET: {project.key}-nnn | tracker URL> [assignee=<name>] [base=<app URL>]"
 ---
 
 # /qa — verify a delivered ticket against the spec (QA lane, no code)

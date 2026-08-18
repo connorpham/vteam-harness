@@ -1,6 +1,12 @@
 # English vocabulary for locale-sensitive gate checks.
 # Gates check NEUTRAL SENTINELS (RESULT:, STATE:, PASS/FAIL…) — these lists only
 # localize the free-prose patterns that cannot be sentinels.
+#
+# These defaults are GENERIC action verbs (design boundary: core ships zero
+# project specifics). Your project's own domain vocabulary — the words that mean
+# money or irreversibility in YOUR app — belongs in vteam.config.yaml
+# `review.high_stakes_terms`, and extra write verbs go in the installed copy of
+# this file (.vteam/locales/<lang>.yml — update preserves your edits as *.new).
 
 # Phrases that void an evidence manifest: hedging instead of measuring.
 hedge_phrases:
@@ -16,8 +22,11 @@ hedge_phrases:
 write_verbs:
   - "CREATE NEW"
   - "CREATES A"
-  - "TOP-UP"
-  - "TOP UP"
-  - "PLACE ORDER"
-  - "PLACES AN ORDER"
+  - "UPDATES THE"
+  - "DELETES"
+  - "SUBMITS"
+  - "REGISTERS"
+  - "PAYS"
+  - "TRANSFERS"
+  - "UPLOADS"
   - "WRITES TO DB"

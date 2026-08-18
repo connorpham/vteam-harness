@@ -63,10 +63,12 @@ ui-evidence, ui_fidelity) — ported against the real app they instrument.
 Shipped: `npx vteam init` (interactive or fully flag-driven with --yes; writes
 config, .vteam runtime, docs skeletons never clobbering ledgers, rendered
 doctrine, managed hooks + hooksPath, .gitignore evidence rules, CI workflow,
-adapters), `vteam doctor` (config parse via the gates' own parser, runtime
-integrity, hooksPath, model-routing staleness, all 9 gate selftests, provider
-preflight), `vteam update` (refreshes framework files, provably leaves ledgers
-untouched). Adapters: claude-code, cursor, windsurf, codex (+AGENTS.md
+adapters), `vteam doctor` (python3 prerequisite check, config parse via the gates' own
+parser, runtime + manifest integrity, hooksPath, model-routing staleness at
+the configured path, all 17 selftests — python/shell/node, context libs
+included — and provider preflight), `vteam update` (manifest-guarded: only
+overwrites files whose hash matches what the framework last wrote; anything
+user-edited is kept with the new version parked as *.new). Adapters: claude-code, cursor, windsurf, codex (+AGENTS.md
 pointer), copilot (+instructions pointer) — non-Claude tools get the
 no-subagent adapter note. E2E-proven in a fresh repo: init → commit → doctor
 exit 0 with preflight GREEN. `doctor --migrate` ships with Phase 6.
@@ -94,8 +96,10 @@ against REAL artifacts — log_check green on the 41-row ledger, verbatim_gate
 green on 503 coded rows / 10 shards, review_check green on a migrated dossier,
 jira provider ping green on the live project, figma leg correctly reporting a
 429 rate limit. DB leg red only because the worktree had no node_modules.
-Remaining: a full /team session on the dogfood branch (separate session), and
-`npm publish vteam@0.1.0` — waiting for the owner (external action).
+Remaining: a full /team session on the dogfood branch (separate session).
+npm publish: DONE — first published as `vteam-harness@0.1.0` (npm blocked the
+name `vteam` for similarity; the bin command stays `vteam`); `0.2.0` is the
+Phase 7 hardening release.
 
 ### Original Phase 6 scope (for reference)
 - E2E: `init` into a blank fixture repo (markdown tracker, generic profile) and
@@ -103,6 +107,37 @@ Remaining: a full /team session on the dogfood branch (separate session), and
 - Dogfood: install vteam into the source project (`vteam doctor --migrate` rewrites old
   sentinels), run one real /team session, diff outcomes vs the legacy harness
 - npm publish `vteam@0.1.0`
+
+## Phase 7 — Hardening ✅ (framework audit round)
+A 9-agent adversarial audit (4 dimensions + empirical install test) drove this
+phase; every fix below closes a confirmed finding.
+- init: validate EVERYTHING before the first write (invalid flags exit 1 with
+  zero files); YAML-safe quoting with a parse-back round-trip proof; non-TTY
+  without --yes fails fast; non-git dirs get one clean line; `.env` gitignored
+  (tokens never commit); existing hook managers (husky/.git/hooks) detected and
+  NEVER silently disabled — config records `git.hooks: external` instead
+- update: the `.vteam/manifest.json` mechanism — "never touches your files" is
+  now checkable, not a promise; refreshes the pre-push hook/CI/gitignore under
+  the same rule; config re-read through the real parser (ctx.mjs), not regexes
+- doctor: python3 prerequisite diagnosis, manifest verification leg, staleness
+  at the configured paths.team, 17 selftests across python/bash/node
+- gates: selftests added to gate.py (driver), stale_verdict_check,
+  docs_shrink_check, tracker lib, ctx.sh, ctx.mjs — every checking gate now
+  carries mutation proof; evd_check regex-escapes filesystem names
+- security: pre-push secret scan FAILS CLOSED (no base → scan the full outgoing
+  content); ticket keys validated before any path/URL is built (traversal dead);
+  jira provider requires https, refuses redirects (Basic auth never re-sent),
+  URL-quotes path parts; preflight parses .env as inert text and redacts
+  credentials from printed remote URLs; gates.yaml documented as a trust boundary
+- config knobs wired: git.branch_pattern (pre-push fence), models.routing +
+  paths.team (model_route/perf_report/doctor), stack.package_manager +
+  project.key ({vars} in gates.yaml), review.reviewers + team.size (rendered
+  into dev/team workflows); specs.sources explicit, self-comparison rejected
+- proof: tests/e2e.mjs (fresh repo → init → doctor GREEN, manifest-guarded
+  update, clean failures, pre-push fence + secret scan go red for real) wired
+  as `npm test` + GitHub Actions CI
+- locales: first-adopter domain vocabulary removed from core defaults (design
+  boundary: zero project specifics); en/vi key parity
 
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)

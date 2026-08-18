@@ -1,10 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
-import { pkgRoot, repoRoot, copyDir, render } from "./util.mjs";
+import { pkgRoot, repoRoot, render } from "./util.mjs";
+import { loadConfig, cfgGet } from "./config.mjs";
+import { ManifestGuard, walkFiles } from "./manifest.mjs";
 import { TOOLS, renderTool, adapterMarker } from "./adapters.mjs";
+import { CI_WORKFLOW, GITIGNORE_RULES, pkgVersion } from "./init.mjs";
 
 /** Refresh framework-owned files from the package. NEVER touches user ledgers
- * (docs/pm, docs/qa, docs/specs, docs/backlog, evd/) or vteam.config.yaml. */
+ * (docs/pm, docs/qa, docs/specs, docs/backlog, evd/) or vteam.config.yaml —
+ * and that promise is now a mechanism, not a comment: every write goes through
+ * the manifest guard, which only overwrites files whose on-disk hash matches
+ * what the framework last wrote. Anything else gets a `<file>.new` neighbor. */
 export async function update(_flags) {
   const root = repoRoot();
   const cfgFile = path.join(root, "vteam.config.yaml");
@@ -12,60 +18,84 @@ export async function update(_flags) {
     console.log("vteam.config.yaml missing — run `npx vteam init` first.");
     process.exit(1);
   }
-  const raw = fs.readFileSync(cfgFile, "utf8");
-  const grab = (k) => (raw.match(new RegExp(`^\\s*${k}:\\s*(.+)$`, "m")) || [])[1]?.trim();
-  const profile = grab("profile") || "generic";
-  const tracker = grab("provider") || "markdown";
+  let userCfg;
+  try {
+    userCfg = loadConfig(root); // the gates' own parser — sections, flow maps, comments, quotes
+  } catch (e) {
+    console.error(`vteam update: ${e.message}`);
+    process.exit(1);
+  }
+  const profile = String(cfgGet(userCfg, "stack.profile", "generic"));
   const cfg = {
-    project: { name: grab("name"), key: grab("key"), language: grab("language") },
-    paths: Object.fromEntries(["specs", "pm", "qa", "adr", "team", "design", "evidence", "backlog"]
-      .map((k) => [k, (raw.match(new RegExp(`^  ${k}:\\s*(.+)$`, "m")) || [])[1]?.trim() || `docs/${k}`])),
+    ...userCfg,
+    paths: { // defaults must match init's — evidence lives at evd, not docs/evidence
+      specs: "docs/specs", pm: "docs/pm", qa: "docs/qa", adr: "docs/adr",
+      team: "docs/team", design: "docs/design", evidence: "evd", backlog: "docs/backlog",
+      ...(userCfg.paths ?? {}),
+    },
   };
+  const guard = new ManifestGuard(root);
+  if (!guard.old) {
+    console.log("⚠ no .vteam/manifest.json (pre-manifest install) — files that differ from " +
+      "this package version are kept and offered as *.new; this run writes the manifest.");
+  }
 
-  copyDir(path.join(pkgRoot, "core", "scripts"), path.join(root, ".vteam", "scripts"));
-  copyDir(path.join(pkgRoot, "core", "locales"), path.join(root, ".vteam", "locales"));
-  if (fs.existsSync(path.join(pkgRoot, "profiles", profile)))
-    copyDir(path.join(pkgRoot, "profiles", profile), path.join(root, ".vteam", "profiles", profile));
+  // ---- .vteam runtime -----------------------------------------------------------
+  guard.syncDir(path.join(pkgRoot, "core", "scripts"), ".vteam/scripts");
+  guard.syncDir(path.join(pkgRoot, "core", "locales"), ".vteam/locales");
+  if (fs.existsSync(path.join(pkgRoot, "profiles", profile))) {
+    guard.syncDir(path.join(pkgRoot, "profiles", profile), `.vteam/profiles/${profile}`);
+  }
   for (const kind of ["tracker", "design"]) {
     const dir = path.join(root, ".vteam", "providers");
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir)) {
       const m = f.match(new RegExp(`^${kind}_(\\w+)\\.py$`));
-      if (m && fs.existsSync(path.join(pkgRoot, "providers", kind, `${m[1]}.py`)))
-        fs.copyFileSync(path.join(pkgRoot, "providers", kind, `${m[1]}.py`), path.join(dir, f));
+      if (m && fs.existsSync(path.join(pkgRoot, "providers", kind, `${m[1]}.py`))) {
+        guard.sync(`.vteam/providers/${f}`,
+          fs.readFileSync(path.join(pkgRoot, "providers", kind, `${m[1]}.py`)));
+      }
     }
   }
   console.log("✓ .vteam runtime refreshed");
 
-  // doctrine: overwrite framework files, but respect local edits? Doctrine is
-  // framework-owned — refresh it; project-specific rules belong in the config
-  // and ledgers, not edits to doctrine (supersession law: one rule, one home).
+  // ---- doctrine (framework-owned, but user edits are preserved as conflicts) -----
   const docSrc = path.join(pkgRoot, "core", "doctrine");
-  const docDst = path.join(root, cfg.paths.team);
-  for (const rel of walk(docSrc)) {
-    const text = fs.readFileSync(path.join(docSrc, rel), "utf8");
-    const out = path.join(docDst, rel);
-    fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, rel.endsWith(".md") ? render(text, cfg) : text);
+  const teamDir = String(cfg.paths.team).replace(/\/+$/, "");
+  for (const rel of walkFiles(docSrc)) {
+    const text = fs.readFileSync(path.join(docSrc, ...rel.split("/")), "utf8");
+    guard.sync(`${teamDir}/${rel}`, rel.endsWith(".md") ? render(text, cfg) : text);
   }
-  console.log(`✓ doctrine refreshed in ${cfg.paths.team}`);
+  console.log(`✓ doctrine refreshed in ${teamDir}`);
 
-  // re-render adapters for every tool already present (marker from the adapter module)
+  // ---- git fence + CI workflow (same rule: refresh, never clobber edits) ---------
+  guard.sync(".githooks/pre-push",
+    fs.readFileSync(path.join(pkgRoot, "core", "templates", "hooks", "pre-push"), "utf8"), 0o755);
+  guard.sync(".github/workflows/vteam-gate.yml", CI_WORKFLOW);
+
+  // ---- .gitignore rules: additive only — user lines are never touched ------------
+  const gi = path.join(root, ".gitignore");
+  const giText = fs.existsSync(gi) ? fs.readFileSync(gi, "utf8") : "";
+  const giLines = new Set(giText.split("\n").map((l) => l.trim()));
+  const missing = GITIGNORE_RULES.filter((r) => !giLines.has(r));
+  if (missing.length) {
+    fs.appendFileSync(gi, "\n" + missing.join("\n") + "\n");
+    console.log(`✓ .gitignore rules refreshed (${missing.length} added)`);
+  }
+
+  // ---- adapters: re-render every tool already present ------------------------------
   for (const tool of TOOLS) {
     if (fs.existsSync(path.join(root, await adapterMarker(tool)))) {
-      await renderTool(tool, root, cfg);
+      await renderTool(tool, root, cfg, (rel, text) => guard.sync(rel, text));
       console.log(`✓ ${tool} workflows re-rendered`);
     }
   }
-  console.log("update done — ledgers and config untouched.");
-}
 
-function walk(dir, prefix = "") {
-  const out = [];
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const rel = prefix ? path.join(prefix, e.name) : e.name;
-    if (e.isDirectory()) out.push(...walk(path.join(dir, e.name), rel));
-    else out.push(rel);
+  guard.save(pkgVersion());
+  if (guard.conflicts.length) {
+    console.log(`\n⚠ ${guard.conflicts.length} file(s) differ from what the framework last wrote — kept YOURS, new version parked beside it:`);
+    for (const c of guard.conflicts) console.log(`  ${c}  →  ${c}.new`);
+    console.log("  Review each pair, merge what you want, then delete the .new file.");
   }
-  return out;
+  console.log("update done — ledgers and config untouched.");
 }

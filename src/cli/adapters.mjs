@@ -4,6 +4,7 @@
 // block, delegates to the tool module, and writes the results.
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { pkgRoot, render, parseFrontmatter, writeFile } from "./util.mjs";
 
@@ -19,7 +20,9 @@ const NO_SUBAGENT_NOTE = `> **Adapter note:** this tool has no native subagent s
 
 async function loadAdapter(tool) {
   if (!TOOLS.includes(tool)) throw new Error(`unknown tool ${tool}`);
-  return import(path.join(pkgRoot, "adapters", `${tool}.mjs`));
+  // file:// URL, not a bare absolute path — plain C:\… specifiers crash Node's
+  // ESM loader on Windows (ERR_UNSUPPORTED_ESM_URL_SCHEME).
+  return import(pathToFileURL(path.join(pkgRoot, "adapters", `${tool}.mjs`)).href);
 }
 
 export async function adapterMarker(tool) {
@@ -55,8 +58,11 @@ function workflows() {
   });
 }
 
-/** Render all workflows for one tool into the target repo. Returns written paths. */
-export async function renderTool(tool, root, cfg) {
+/** Render all workflows for one tool into the target repo. Returns written
+ * paths. `write(relPath, text)` lets init/update route output through the
+ * manifest guard; the default writes directly. */
+export async function renderTool(tool, root, cfg,
+  write = (rel, text) => writeFile(path.join(root, rel), text)) {
   const adapter = await loadAdapter(tool);
   const routing = routingBlock(tool, root);
   const ctx = { root, cfg, noSubagentNote: NO_SUBAGENT_NOTE };
@@ -66,12 +72,12 @@ export async function renderTool(tool, root, cfg) {
     const wf = {
       name,
       description: render(raw.meta.description || "", cfg),
-      args: raw.meta.args || "",
+      args: render(raw.meta.args || "", cfg), // frontmatter args carry {project.key} too
       // guidelines is method-only — no agents spawned, no routing block needed
       body: (name === "guidelines" ? "" : routing) + render(raw.body, cfg),
     };
     const out = adapter.render(wf, ctx);
-    writeFile(path.join(root, out.path), out.text);
+    write(out.path, out.text);
     written.push(out.path);
   }
   if (adapter.pointers) written.push(...adapter.pointers(root));

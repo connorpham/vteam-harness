@@ -14,6 +14,11 @@ Interface (all providers):
     get_issue(key)   -> Issue dict: {key, summary, description, status,
                         status_category, assignee, labels, estimate, links,
                         comments, attachments}
+                        `comments` is NEWEST-FIRST — a fixed interface
+                        semantic, not a provider choice: comment_check reads
+                        comments[:5] as "the latest 5". jira orders with
+                        orderBy=-created; the markdown provider appends
+                        oldest-first on disk and REVERSES at parse time.
     search(query)    -> [Issue]  (provider-native query string)
     transition(key, category)      # category: in_progress|in_review|done|todo
     comment(key, body) -> the body as READ BACK from the tracker (None = failed)
@@ -23,6 +28,11 @@ Interface (all providers):
 
 status_category maps provider-specific status names via config:
 `tracker.done_statuses`, `tracker.review_status`.
+
+Ticket keys are UNTRUSTED input (agents copy them from tracker/branch content):
+valid_key() rejects anything but <letters+digits>-<number> BEFORE a path or URL
+is built from a key — see MarkdownTracker._file/attach/link and the jira
+provider. Selftest: python3 tracker.py --selftest.
 """
 from __future__ import annotations
 
@@ -30,9 +40,26 @@ import hashlib
 import importlib.util
 import re
 import shutil
+import sys
 from pathlib import Path
 
 from ctx import Ctx
+
+KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*-[0-9]+$")
+
+
+def valid_key(key: str) -> str:
+    """Validate a ticket key BEFORE any filesystem path or URL is built from it.
+
+    Keys flow in from argv, plan.yaml and tracker content — all agent-writable —
+    so '../../x' or 'PROJ-1/../..' must die LOUDLY here, never traverse a path
+    or bend a request URL. Returns the canonical UPPERCASE key."""
+    k = str(key).strip()
+    if not KEY_RE.fullmatch(k):
+        raise SystemExit(f"tracker: invalid ticket key {key!r} — expected "
+                         f"<PREFIX>-<number> (letters/digits prefix, e.g. PROJ-12); "
+                         f"refusing to build a path or URL from it")
+    return k.upper()
 
 
 class Tracker:
@@ -84,6 +111,11 @@ class MarkdownTracker(Tracker):
         ## Comments
         ### <timestamp>
         <body>
+
+    File appends are oldest-first; the parsed `comments` list is REVERSED to
+    honor the interface's newest-first contract (comment_check reads
+    comments[:5] as "the latest 5" — oldest-first would false-red every ticket
+    past 5 comments).
     """
 
     def __init__(self, c: Ctx):
@@ -91,7 +123,7 @@ class MarkdownTracker(Tracker):
         self.dir = c.root / str(c.cfg("paths.backlog", "docs/backlog"))
 
     def _file(self, key: str) -> Path:
-        return self.dir / f"{key.upper()}.md"
+        return self.dir / f"{valid_key(key)}.md"
 
     def ping(self) -> tuple[bool, str]:
         if self.dir.is_dir():
@@ -116,7 +148,8 @@ class MarkdownTracker(Tracker):
             "labels": [x.strip() for x in field("labels").split(",") if x.strip()],
             "estimate": field("estimate"),
             "links": {"blocked_by": [x.strip().upper() for x in field("blocked-by").split(",") if x.strip()]},
-            "comments": [c.strip() for c in comments],
+            # file order is oldest-first (appends) — interface wants NEWEST-FIRST
+            "comments": [c.strip() for c in reversed(comments)],
             "attachments": sorted(p.name for p in (self.dir / "attachments" / key.upper()).glob("*"))
                            if (self.dir / "attachments" / key.upper()).is_dir() else [],
         }
@@ -160,7 +193,7 @@ class MarkdownTracker(Tracker):
         return body if any(body.strip() in c for c in issue["comments"]) else None
 
     def attach(self, key: str, path: Path):
-        dest_dir = self.dir / "attachments" / key.upper()
+        dest_dir = self.dir / "attachments" / valid_key(key)
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / path.name
         shutil.copy2(path, dest)
@@ -171,6 +204,7 @@ class MarkdownTracker(Tracker):
                 "url": str(dest.relative_to(self.c.root))}
 
     def link(self, blocker: str, blocked: str) -> None:
+        blocker = valid_key(blocker)  # written into the ticket file — validate first
         f = self._file(blocked)
         text = f.read_text(encoding="utf-8")
         m = re.search(r"^- blocked-by:\s*(.*)$", text, re.M)
@@ -202,3 +236,55 @@ def load(c: Ctx) -> Tracker:
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
     return mod.Provider(c)
+
+
+def _selftest():
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\nproject:\n  key: PROJ\npaths:\n  backlog: docs/backlog\n"
+            "tracker:\n  provider: markdown\n", encoding="utf-8")
+        bl = root / "docs" / "backlog"
+        bl.mkdir(parents=True)
+        (bl / "PROJ-1.md").write_text("# PROJ-1: demo ticket\n- status: To Do\n\nbody\n",
+                                      encoding="utf-8")
+        t = MarkdownTracker(Ctx(start=root))
+
+        # ordering contract: comments() is NEWEST-FIRST, including past 5 comments
+        for i in range(1, 7):
+            assert t.comment("PROJ-1", f"comment number {i}") is not None, "read-back failed"
+        issue = t.get_issue("PROJ-1")
+        assert len(issue["comments"]) == 6, issue["comments"]
+        assert "comment number 6" in issue["comments"][0], issue["comments"][0]
+        assert "comment number 1" in issue["comments"][-1], issue["comments"][-1]
+        # the comment_check contract — the latest post must sit inside [:5]
+        assert any("comment number 6" in b for b in issue["comments"][:5]), \
+            "newest comment fell outside the latest-5 window — ordering broken"
+
+        # mutations — traversal/malformed keys must die BEFORE any path is built
+        for bad in ("../../etc/passwd", "PROJ-1/../../x", "PROJ_1", "PROJ-", "-1", "PROJ-1x"):
+            for op in (lambda k: t._file(k),
+                       lambda k: t.attach(k, root / "vteam.config.yaml"),
+                       lambda k: t.link(k, "PROJ-1")):
+                try:
+                    op(bad)
+                    raise AssertionError(f"key {bad!r} should have exited")
+                except SystemExit:
+                    pass
+        assert not (bl / "attachments").exists(), "a bad key still created a directory"
+
+        # transition + read-back still work after validation
+        t.transition("PROJ-1", "in_review")
+        assert t.get_issue("PROJ-1")["status_category"] == "in_review"
+    print("tracker selftest: OK (markdown comments NEWEST-FIRST incl. >5 window, "
+          "read-back, 6 bad keys × 3 ops all red, transition)")
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
+    else:
+        print(__doc__)

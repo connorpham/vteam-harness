@@ -1,46 +1,136 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { pkgRoot, repoRoot, ask, askChoice, copyDir, writeIfAbsent, writeFile, render } from "./util.mjs";
+import { pkgRoot, gitRoot, ask, askChoice, writeIfAbsent, writeFile, render } from "./util.mjs";
+import { parseConfig } from "./config.mjs";
+import { ManifestGuard, walkFiles } from "./manifest.mjs";
 import { TOOLS, renderTool } from "./adapters.mjs";
 
 const PROFILES = ["generic", "node", "python", "nextjs-prisma"];
 const TRACKERS = ["markdown", "jira"];
 const DESIGNS = ["none", "figma"];
 const AUTONOMY = ["off", "assisted", "full"];
+const VALUE_FLAGS = ["name", "key", "language", "profile", "tracker", "design", "autonomy", "tools"];
+
+/** The CI workflow init installs (update refreshes it under the manifest rule). */
+export const CI_WORKFLOW = `name: vteam gate
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install pillow
+      - run: bash .vteam/scripts/gate.sh
+`;
+
+/** The .gitignore rules init appends (tokens live in .env — .env stays out of git). */
+export const GITIGNORE_RULES = [
+  "# vteam: evidence text commits, binaries don't",
+  "evd/**",
+  "!evd/**/",
+  "!evd/**/*.md",
+  "!evd/**/*.json",
+  "# vteam: tokens live in .env — .env never commits",
+  ".env",
+];
+
+function fail(msg) {
+  console.error(`vteam init: ${msg}`);
+  process.exit(1);
+}
+
+/** A user string as a YAML scalar that round-trips through lib/ctx.py's
+ * constrained parser (quotes stripped, NO escape sequences, ' #' always a
+ * comment — even inside quotes). Anything that can't round-trip is rejected
+ * BEFORE any file is written. */
+function yamlStr(s, what) {
+  if (/[\r\n]/.test(s)) fail(`${what} must be a single line`);
+  if (/\s#/.test(s)) fail(`${what} cannot contain ' #' — the config parser treats it as a comment`);
+  if (s.includes("'") && s.includes('"')) fail(`${what} cannot mix single and double quotes`);
+  if (/^\s|\s$/.test(s)) fail(`${what} cannot start or end with whitespace`);
+  return s.includes("'") ? `"${s}"` : `'${s}'`;
+}
 
 export async function init(flags) {
-  const root = repoRoot();
+  // ---- preconditions ---------------------------------------------------------
+  const root = gitRoot();
+  if (!root) fail("not a git repository — run `git init` first, then re-run `vteam init`.");
   const cfgFile = path.join(root, "vteam.config.yaml");
   if (fs.existsSync(cfgFile)) {
     console.log("vteam.config.yaml already exists — use `vteam update` to refresh the install.");
     process.exit(1);
   }
+  for (const f of VALUE_FLAGS) {
+    if (flags[f] === true) fail(`--${f} requires a value (e.g. --${f} <value>)`);
+  }
 
+  // ---- gather (prompt only on a real TTY) --------------------------------------
   const yes = !!flags.yes;
-  const get = async (flag, q, def) => flags[flag] ?? (yes ? def : await ask(q, def));
-  const getChoice = async (flag, q, opts, def) =>
-    flags[flag] ?? (yes ? def : await askChoice(q, opts, def));
+  const needTTY = (flag) => {
+    if (!process.stdin.isTTY) {
+      fail(`non-interactive session: pass --yes or all flags (missing --${flag})`);
+    }
+  };
+  const get = async (flag, q, def) => {
+    if (flags[flag] !== undefined) return String(flags[flag]);
+    if (yes) return def;
+    needTTY(flag);
+    return ask(q, def);
+  };
+  const getChoice = async (flag, q, opts, def) => {
+    if (flags[flag] !== undefined) return String(flags[flag]);
+    if (yes) return def;
+    needTTY(flag);
+    return askChoice(q, opts, def);
+  };
 
   const name = await get("name", "Project name", path.basename(root));
-  const key = (await get("key", "Ticket key prefix (e.g. PROJ)", "PROJ")).toUpperCase();
+  const keyRaw = await get("key", "Ticket key prefix (e.g. PROJ)", "PROJ");
   const language = await get("language", "Owner-facing output language (en, vi, …)", "en");
   const profile = await getChoice("profile", "Stack profile", PROFILES, "generic");
   const tracker = await getChoice("tracker", "Issue tracker", TRACKERS, "markdown");
   const design = await getChoice("design", "Design source", DESIGNS, "none");
   const autonomy = await getChoice("autonomy", "Autonomy level (quality gates never relax; this only flips wait-for-human gates)", AUTONOMY, "assisted");
   const toolsRaw = await get("tools", `Agent tools to install (comma-separated: ${TOOLS.join(", ")})`, "claude-code");
-  const tools = String(toolsRaw).split(",").map((t) => t.trim()).filter((t) => TOOLS.includes(t));
+
+  // ---- validate EVERYTHING before the first write -------------------------------
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(keyRaw)) {
+    fail(`--key must match ^[A-Za-z][A-Za-z0-9]*$ (got ${JSON.stringify(keyRaw)})`);
+  }
+  const key = keyRaw.toUpperCase();
+  if (!/^[A-Za-z]{2,8}$/.test(language)) {
+    fail(`--language must be a 2-8 letter code like en, vi (got ${JSON.stringify(language)})`);
+  }
+  if (!PROFILES.includes(profile)) fail(`unknown --profile ${JSON.stringify(profile)} — valid: ${PROFILES.join(", ")}`);
+  if (!TRACKERS.includes(tracker)) fail(`unknown --tracker ${JSON.stringify(tracker)} — valid: ${TRACKERS.join(", ")}`);
+  if (!DESIGNS.includes(design)) fail(`unknown --design ${JSON.stringify(design)} — valid: ${DESIGNS.join(", ")}`);
+  if (!AUTONOMY.includes(autonomy)) fail(`unknown --autonomy ${JSON.stringify(autonomy)} — valid: ${AUTONOMY.join(", ")}`);
+  const tools = String(toolsRaw).split(",").map((t) => t.trim()).filter(Boolean);
   if (!tools.length) tools.push("claude-code");
+  for (const t of tools) {
+    if (!TOOLS.includes(t)) fail(`unknown --tools value ${JSON.stringify(t)} — valid: ${TOOLS.join(", ")}`);
+  }
+  const nameYaml = yamlStr(name, "--name");
   const today = new Date().toISOString().slice(0, 10);
 
-  const cfg = {
-    project: { name, key, language, adopted: today },
-    paths: {
-      specs: "docs/specs", pm: "docs/pm", qa: "docs/qa", adr: "docs/adr",
-      team: "docs/team", design: "docs/design", evidence: "evd", backlog: "docs/backlog",
-    },
-  };
+  // hooks safety: NEVER silently disable an existing hook manager (husky, lefthook,
+  // populated .git/hooks). If one is present, ship the fence but leave wiring manual.
+  let currentHooksPath = "";
+  try {
+    currentHooksPath = execSync("git config core.hooksPath",
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch { /* unset */ }
+  let existingHooks = [];
+  try {
+    const hooksDir = path.join(root, ".git", "hooks");
+    existingHooks = fs.readdirSync(hooksDir).filter((f) => !f.endsWith(".sample"));
+  } catch { /* .git may be a worktree file — treat as no local hooks */ }
+  const foreignHooksPath = currentHooksPath && currentHooksPath !== ".githooks";
+  const hooksMode = (foreignHooksPath || existingHooks.length) ? "external" : "managed";
 
   // ---- vteam.config.yaml ----------------------------------------------------
   const yaml = `# vteam configuration — the contract between this repo and the framework.
@@ -48,9 +138,9 @@ export async function init(flags) {
 version: 1
 
 project:
-  name: ${name}
+  name: ${nameYaml}
   key: ${key}
-  language: ${language}
+  language: ${language.toLowerCase()}
   adopted: ${today}
 
 paths:
@@ -63,6 +153,12 @@ paths:
   evidence: evd
   backlog: docs/backlog
 
+specs:
+  # the ORIGINAL spec documents BA shards from (verbatim_gate compares shards
+  # in paths.specs against these — leave empty until you have source docs;
+  # never point it at paths.specs itself: self-comparison is self-grading)
+  sources: []
+
 stack:
   profile: ${profile}
   package_manager: npm
@@ -70,7 +166,7 @@ stack:
 git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
-  hooks: managed
+  hooks: ${hooksMode}
   code_paths: [src/, prisma/]
 
 tracker:
@@ -102,24 +198,35 @@ review:
 models:
   routing: default
 `;
+
+  // round-trip proof BEFORE writing: the generated YAML must come back
+  // identical through the same constrained parser the gates use.
+  let cfg;
+  try {
+    cfg = parseConfig(yaml);
+  } catch (e) {
+    fail(`generated config does not parse (${e.message}) — check --name/--key values`);
+  }
+  if (cfg.project.name !== name) fail(`project.name would not round-trip through the config parser (got ${JSON.stringify(cfg.project.name)}) — simplify --name`);
+  if (cfg.project.key !== key) fail("project.key would not round-trip through the config parser");
+
   writeFile(cfgFile, yaml);
 
-  // ---- .vteam runtime ---------------------------------------------------------
-  copyDir(path.join(pkgRoot, "core", "scripts"), path.join(root, ".vteam", "scripts"));
-  copyDir(path.join(pkgRoot, "core", "locales"), path.join(root, ".vteam", "locales"));
-  copyDir(path.join(pkgRoot, "profiles", profile), path.join(root, ".vteam", "profiles", profile));
+  // ---- .vteam runtime (recorded in the manifest) --------------------------------
+  const guard = new ManifestGuard(root);
+  guard.forceDir(path.join(pkgRoot, "core", "scripts"), ".vteam/scripts");
+  guard.forceDir(path.join(pkgRoot, "core", "locales"), ".vteam/locales");
+  guard.forceDir(path.join(pkgRoot, "profiles", profile), `.vteam/profiles/${profile}`);
   if (tracker !== "markdown") {
-    fs.mkdirSync(path.join(root, ".vteam", "providers"), { recursive: true });
-    fs.copyFileSync(path.join(pkgRoot, "providers", "tracker", `${tracker}.py`),
-      path.join(root, ".vteam", "providers", `tracker_${tracker}.py`));
+    guard.force(`.vteam/providers/tracker_${tracker}.py`,
+      fs.readFileSync(path.join(pkgRoot, "providers", "tracker", `${tracker}.py`)));
   }
   if (design !== "none") {
-    fs.mkdirSync(path.join(root, ".vteam", "providers"), { recursive: true });
-    fs.copyFileSync(path.join(pkgRoot, "providers", "design", `${design}.py`),
-      path.join(root, ".vteam", "providers", `design_${design}.py`));
+    guard.force(`.vteam/providers/design_${design}.py`,
+      fs.readFileSync(path.join(pkgRoot, "providers", "design", `${design}.py`)));
   }
 
-  // ---- docs skeletons (never clobber existing ledgers) -----------------------
+  // ---- docs skeletons (user ledgers from day one — never clobbered, never manifest-owned)
   const T = (f) => fs.readFileSync(path.join(pkgRoot, "core", "templates", "docs", f), "utf8");
   writeIfAbsent(path.join(root, "docs/pm/log.md"), T("log.md"));
   writeIfAbsent(path.join(root, "docs/pm/decisions.md"), T("decisions.md"));
@@ -131,68 +238,66 @@ models:
   writeIfAbsent(path.join(root, "docs/specs/changes.md"), T("changes.md"));
   if (tracker === "markdown") writeIfAbsent(path.join(root, "docs/backlog/.gitkeep"), "");
 
-  // ---- doctrine rendered into the repo ---------------------------------------
+  // ---- doctrine rendered into the repo (recorded only when actually written) ----
   const docSrc = path.join(pkgRoot, "core", "doctrine");
-  const docDst = path.join(root, "docs", "team");
-  for (const rel of walk(docSrc)) {
-    const out = path.join(docDst, rel);
-    const text = fs.readFileSync(path.join(docSrc, rel), "utf8");
-    writeIfAbsent(out, rel.endsWith(".md") ? render(text, cfg) : text);
+  for (const rel of walkFiles(docSrc)) {
+    const text = fs.readFileSync(path.join(docSrc, ...rel.split("/")), "utf8");
+    const rendered = rel.endsWith(".md") ? render(text, cfg) : text;
+    const outRel = `docs/team/${rel}`;
+    if (writeIfAbsent(path.join(root, ...outRel.split("/")), rendered)) guard.record(outRel, rendered);
+    else console.log(`⚠ ${outRel} already exists — kept yours (vteam update will offer ${outRel}.new)`);
   }
 
   // ---- git fence --------------------------------------------------------------
-  const hook = path.join(root, ".githooks", "pre-push");
-  writeIfAbsent(hook, fs.readFileSync(path.join(pkgRoot, "core", "templates", "hooks", "pre-push"), "utf8"));
-  try { fs.chmodSync(hook, 0o755); } catch {}
-  try {
-    execSync("git config core.hooksPath .githooks", { cwd: root });
-    console.log("✓ git config core.hooksPath .githooks");
-  } catch { console.log("⚠ could not set core.hooksPath — run it by hand"); }
+  const hookText = fs.readFileSync(path.join(pkgRoot, "core", "templates", "hooks", "pre-push"), "utf8");
+  const hookAbs = path.join(root, ".githooks", "pre-push");
+  if (writeIfAbsent(hookAbs, hookText)) guard.record(".githooks/pre-push", hookText);
+  try { fs.chmodSync(hookAbs, 0o755); } catch { /* pre-existing user hook: leave its mode */ }
+  if (hooksMode === "managed") {
+    try {
+      execSync("git config core.hooksPath .githooks", { cwd: root });
+      console.log("✓ git config core.hooksPath .githooks");
+    } catch { console.log("⚠ could not set core.hooksPath — run it by hand"); }
+  } else {
+    const reason = foreignHooksPath
+      ? `core.hooksPath is already ${JSON.stringify(currentHooksPath)}`
+      : `.git/hooks already contains: ${existingHooks.join(", ")}`;
+    console.log(`⚠ existing git hooks detected (${reason}) — NOT overwriting your hook setup.
+  vteam's pre-push fence sits at .githooks/pre-push but is NOT active. To wire it:
+    - have your hook manager's pre-push run:  .githooks/pre-push "$@"
+      (husky: add that line to .husky/pre-push), or
+    - switch entirely:  git config core.hooksPath .githooks  (disables your current hooks).
+  The config records git.hooks: external — vteam will not touch hook wiring.`);
+  }
 
-  // ---- .gitignore: evidence images out, text in --------------------------------
+  // ---- .gitignore: evidence images out, text in, .env out -----------------------
   const gi = path.join(root, ".gitignore");
-  const rules = "\n# vteam: evidence text commits, binaries don't\nevd/**\n!evd/**/\n!evd/**/*.md\n!evd/**/*.json\n";
   if (!fs.existsSync(gi) || !fs.readFileSync(gi, "utf8").includes("# vteam:")) {
-    fs.appendFileSync(gi, rules);
+    fs.appendFileSync(gi, "\n" + GITIGNORE_RULES.join("\n") + "\n");
   }
 
   // ---- CI workflow --------------------------------------------------------------
-  writeIfAbsent(path.join(root, ".github", "workflows", "vteam-gate.yml"),
-    `name: vteam gate
-on: [push, pull_request]
-jobs:
-  gate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - run: pip install pillow
-      - run: bash .vteam/scripts/gate.sh
-`);
+  const ciRel = ".github/workflows/vteam-gate.yml";
+  if (writeIfAbsent(path.join(root, ...ciRel.split("/")), CI_WORKFLOW)) guard.record(ciRel, CI_WORKFLOW);
 
-  // ---- adapters -----------------------------------------------------------------
+  // ---- adapters (outputs are framework-owned → recorded) --------------------------
   for (const tool of tools) {
-    const written = await renderTool(tool, root, cfg);
+    const written = await renderTool(tool, root, cfg, (rel, text) => guard.force(rel, text));
     console.log(`✓ ${tool}: ${written.length} workflow files`);
   }
 
+  guard.save(pkgVersion());
   console.log(`
 vteam installed. Next steps:
   1. Review vteam.config.yaml (high-stakes paths/terms, code_paths, capacity).
-  2. ${tracker === "jira" ? "Add JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN to .env." :
+  2. ${tracker === "jira" ? "Add JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN to .env (gitignored)." :
        "Tickets live in docs/backlog/*.md (markdown tracker — zero services)."}
-  ${design === "figma" ? "3. Add FIGMA_ACCESS_TOKEN / FIGMA_FILE_KEY to .env.\n  4." : "3."} Run: npx vteam doctor
+  ${design === "figma" ? "3. Add FIGMA_ACCESS_TOKEN / FIGMA_FILE_KEY to .env (gitignored).\n  4." : "3."} Run: npx vteam doctor
   Then start a workday with /team in your agent tool.`);
 }
 
-function walk(dir, prefix = "") {
-  const out = [];
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    const rel = prefix ? path.join(prefix, e.name) : e.name;
-    if (e.isDirectory()) out.push(...walk(path.join(dir, e.name), rel));
-    else out.push(rel);
-  }
-  return out;
+export function pkgVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(pkgRoot, "package.json"), "utf8")).version ?? "0";
+  } catch { return "0"; }
 }

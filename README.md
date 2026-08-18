@@ -47,9 +47,9 @@ Most frameworks solve the *"what to build"* side (specs, plans, task lists). **v
 | `/verify` | The gate | Lint → types → unit → build → reality checks → integration → e2e, in a fixed cheapest-first order. Skipped steps must declare why — silent skips are a failure. |
 | `guidelines` | Method | Behavioral defaults that prevent classic LLM coding mistakes (think first, surgical diffs, red-first tests). |
 
-### The machinery (14 gates that can actually fail)
+### The machinery (15 gates that can actually fail)
 
-Definition-of-Ready checks, review-dossier enforcement at `git push`, evidence validation (images must open, be readable, and **not be a blank/error page** — detected by pixel analysis), ledger schema checks, stale-verdict detection (*a verdict is valid only for the code it examined*), verbatim-spec guards, report-comment read-back, secret scanning with **no** escape hatch, and more. Every one carries `--selftest` mutation proof.
+Definition-of-Ready checks, review-dossier enforcement at `git push`, evidence validation (images must open, be readable, and **not be a blank/error page** — detected by pixel analysis), ledger schema checks, stale-verdict detection (*a verdict is valid only for the code it examined*), verbatim-spec guards, report-comment read-back, and secret scanning with **no** escape hatch that **fails closed** (no diff base → the full outgoing content is scanned). Every checking gate carries `--selftest` mutation proof — `doctor` runs all 17 (python, shell and node, context libraries included) — and the two live-environment gates (the pre-push fence and preflight) are driven to red for real by the e2e suite.
 
 ### The paper trail (your project's memory)
 
@@ -112,8 +112,10 @@ review:   { high_stakes_paths: [...], high_stakes_terms: [wallet, refund] }
 - **Languages:** the framework speaks English internally; every owner-facing report speaks *your* language (`language: vi`, etc.). Machine-checked markers are locale-neutral sentinels, so gates work in any language.
 
 ```bash
-npx vteam-harness doctor    # health check: config, hooks, all gate selftests, live provider pings
-npx vteam-harness update    # pull framework improvements — provably never touches your ledgers
+npx vteam-harness doctor    # python3 check, config parse, manifest verify, hooks, 17 selftests, live provider pings
+npx vteam-harness update    # refresh framework files — .vteam/manifest.json makes "never touches
+                            # your files" checkable: only hash-unmodified files are overwritten,
+                            # anything you edited is kept (new version parked as *.new)
 ```
 
 ---
@@ -130,7 +132,7 @@ Use them together if you like: vteam doesn't care where your spec came from, onl
 
 ## Status
 
-Working and end-to-end tested (fresh-repo install → doctor green; dogfooded against the source project's real artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates). Pre-1.0: expect sharp edges. GitHub/Linear tracker providers and deeper multi-human team support are next.
+Working and end-to-end tested — and the test ships in the repo: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) (fresh repo → init → **doctor green**, manifest-guarded update, invalid input writes nothing, the pre-push fence and secret scan actually go red), wired to CI on every push. Also dogfooded against the source project's real artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates. Published as `vteam-harness` (npm blocked the name `vteam` for similarity; the command is still `vteam`). Pre-1.0: expect sharp edges. GitHub/Linear tracker providers and deeper multi-human team support are next.
 
 - Architecture & design decisions: [docs/DESIGN.md](docs/DESIGN.md)
 - Build history & roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)

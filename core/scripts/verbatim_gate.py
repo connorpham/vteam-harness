@@ -76,13 +76,26 @@ def check_shard(name: str, text: str, truth: dict) -> tuple[list, int]:
 
 def main() -> int:
     c = Ctx()
-    sources = [c.root / s for s in c.cfg("specs.sources", [])]
-    if not sources:
-        print("⚠️  verbatim_gate: no `specs.sources` configured — nothing to compare "
-              "(configure it, or this gate guards nothing)")
+    # specs.sources = the ORIGINAL spec documents shards are copied from. It must
+    # be distinct from paths.specs (the shards) — self-comparison is self-grading.
+    configured = c.cfg("specs.sources", [])
+    if not configured:
+        print("⚠️  verbatim_gate: `specs.sources` is empty in vteam.config.yaml — "
+              "this gate guards NOTHING until you list the original spec documents "
+              "(the files BA shards from), e.g.\n"
+              "    specs:\n      sources: [docs/specs/sources]\n"
+              "Passing loudly, not silently.")
         return 0
-    truth, dupes = build_truth(sources)
     shard_dir = c.path("specs")
+    sources = []
+    for s in configured:
+        p = c.root / str(s)
+        if p.resolve() == shard_dir.resolve():
+            sys.exit(f"verbatim_gate: specs.sources entry {s!r} IS paths.specs — "
+                     f"comparing shards to themselves would always pass; point "
+                     f"sources at the original documents instead")
+        sources.append(p)
+    truth, dupes = build_truth(sources)
     problems, checked, files = [], 0, 0
     for f in sorted(shard_dir.glob("*.md")):
         if f.name in SKIP_NAMES or f.name.endswith("-draft.md") or "-plan" in f.name:

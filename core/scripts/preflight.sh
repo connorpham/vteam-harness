@@ -6,8 +6,12 @@
 # --backend: a ticket with no UI → the design-source legs only WARN, never block.
 # Exit 0 = all green; 1 with the misses + unblock steps. Never prints tokens.
 set -u
-cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-[ -f .env ] && { set -a; . ./.env; set +a; }
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/ctx.sh"
+cd "$(vteam_root 2>/dev/null || pwd)"
+# .env is parsed as INERT TEXT (ctx.sh), never sourced — a value carrying $(…)
+# or backticks is data here, exactly as in ctx.py. Sourcing .env would hand
+# code execution to anything that can write that file.
+vteam_load_env .env
 
 BACKEND=0
 [ "${1:-}" = "--backend" ] && BACKEND=1
@@ -49,7 +53,10 @@ case "$DSG" in
 esac
 
 # 3. Git + hosting CLI — push code, open PRs
-git remote get-url origin >/dev/null 2>&1 && ok "Git: remote origin $(git remote get-url origin)" \
+# The printed URL strips userinfo (user:token@) — remotes cloned with embedded
+# PATs are common in CI, and this script promises to never print tokens.
+git remote get-url origin >/dev/null 2>&1 \
+  && ok "Git: remote origin $(git remote get-url origin | sed -E 's#(://)[^/@]+@#\1#')" \
   || miss "Git" "no origin remote"
 HOOKS=$(git config core.hooksPath || true)
 if [ "$(python3 .vteam/scripts/lib/ctx.py git.hooks 2>/dev/null || echo managed)" = "managed" ]; then
