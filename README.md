@@ -2,186 +2,251 @@
 
 **Proof-of-done for AI agents.** Your agent can't say *done* anymore — it has to prove it.
 
-One command puts a whole virtual AI team to work on your repository — a PM, a BA, an architect, a developer, and a QA that ship real tickets with real evidence, on any AI coding tool.
+vteam installs a virtual software team into your repository — a PM, a BA, an architect, a developer and a QA — together with **12 machine gates that exit non-zero** when work is claimed but not proven. It runs on Claude Code, Cursor, Windsurf, Codex and Copilot, and it was extracted from a harness that ran a real project autonomously: 37+ merged PRs, 113+ confirmed review findings, 24/7 scheduled sessions, one human owner spending ~15 minutes a day. Every rule exists because something specific broke without it.
 
-## 60-second start
+- [Install and first run](#install-and-first-run)
+- [Requirements](#requirements)
+- [The problem it solves](#the-problem-it-solves)
+- [The five laws](#the-five-laws)
+- [What ships](#what-ships): [workflows](#workflows-8-rendered-for-your-tool) · [gates](#gates-12-checks-that-exit-non-zero) · [board](#the-board) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control)
+- [Configuration](#configuration)
+- [Command reference](#command-reference)
+- [What you get out of it](#what-you-get-out-of-it)
+- [Known limits](#known-limits)
+- [Status](#status)
+
+---
+
+## Install and first run
 
 ```bash
-npx vteam-harness audit    # grade this repo's AI-agent accountability 0-100 — no install, writes nothing
-npx vteam-harness init     # close the gap: the team + 15 machine gates (Claude Code, Cursor, Windsurf, Codex, Copilot)
-/team                      # then start a full "workday" in your agent tool
+npx vteam-harness audit    # 1. grade this repo 0-100. No install, no writes, no network.
+npx vteam-harness init     # 2. install the team + the gates
+npx vteam-harness doctor   # 3. prove the install: 17 selftests + provider preflight
 ```
 
-`audit` works on any repo, vteam or not: six dimensions (gates, hooks, evidence, review trail, verdicts, self-proof), a letter grade, and for every ❌ the exact artifact *a machine would need to see* to believe your agents. `--json` for scripts. It never writes, never phones home — and like every vteam check, it carries its own `--selftest` mutation proof.
+Then open your agent tool and run `/team` to start a workday, or `/dev PROJ-12` for one ticket.
 
-Claude Code users can skip the terminal:
+**Start with `audit`.** It works on any repository, vteam installed or not, and scores six dimensions — can anything fail red, do pushes get checked, does evidence outlive the chat session, is there a review trail, are approvals tied to commits, can your checks prove they can fail. For every ❌ it names the exact artifact *a machine would need to see*. Add `--json` for scripts.
+
+Claude Code users can install through the plugin instead of the terminal:
 
 ```
 /plugin marketplace add connorpham/vteam-harness
 /plugin install vteam@vteam-harness
-/vteam:setup               # grades the repo, installs, verifies — showing real output at every step
+/vteam:setup
 ```
 
-vteam belongs to the same family as **BMAD Method, SpecKit, OpenSpec and Superpowers** — but it was not designed on a whiteboard. It was **extracted from a production harness that ran a real project autonomously**: 37+ merged PRs, 113+ confirmed review findings, 24/7 scheduled sessions, a single human owner spending ~15 minutes a day. Every rule in this framework exists because something specific broke without it.
+**Working in a mature repo with no documentation?** Run `/docs` first. It reads your codebase, asks you one batched round of questions, and writes the spec shards, decision records and known-issues the other lanes assume already exist — marking every sentence `DRAFT-FROM-CODE` or `OWNER-CONFIRMED`, so nothing it inferred can be mistaken for something you confirmed.
+
+---
+
+## Requirements
+
+| Requirement | Why | If missing |
+|---|---|---|
+| **Node.js ≥ 20** | the installer CLI and the board | `npx` won't run |
+| **git** | repo root, hooks, the review fence, verdict anchoring | `init` refuses with one clear line |
+| **Python 3** | 12 of the gates are Python | `doctor` diagnoses it and stops — it never crashes on it |
+| **bash** | 2 gates, the pre-push fence, the session hook | on Windows use WSL or Git Bash |
+| **Pillow** (`pip install pillow`) | the two screenshot-evidence gates analyse pixels | those gates report *"CANNOT CHECK — Pillow missing"* and go red; they never quietly pass |
+
+The npm package itself has **zero dependencies** — nothing is downloaded at install time beyond the package, and there are no install scripts.
 
 ---
 
 ## The problem it solves
 
-AI agents are great at writing code and terrible at being **accountable** for it. Left alone, an agent will:
+AI agents write code well and are terrible at being **accountable** for it. Left alone, an agent will:
 
 - say *"done"* with nothing to prove it,
 - review its own work and approve it,
 - invent an answer when the spec is silent,
 - quietly skip the step that was inconvenient,
-- and produce reports that read well but point at nothing.
+- produce a report that reads well and points at nothing.
 
-Most frameworks solve the *"what to build"* side (specs, plans, task lists). **vteam solves the *"how a team of agents stays honest"* side** — and it does it with machinery, not prose:
+vteam does not ask an agent to be more careful. It makes *done* a machine's verdict: a gate exits non-zero, a push is refused, a verdict expires. Prose can be ignored; an exit code cannot.
 
-| Principle | What it means in practice |
+---
+
+## The five laws
+
+| Law | What it means in practice |
 |---|---|
-| **A gate that has never been red does not exist** | Every quality check ships with a *mutation self-test*: feed it a violating input, watch it fail, prove it works. An always-green check is deleted or fixed. |
-| **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable goes to a committed file or the issue tracker. Every outward write is **read back** to confirm it landed. |
-| **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip — with a documented, reversible, labelled paper trail. Real money, legal, credentials and data deletion are **never** auto-decided. |
-| **One rule, one home** | Changing a rule means deleting the old sentence in the same commit. No framework rot, no two files disagreeing about the law. |
-| **Agents don't chat** | One brief → one card → done. Briefs are file paths + scope, never pasted walls of text. Exactly one rebuttal round, and it must be paid for with runnable evidence. Your token bill stays sane. |
+| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` runs all 17. An always-green check gets fixed or deleted. |
+| **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable lands in a committed file or the tracker, and every outward write is **read back** to confirm it landed. |
+| **A verdict is valid only for the code it examined** | Each QA verdict pins two anchors: `COMMIT:` for the code and `VERIFIED-AT:` for the clock. When the code moves, the verdict expires and the ticket returns to the queue. A verdict that can't be anchored is red — *"cannot verify"* and *"verified clean"* are different answers. |
+| **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip, with a labelled, reversible paper trail. Real money, legal, credentials and data deletion are never auto-decided. |
+| **Agents don't chat** | One brief → one card → done. Briefs are file paths and scope, never pasted walls of text. Exactly one rebuttal round, and it must be paid for with runnable evidence. Your token bill stays sane. |
 
 ---
 
-## Who verifies the work?
+## What ships
 
-Every framework in this family tells the agent to be rigorous. The difference is what happens when it isn't:
-
-| | They ship | vteam ships |
-|---|---|---|
-| **"Done"** | The agent's own claim, styled as a checklist | `gate.sh` exits non-zero until tests, evidence and review dossiers exist — *done* is an exit code, not a sentence |
-| **Review** | A prompt asking the agent to review carefully | Committed review dossiers enforced at `git push`; every verdict pins the commit it examined and expires when the code moves |
-| **The gates themselves** | Trust — nobody tests the checker | Every checking gate ships `--selftest`: feed it a violating input, watch it go red. A gate that has never been red does not exist |
-
-The full receipts — tool by tool, with sources, star counts, and genuine credit where each one leads: **[docs/COMPARISON.md](docs/COMPARISON.md)**.
-
----
-
-## What you get after `npx vteam-harness init`
-
-### The team (8 workflows, rendered for YOUR tool)
+### Workflows (8, rendered for YOUR tool)
 
 | Command | Role | What it does |
 |---|---|---|
 | `/team` | Everyone | A full **workday**: clears your decision queue first, then works every unblocked item — dev tickets sequentially, BA drafts and architecture records in parallel background lanes, QA between dev tasks — until only *you* can move things forward. Ends with a one-page desk report. |
-| `/pm` | Project manager | Reads the tracker + sprint plan + decision queue, picks the highest-value unblocked work, dispatches it, and funnels everything that needs a human into ONE table. Never invents answers. |
-| `/ba` | Business analyst | Turns your spec into a runnable backlog: verbatim spec shards (byte-checked), user stories with *testable* Given/When/Then criteria, every gap becoming a structured question instead of a guess. Challenger-reviewed before tickets are filed. |
-| `/dev` | Developer | Ticket → branch → minimal implementation → verification gate → **self-review with machine-measured design fidelity** → two fresh reviewer agents (three on high-stakes diffs) → PR → a 7-part plain-language report on the ticket. |
-| `/qa` | QA engineer | Verify-only: derives expectations from the SPEC (never the ticket prose), runs 2–5 test cases headed in a real browser, collects annotated evidence, cross-checks every claim, gets a challenger sign-off, writes a report a non-programmer understands in 2 minutes. Never touches product code. |
-| `/docs` | Docs bootstrapper | For mature-but-undocumented repos: reads the codebase, asks you ONE batched round of questions, and writes the spec shards, decision seeds, known-issues and config patch the other lanes assume already exist. Every generated sentence is marked `DRAFT-FROM-CODE` or `OWNER-CONFIRMED` — nothing it guessed can be mistaken for something you confirmed. |
-| `/verify` | The gate | Lint → types → unit → build → reality checks → integration → e2e, in a fixed cheapest-first order. Skipped steps must declare why — silent skips are a failure. |
-| `guidelines` | Method | Behavioral defaults that prevent classic LLM coding mistakes (think first, surgical diffs, red-first tests). |
+| `/pm` | Project manager | Reads the tracker, sprint plan and decision queue, picks the highest-value unblocked work, dispatches it, and funnels everything needing a human into ONE table. Never invents answers. |
+| `/ba` | Business analyst | Turns a spec into a runnable backlog: byte-checked verbatim spec shards, user stories with *testable* Given/When/Then criteria, every gap becoming a structured question instead of a guess. Challenger-reviewed before tickets are filed. |
+| `/dev` | Developer | Ticket → branch → minimal implementation → verification gate → self-review with machine-measured design fidelity → two fresh reviewer agents (three on high-stakes diffs) → PR → a 7-part plain-language report on the ticket. |
+| `/qa` | QA engineer | Verify-only: derives expectations from the SPEC, never the ticket prose; runs 2–5 test cases in a real browser; collects annotated evidence; cross-checks every claim; gets a challenger sign-off; writes a report a non-programmer understands in two minutes. Never touches product code. |
+| `/docs` | Docs bootstrapper | Reads the codebase, interviews you once in a batched table, writes spec shards, decision seeds, known-issues and a **proposed** config patch — split `DRAFT-FROM-CODE` vs `OWNER-CONFIRMED`, and it never edits your config itself. |
+| `/verify` | The gate | Lint → types → unit → build → reality checks → integration → e2e, cheapest-first. A skipped step must declare why; a silent skip is a failure. |
+| `guidelines` | Method | Behavioural defaults that prevent classic LLM coding mistakes: think first, surgical diffs, red-first tests. |
 
-### The machinery (15 gates that can actually fail)
+### Gates (12 checks that exit non-zero)
 
-Definition-of-Ready checks, review-dossier enforcement at `git push`, evidence validation (images must open, be readable, and **not be a blank/error page** — detected by pixel analysis), ledger schema checks, stale-verdict detection (*a verdict is valid only for the code it examined* — verdicts pin TWO anchors, `COMMIT:` for the code and `VERIFIED-AT:` for the clock, so squash/rebase repos set `git.merge_strategy` and the gate falls back to the clock instead of going silently green; an unanchorable verdict is RED), verbatim-spec guards, report-comment read-back, and secret scanning with **no** escape hatch that **fails closed** (no diff base → the full outgoing content is scanned). Every checking gate carries `--selftest` mutation proof — `doctor` runs all 17 (python, shell and node, context libraries included) — and the two live-environment gates (the pre-push fence and preflight) are driven to red for real by the e2e suite.
+Each one ships a `--selftest` that feeds it a violating input and proves it goes red.
 
-### The board (see the proof trail without grepping it)
+| Gate | Blocks |
+|---|---|
+| `gate.py` | the verification pipeline itself — runs your stack profile's ordered steps and stops at the first red; a step that can't run without a declared `skip_reason` is a manifest error, not a skip |
+| `dor_check.py` | a ticket entering DEV without testable acceptance criteria, a spec citation, an estimate and a declared scope — with a durable waiver path for real exceptions |
+| `review_check.py` | a push whose review dossier is missing, malformed, or approves without a "what I tried to break" list |
+| `evd_check.py` | evidence that doesn't exist, doesn't open, or whose report skips the template — including every claim in the report that no evidence file backs |
+| `evd_ui_check.py` | screenshots that are blank, error pages or the wrong region — detected by pixel analysis, not by filename |
+| `stale_verdict_check.py` | a "done" ticket whose code changed after the verdict, and any verdict that cannot be anchored to a commit or timestamp |
+| `log_check.py` | a dispatch ledger row that breaks the schema, or a ledger edited anywhere but the end |
+| `verbatim_gate.py` | a spec shard that has drifted from the source document it was copied from |
+| `comment_check.py` | a ticket report missing any of its seven required sections |
+| `schedule_check.py` | *"we're on schedule"* as an opinion — the plan is a structured file and this computes the answer |
+| `docs_shrink_check.sh` | a ledger silently losing more than 20% of its lines (an accidental overwrite, not an edit) |
+| `preflight.sh` | starting work when the tracker, design source, git remote or database isn't actually reachable — every link is pinged for real |
 
-`npx vteam board` serves the accountability files back as one local page — ticket columns by status, ledger rows with `done`/`blocked`/`failed` badges and token accounting, evidence per ticket with its VERDICT and pinned COMMIT, and the decision queue front and center whenever something is OPEN. Read-only **by construction**, not by convention: binds `127.0.0.1` only, answers exactly `GET /` and `GET /api/state`, serves no files, no mutating endpoint at all — a board that could transition a ticket would be a second write path around the gates. Every panel names the file it was read from; empty panels say which file to create instead of rendering a plausible blank. And like every check in the repo, it proves it can fail: `node src/cli/board.mjs --selftest`.
+Plus the **pre-push fence** (`.githooks/pre-push`): no direct pushes to the protected branch, no product code on a branch outside your configured grammar, no push without its review dossier — and a **secret scan with no escape hatch that fails closed**: if the diff base is unavailable it scans the full outgoing content rather than passing.
 
-### The paper trail (your project's memory)
+Three more gates ship with the `nextjs-prisma` profile: design-token drift, UI fidelity measured against the design's own node data, and browser evidence capture.
 
-A decision queue (nothing needing you is ever scattered), a dispatch ledger (machine-checked, append-only), session minutes, an acceptance dossier (the ONE file you read to sign off), and a knowledge base with **graduation rules** — lessons don't accumulate, they turn into gates and then get deleted.
-
-### Performance & cost management (who did what, on which model, at what price)
-
-The ledger convention pays off because a machine reads it. `perf_report.py` turns it into answers:
-
-- **Who did what** — per-lane items, outcomes, token totals and medians.
-- **Was the model choice sane** — tier usage checked against the routing table, with flags: `frontier` used without an owner-approved escalation trail · a cheap lookup model doing DEV work · finished work with no model recorded. History written before vteam still reads (legacy model names are mapped; pre-adoption rows are grandfathered, never flagged unfairly).
-- **Where the tokens went** — outliers >2× the median (usually extra review rounds), a monthly trend, and a rough cost band priced from the model data file — honestly labelled an estimate.
-
-Flags land in every desk report; the full report is a mandatory input of the 14-day framework review — **routing changes get argued from this report, never from vibes**.
-
-### Model routing that reaches your tool
-
-Doctrine speaks in abstract tiers so it never rots (`frontier / workhorse / standard / utility` — expensive brains for expensive-if-wrong decisions, cheap brains for checklist work, and **never a downgrade at a quality gate**). One data file, `model-routing.data.yaml`, is the machine home: role→tier routing, high-stakes overrides (a diff touching money bumps the second reviewer up a tier), prices, and **the exact model name each tool wants**.
-
-Every rendered workflow carries the resolved table for *its* tool — a Claude Code agent knows exactly what to pass as the subagent `model` parameter; Cursor/Windsurf users get "switch your model picker to X for this pass"; tools you haven't configured show a visible SET-ME banner instead of a silently wrong default. Runtime resolution:
+### The board
 
 ```bash
-python3 .vteam/scripts/model_route.py dev-r2 --tool claude-code                # → sonnet
-python3 .vteam/scripts/model_route.py dev-r2 --tool claude-code --high-stakes # → opus
+npx vteam-harness board          # http://127.0.0.1:4177
 ```
 
-When providers change models or prices, you edit ONE data file and run `vteam update` — doctrine, workflows and reports all follow.
+The proof trail as one local page: ticket columns by status, ledger rows with `done`/`blocked`/`failed` badges and token accounting, evidence per ticket with its verdict and pinned commit, and the decision queue front and centre whenever something needs you.
+
+Read-only **by construction**: it binds `127.0.0.1` only, answers exactly `GET /` and `GET /api/state`, serves no files, and has no mutating endpoint at all — every write attempt gets a 405, because a board that could transition a ticket would be a second write path around the gates. Every panel names the file it read; empty panels tell you which file to create instead of rendering a plausible blank.
+
+### The paper trail
+
+Your project's memory, all machine-readable: a **decision queue** so nothing needing you is ever scattered, an append-only **dispatch ledger**, session minutes, an **acceptance dossier** (the one file you read to sign off), and a knowledge base with **graduation rules** — lessons don't pile up, they become gates and then get deleted.
+
+### Model routing and cost control
+
+Doctrine speaks in tiers so it never rots — `frontier / workhorse / standard / utility`: expensive models for expensive-if-wrong decisions, cheap models for checklist work, and **never a downgrade at a quality gate**. One data file (`model-routing.data.yaml`) holds role→tier routing, high-stakes overrides (a diff touching money bumps the second reviewer up a tier), prices, and the exact model name each tool expects.
+
+```bash
+python3 .vteam/scripts/model_route.py dev-r2 --tool claude-code                 # → sonnet
+python3 .vteam/scripts/model_route.py dev-r2 --tool claude-code --high-stakes   # → opus
+```
+
+Because the ledger records tokens and tier per ticket, `perf_report.py` answers questions instead of guessing: who did what at what cost, whether the model choice was sane (flagging frontier use without an approved escalation trail, or a cheap model doing DEV work), where the tokens went (outliers above 2× the median, monthly trend, a cost band honestly labelled an estimate). Routing changes get argued from that report, never from vibes.
 
 ---
 
-## What's in it for your project
+## Configuration
 
-**If you're a solo owner / founder:** the team runs while you sleep. Your daily touchpoint is a 15-minute desk report: what got done (with live evidence links), what needs you (batched questions with ready-made proposals and reversal costs), what's at risk in the next 7 days. When the backlog drains, you read one acceptance file and sign off in batches.
-
-**If you're a developer:** you stop being the agent's babysitter. The DoR gate bounces underspecified tickets back to analysis before you waste a session. Reviews come from *fresh* agents with empty context, held to a written standard — an APPROVE without a "what I tried to break" list is invalid, and a fabricated finding voids the whole card. Your PRs carry committed review dossiers anyone can audit later.
-
-**If you're a team:** work-in-progress is limited by design (one coding item at a time — Little's Law is enforced, not quoted), crashed sessions can't orphan tickets (claims have timestamps and TTLs), two sessions can't grab the same work, and the sprint plan is a structured file a script measures — *"we're on schedule"* is a computed number, never a hand-written sentence.
-
-**If you care about cost:** token discipline is a first-class rule set. Model routing sends expensive models only to expensive-if-wrong decisions (architecture, money logic, first reviewer) and cheap models to checklist work — resolved to concrete model names per tool, not left as prose. The ledger records tokens and the tier per ticket, and `perf_report.py` turns that into per-lane spend, routing-violation flags, outliers and a cost estimate — so the routing gets tuned with data, and overspend has nowhere to hide.
-
----
-
-## Works with your stack, not against it
-
-Everything project-specific lives in **one config file** — the framework itself contains zero assumptions about your project (that's a standing rule: adaptation is configuration, never forking).
+Everything project-specific lives in one file. Adaptation is configuration, never forking.
 
 ```yaml
-# vteam.config.yaml (generated by init, edited by you)
-project:  { name: My Project, key: PROJ, language: en }   # reports in en/vi/…
-stack:    { profile: nextjs-prisma }        # or node / python / generic
-tracker:  { provider: jira }                # or github / markdown (markdown = zero external services)
-design:   { provider: figma }               # or none
-autonomy: { level: assisted, self_merge: false }   # gates never relax; merges can stay human
-review:   { high_stakes_paths: [...], high_stakes_terms: [wallet, refund] }
+# vteam.config.yaml — generated by init, edited by you
+project:  { name: My Project, key: PROJ, language: en }   # reports in your language
+paths:    { specs: docs/specs, pm: docs/pm, qa: docs/qa, evidence: evd }
+stack:    { profile: node, package_manager: npm }         # generic | node | python | nextjs-prisma
+git:
+  protected_branch: main
+  branch_pattern: "^(feat|fix)/{key}-[0-9]+-"             # your grammar, enforced by the fence
+  merge_strategy: merge                                   # merge | squash | rebase
+  hooks: managed                                          # or external, if you own hook wiring
+tracker:  { provider: markdown }                          # markdown | jira | github
+design:   { provider: none }                              # none | figma
+autonomy: { level: assisted, self_merge: false }          # gates never relax; merges can stay human
+review:
+  reviewers: 2
+  high_stakes_paths: ["prisma/schema.prisma"]             # a diff here gets an extra reviewer
+  high_stakes_terms: [wallet, refund, payout]             # your project's risk vocabulary
+docs:
+  task_context:                                           # what /dev reads before coding
+    always: [docs/architecture.md]
+    by_label: { payment: [docs/specs/billing.md] }
 ```
 
-- **Agent tools:** Claude Code (native skills + subagents), Cursor, Windsurf, Codex, Copilot (with a documented sequential-review fallback for tools without subagents).
-- **Trackers:** Jira (every Atlassian quirk handled: ADF, attachment read-back, link-direction verification), **GitHub Issues** (`PROJ-123` ⇄ issue `#123`; labels carry the status machine, every write is read back, and it's honest about what the API can't do — attachments stay in the committed evidence dir, named on the issue), or a **markdown backlog** — tickets as files, so the whole framework runs with *no external service at all*.
-- **Design source:** Figma (fidelity measured in numbers against the design's own node data — expected values come from the design, never from your code, because *measuring code with code is self-grading*) or none.
-- **Languages:** the framework speaks English internally; every owner-facing report speaks *your* language (`language: vi`, etc.). Machine-checked markers are locale-neutral sentinels, so gates work in any language.
+Four knobs worth setting deliberately:
 
-```bash
-npx vteam-harness doctor    # python3 check, config parse, manifest verify, hooks, 17 selftests, live provider pings
-                            # --json for machine-readable {ok, checks}
-npx vteam-harness update    # refresh framework files — .vteam/manifest.json makes "never touches
-                            # your files" checkable: only hash-unmodified files are overwritten,
-                            # anything you edited is kept (new version parked as *.new)
-```
+- **`git.merge_strategy`** — `squash` and `rebase` discard branch commits when a PR lands, so verdicts anchor by timestamp instead of by sha. Set this to match your repo or the stale-verdict gate will tell you it cannot anchor.
+- **`autonomy.self_merge`** — whether an agent may merge its own green PR. Only honoured at `level: full`, and you can keep it `false` there.
+- **`review.high_stakes_terms`** — the words that mean money or irreversibility *in your product*. A diff mentioning them gets an extra reviewer at a higher tier.
+- **`docs.task_context`** — which background documents `/dev` must read for which kind of ticket. A file listed here but missing is reported loudly, never guessed around.
+
+Supported surfaces: **agent tools** Claude Code (native skills and subagents), Cursor, Windsurf, Codex and Copilot (the last two with a documented sequential-review fallback where subagents don't exist); **trackers** Jira (ADF flattening, attachment read-back, link-direction verification), GitHub Issues (`PROJ-123` ⇄ issue `#123`, labels carry the status machine) or a markdown backlog that needs no external service at all; **design source** Figma (fidelity measured against the design's own node data, because measuring code with code is self-grading) or none.
 
 ---
 
-## How is this different from BMAD / SpecKit / OpenSpec / Superpowers?
+## Command reference
 
-Those frameworks are strongest at the **front** of the lifecycle: turning an idea into specs, plans and tasks. vteam borrows gratefully where they lead (a change-ledger idea from OpenSpec, a scale-adaptive light path from BMAD, brief-writing and red-first testing standards from Superpowers) — and adds the part none of them enforce:
+| Command | What it does |
+|---|---|
+| `npx vteam-harness audit [--json]` | grade any repo's agent accountability 0–100. No install needed, never writes, no network. |
+| `npx vteam-harness init [--yes]` | install into the current repo. Every flag value is validated before the first byte is written; invalid input exits 1 having written nothing. Flags: `--name --key --language --profile --tracker --design --autonomy --tools`. |
+| `npx vteam-harness doctor [--json]` | prove the install: prerequisites, config parse, manifest integrity, hook wiring, routing freshness, all 17 selftests, live provider pings. |
+| `npx vteam-harness update` | refresh framework files. `.vteam/manifest.json` makes *"never touches your files"* checkable: only files whose hash matches what the framework last wrote get overwritten; anything you edited is kept and the new version is parked as `*.new`. |
+| `npx vteam-harness board [--port N]` | the read-only local dashboard. |
+| `npx vteam-harness doctor --migrate [--apply]` | rewrite legacy pre-vteam markers in existing ledgers and evidence. Dry-run by default. |
 
-> **the back of the lifecycle** — proof of done, adversarial review with teeth, evidence that survives the session, verdicts pinned to commits, autonomy with an audit trail, and a learning loop where every incident becomes a gate.
+---
 
-Use them together if you like: vteam doesn't care where your spec came from, only that once it exists, nothing ships without proving itself against it. The detailed, sourced comparison lives in [docs/COMPARISON.md](docs/COMPARISON.md).
+## What you get out of it
+
+**If you're a solo owner or founder:** the team works while you sleep, and your daily touchpoint is a 15-minute desk report — what got done with live evidence links, what needs you as batched questions with ready-made proposals and stated reversal costs, what's at risk in the next seven days. When the backlog drains you read one acceptance file and sign off in batches.
+
+**If you're a developer:** you stop babysitting the agent. Underspecified tickets bounce back to analysis before you waste a session. Reviews come from fresh agents with empty context held to a written standard, so an approval without a "what I tried to break" list is invalid and a fabricated finding voids the whole card. Your PRs carry committed review dossiers anyone can audit months later.
+
+**If you're leading a team:** work-in-progress is limited by design, crashed sessions can't orphan tickets (claims carry timestamps and TTLs), two sessions can't grab the same work, and *"we're on schedule"* becomes a number a script computes from a structured plan rather than a sentence someone typed.
+
+**If you care about cost:** token discipline is a first-class rule set, expensive models are routed only to expensive-if-wrong decisions, and every ticket's tokens and tier land in the ledger — so overspend has nowhere to hide and routing gets tuned from data.
+
+**If you're handing work to someone else:** every claim in the repository is traceable. A verdict names the commit it examined. A review names what it tried to break. Evidence is a file, not a memory of a chat.
+
+---
+
+## Known limits
+
+Stated plainly, because a framework about honest reporting should be honest about itself:
+
+- **It suits a repo willing to adopt the practice.** vteam creates the ledgers, specs and evidence layout it needs (and `/docs` bootstraps documentation from your code), but it does expect that from now on decisions land in files and evidence gets committed. If your team won't commit evidence, this is the wrong tool.
+- **`init` writes its layout using defaults it does not yet infer from your repo.** Review the generated `vteam.config.yaml` before your first run — especially `protected_branch`, `branch_pattern` and `merge_strategy`. Detect-then-propose is the next thing being built.
+- **Repo-level Claude Code skills with the same names are currently overwritten** by `init` (`team`, `pm`, `ba`, `dev`, `qa`, `verify`, `docs`, `guidelines`). If you have your own skill by one of those names, back it up first. This is a known bug, not a design choice, and it is being fixed.
+- **There is no `uninstall` command yet.** Removing vteam today means deleting `vteam.config.yaml`, `.vteam/`, the rendered tool directories, `.githooks/pre-push`, and resetting `core.hooksPath`.
+- **The CI snippet it writes is GitHub Actions.** On other platforms call `bash .vteam/scripts/gate.sh` from your own pipeline — the gates themselves are platform-agnostic.
+- **One human owner plus agents is the tested shape.** `team.size > 1` is documented but not yet enforced by machinery; treat multi-human support as best-effort.
+- **Trackers are markdown, Jira and GitHub Issues.** Linear and Trello are not implemented.
+- **Evidence is committed to git.** If your screenshots would contain regulated or personal data, decide your policy before enabling the screenshot gates — a committed image is permanent.
 
 ---
 
 ## Status
 
-Working and end-to-end tested — and the test ships in the repo: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) (fresh repo → init → **doctor green**, manifest-guarded update, invalid input writes nothing, the pre-push fence and secret scan actually go red), wired to CI on every push. Also dogfooded against the source project's real artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates. Published as `vteam-harness` (npm blocked the name `vteam` for similarity; the command is still `vteam`). Pre-1.0: expect sharp edges. The GitHub Issues tracker provider shipped with the proof-of-done campaign; Linear and deeper multi-human team support are next.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **82 checks** covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
 
-- Architecture & design decisions: [docs/DESIGN.md](docs/DESIGN.md)
-- Build history & roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
+Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
+
+- Architecture and design decisions: [docs/DESIGN.md](docs/DESIGN.md)
+- Build history and what's next: [docs/ROADMAP.md](docs/ROADMAP.md)
 - The incidents behind the rules: [core/doctrine/provenance.md](core/doctrine/provenance.md)
+- The excuses agents use to route around gates: [core/doctrine/red-flags.md](core/doctrine/red-flags.md)
 
 ## Layout
 
 ```
 core/        tool-agnostic source: doctrine, workflows, gates, templates, locales
-adapters/    one renderer module per tool (claude-code, cursor, windsurf, codex, copilot) — see adapters/README.md to add yours
-profiles/    stack profiles for the verification gate (nextjs-prisma, node, python, generic)
-providers/   tracker + design-source adapters (jira, github, markdown / figma, none)
-plugins/     the Claude Code plugin (/plugin marketplace add connorpham/vteam-harness)
-bin/, src/   the npx installer CLI (audit · init · doctor · update · doctor --migrate)
+adapters/    one renderer module per tool — see adapters/README.md to add yours
+profiles/    stack profiles for the verification gate (generic, node, python, nextjs-prisma)
+providers/   tracker and design-source adapters (markdown, jira, github / figma, none)
+plugins/     the Claude Code plugin
+bin/, src/   the installer CLI (audit · init · doctor · update · board · doctor --migrate)
+tests/       the end-to-end suite behind every claim above
 ```
 
 ## License
