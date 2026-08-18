@@ -101,6 +101,16 @@ decided requirement deltas live in the change ledger. A NEW spec contradiction
 discovered mid-work → add a CH-nn row with status `proposed` (PM/BA arbitrate
 later); don't just narrate it in the task-sheet.
 
+**Task context (only when config `docs.task_context` exists):** read the files it
+maps for THIS ticket — `always:` first, then the `by_label:` lists matching the
+ticket's labels and its issue type. This is the project background the owner
+already wrote down (created by `/docs` on undocumented repos); reading it is
+cheaper than rediscovering it in review. **A listed file that does not exist is
+said LOUDLY in the task-sheet** — one line, `task context MISSING: <path> (mapped
+by <always|label:<name>>)` — never silently skipped and never replaced by a
+guess: a stale mapping means either the config or the repo moved, and the owner
+needs to know which.
+
 Write `{paths.evidence}/<TICKET>/dev/tasksheet.md` BEFORE touching code (it
 carries Impact + assumptions + self-review results; it commits with the code so
 the next session can resume the work):
@@ -342,6 +352,8 @@ APPROVE does the pipeline proceed to T5. Unresolvable disagreement → the user.
       citations BEFORE the first edit, and COMMITS with the code
 - [ ] T1: change ledger filtered for this ticket's shard/screen; a newly found
       spec contradiction got a `proposed` CH-nn row
+- [ ] T1: `docs.task_context` files read (`always:` + this ticket's labels/type)
+      when configured; any missing mapped file named loudly in the task-sheet
 - [ ] Work on a `feat|fix/<TICKET>-*` branch — zero commits on the protected branch
 - [ ] Schema change (if any) has a committed migration + regenerated client
 - [ ] /verify gate green, exact result lines recorded

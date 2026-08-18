@@ -64,7 +64,7 @@ The full receipts — tool by tool, with sources, star counts, and genuine credi
 
 ## What you get after `npx vteam-harness init`
 
-### The team (7 workflows, rendered for YOUR tool)
+### The team (8 workflows, rendered for YOUR tool)
 
 | Command | Role | What it does |
 |---|---|---|
@@ -73,12 +73,17 @@ The full receipts — tool by tool, with sources, star counts, and genuine credi
 | `/ba` | Business analyst | Turns your spec into a runnable backlog: verbatim spec shards (byte-checked), user stories with *testable* Given/When/Then criteria, every gap becoming a structured question instead of a guess. Challenger-reviewed before tickets are filed. |
 | `/dev` | Developer | Ticket → branch → minimal implementation → verification gate → **self-review with machine-measured design fidelity** → two fresh reviewer agents (three on high-stakes diffs) → PR → a 7-part plain-language report on the ticket. |
 | `/qa` | QA engineer | Verify-only: derives expectations from the SPEC (never the ticket prose), runs 2–5 test cases headed in a real browser, collects annotated evidence, cross-checks every claim, gets a challenger sign-off, writes a report a non-programmer understands in 2 minutes. Never touches product code. |
+| `/docs` | Docs bootstrapper | For mature-but-undocumented repos: reads the codebase, asks you ONE batched round of questions, and writes the spec shards, decision seeds, known-issues and config patch the other lanes assume already exist. Every generated sentence is marked `DRAFT-FROM-CODE` or `OWNER-CONFIRMED` — nothing it guessed can be mistaken for something you confirmed. |
 | `/verify` | The gate | Lint → types → unit → build → reality checks → integration → e2e, in a fixed cheapest-first order. Skipped steps must declare why — silent skips are a failure. |
 | `guidelines` | Method | Behavioral defaults that prevent classic LLM coding mistakes (think first, surgical diffs, red-first tests). |
 
 ### The machinery (15 gates that can actually fail)
 
-Definition-of-Ready checks, review-dossier enforcement at `git push`, evidence validation (images must open, be readable, and **not be a blank/error page** — detected by pixel analysis), ledger schema checks, stale-verdict detection (*a verdict is valid only for the code it examined*), verbatim-spec guards, report-comment read-back, and secret scanning with **no** escape hatch that **fails closed** (no diff base → the full outgoing content is scanned). Every checking gate carries `--selftest` mutation proof — `doctor` runs all 17 (python, shell and node, context libraries included) — and the two live-environment gates (the pre-push fence and preflight) are driven to red for real by the e2e suite.
+Definition-of-Ready checks, review-dossier enforcement at `git push`, evidence validation (images must open, be readable, and **not be a blank/error page** — detected by pixel analysis), ledger schema checks, stale-verdict detection (*a verdict is valid only for the code it examined* — verdicts pin TWO anchors, `COMMIT:` for the code and `VERIFIED-AT:` for the clock, so squash/rebase repos set `git.merge_strategy` and the gate falls back to the clock instead of going silently green; an unanchorable verdict is RED), verbatim-spec guards, report-comment read-back, and secret scanning with **no** escape hatch that **fails closed** (no diff base → the full outgoing content is scanned). Every checking gate carries `--selftest` mutation proof — `doctor` runs all 17 (python, shell and node, context libraries included) — and the two live-environment gates (the pre-push fence and preflight) are driven to red for real by the e2e suite.
+
+### The board (see the proof trail without grepping it)
+
+`npx vteam board` serves the accountability files back as one local page — ticket columns by status, ledger rows with `done`/`blocked`/`failed` badges and token accounting, evidence per ticket with its VERDICT and pinned COMMIT, and the decision queue front and center whenever something is OPEN. Read-only **by construction**, not by convention: binds `127.0.0.1` only, answers exactly `GET /` and `GET /api/state`, serves no files, no mutating endpoint at all — a board that could transition a ticket would be a second write path around the gates. Every panel names the file it was read from; empty panels say which file to create instead of rendering a plausible blank. And like every check in the repo, it proves it can fail: `node src/cli/board.mjs --selftest`.
 
 ### The paper trail (your project's memory)
 
@@ -131,7 +136,7 @@ project:  { name: My Project, key: PROJ, language: en }   # reports in en/vi/…
 stack:    { profile: nextjs-prisma }        # or node / python / generic
 tracker:  { provider: jira }                # or github / markdown (markdown = zero external services)
 design:   { provider: figma }               # or none
-autonomy: { level: assisted }               # off / assisted / full
+autonomy: { level: assisted, self_merge: false }   # gates never relax; merges can stay human
 review:   { high_stakes_paths: [...], high_stakes_terms: [wallet, refund] }
 ```
 

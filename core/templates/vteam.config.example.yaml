@@ -26,6 +26,12 @@ specs:
                          # compares shards in paths.specs against these; never point
                          # it at paths.specs itself (self-comparison is self-grading)
 
+docs:
+  task_context:          # extra background /dev reads at T1, keyed by ticket label/type
+    always: []           # read for EVERY ticket, e.g. [docs/architecture.md]
+    by_label: {}         # label/type (lowercase) -> file list; mapped-but-missing files
+                         # are reported LOUDLY in the task sheet, never guessed
+
 stack:
   profile: generic       # generic | node | python | nextjs-prisma  → profiles/<name>/gates.yaml
   package_manager: npm
@@ -33,6 +39,8 @@ stack:
 git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
+  merge_strategy: merge  # merge | squash | rebase — squash/rebase discard branch shas,
+                         # so QA verdicts anchor by VERIFIED-AT (stale_verdict falls back to it)
   hooks: managed         # managed: vteam owns .githooks/pre-push · external: repo has real branch protection
   code_paths: [src/]     # "product code" for the review fence + stale-verdict scans
 
@@ -50,7 +58,8 @@ team:
   capacity_per_day: 0.8  # person-days of throughput per calendar working day
 
 autonomy:
-  level: assisted        # off: every gate waits for you · assisted: asks at merge/close · full: self-merge/self-close with paper trail
+  level: assisted
+  self_merge: false      # agent may merge its own green PR (only honored at level: full)        # off: every gate waits for you · assisted: asks at merge/close · full: self-merge/self-close with paper trail
   exemptions:            # NEVER auto-decided regardless of level
     - real-money
     - legal

@@ -36,6 +36,8 @@ export const GITIGNORE_RULES = [
   "!evd/**/*.json",
   "# vteam: tokens live in .env — .env never commits",
   ".env",
+  "# vteam: machine-local doctor snapshot for `vteam board`",
+  ".vteam/doctor.json",
 ];
 
 function fail(msg) {
@@ -159,6 +161,12 @@ specs:
   # never point it at paths.specs itself: self-comparison is self-grading)
   sources: []
 
+docs:
+  task_context:            # extra background /dev reads at T1, keyed by ticket label/type
+    always: []             # read for EVERY ticket, e.g. [docs/architecture.md]
+    by_label: {}           # label/type (lowercase) -> file list; a mapped-but-missing
+                           # file is reported LOUDLY in the task sheet, never guessed
+
 stack:
   profile: ${profile}
   package_manager: npm
@@ -166,6 +174,10 @@ stack:
 git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
+  merge_strategy: merge
+  # merge | squash | rebase — how PRs land on the protected branch. squash and
+  # rebase DISCARD branch shas, so QA verdicts anchor by VERIFIED-AT (qa workflow)
+  # and stale_verdict_check falls back to it; set this to match your repo.
   hooks: ${hooksMode}
   code_paths: [src/, prisma/]
 
@@ -183,6 +195,9 @@ team:
 
 autonomy:
   level: ${autonomy}
+  # agent may merge its own green PR — only honored at level: full; flip to
+  # false to keep every merge in human hands even at full autonomy
+  self_merge: ${autonomy === "full"}
   exemptions:
     - real-money
     - legal

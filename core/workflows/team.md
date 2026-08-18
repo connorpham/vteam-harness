@@ -16,7 +16,9 @@ in parallel**. On any conflict between the two files → /pm wins.
 **What this workflow is NOT:** not a "drop the gates for speed" mode. Every
 QUALITY gate of the child lanes (/verify, reviews per `review-standard.md`, the
 evidence gate, challengers) holds absolutely. At `autonomy.level: full`, the
-WAIT-FOR-HUMAN gates run autonomous: eligible PRs self-merge (/dev T5.3),
+WAIT-FOR-HUMAN gates run autonomous: eligible PRs self-merge — governed by
+config `autonomy.self_merge` (this install: **{autonomy.self_merge}**; off =
+green PRs wait for the owner even at full autonomy) —
 QA-passed tickets self-close (/qa V7.3b), challenger-approved BA drafts become
 tickets (/ba B4), due questions get provisional decisions with a paper trail
 (/pm P-DECIDE 2b). Only the EXEMPTIONS (`autonomy.exemptions`) still stop for

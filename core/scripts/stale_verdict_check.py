@@ -11,9 +11,16 @@ Anchor preference:
   1. The COMMIT sha pinned in {paths.evidence}/<T>/REPORT.md — precise, and the
      only anchor that also covers pre-merge verdicts (time-based anchors get
      "washed" by post-verdict pre-merge commits).
-  2. Fallback: the tracker's changelog (last move into a judged status) — only
-     for providers that keep one; the markdown provider doesn't, and this gate
-     says so instead of guessing.
+  2. The VERIFIED-AT timestamp in the same REPORT.md — the fallback that
+     survives squash/rebase merges, where the pinned branch sha is DISCARDED
+     when the branch lands (git.merge_strategy: squash|rebase declares this).
+  3. The tracker's changelog (last move into a judged status) — only for
+     providers that keep one; the markdown provider doesn't.
+  A judged ticket that NONE of the three can anchor is RED, not a warning:
+  "cannot verify" and "verified clean" are different verdicts, and this gate
+  exists precisely to keep them apart. (Provenance: on squash-merge repos the
+  sha anchor always dangles, and the old warn-and-continue turned this gate
+  into a permanently green no-op — found by adversarial review, 2026-08.)
 
 "Code changed after" = commits touching the configured code paths, mentioning
 <TICKET> in the subject, later than the anchor.
@@ -56,6 +63,17 @@ def pinned_commit(c: Ctx, ticket: str) -> str | None:
     m = re.search(r"COMMIT\s*[:：]\s*([0-9a-f]{7,40})\b",
                   p.read_text(encoding="utf-8", errors="replace"), re.I)
     return m.group(1) if m else None
+
+
+def verified_at(c: Ctx, ticket: str) -> str | None:
+    """The VERIFIED-AT ISO timestamp from REPORT.md — the anchor that survives
+    squash/rebase merges (the pinned sha does not)."""
+    p = c.path("evidence") / ticket / "REPORT.md"
+    if not p.is_file():
+        return None
+    m = re.search(r"VERIFIED-AT\s*[:：]\s*(\d{4}-\d{2}-\d{2}[T ][0-9:+.Z-]+)",
+                  p.read_text(encoding="utf-8", errors="replace"), re.I)
+    return m.group(1).strip() if m else None
 
 
 def hits_from_log(out: str, ticket: str, min_iso: str = "") -> list[str]:
@@ -102,34 +120,77 @@ def main() -> int:
         print(f"no evidence dirs with key {key}- under {evd}")
         return 0
 
+    strategy = str(c.cfg("git.merge_strategy", "merge"))
     stale: list[tuple[str, str, list[str]]] = []
+    unresolved: list[tuple[str, str]] = []  # (ticket, why) — judged but unanchorable → RED
     for tk in tickets:
         issue = t.get_issue(tk)
         sha = pinned_commit(c, tk)
+        vat = verified_at(c, tk)
+        judged = issue["status_category"] == "done"
+
         if sha:
             after = changes_after_sha(c, tk, sha)
-            if after is None:
-                print(f"⚠️  {tk}: REPORT.md pins commit {sha[:12]} but the local repo "
-                      f"lacks it (missing fetch?) — refusing to conclude clean, check by hand")
+            if after is not None:
+                if after:
+                    stale.append((tk, f"{issue['status']} · REPORT pins {sha[:7]}", after))
                 continue
-            if after:
-                stale.append((tk, f"{issue['status']} · REPORT pins {sha[:7]}", after))
+            # pinned sha unresolvable — expected under squash/rebase, alarming under merge
+            if vat:
+                after = changes_after_time(c, tk, vat)
+                if after:
+                    stale.append((tk, f"{issue['status']} · sha {sha[:7]} gone "
+                                      f"({strategy}) · VERIFIED-AT {vat[:16].replace('T', ' ')}", after))
+                else:
+                    print(f"ℹ️  {tk}: pinned sha {sha[:7]} unresolvable ({strategy} merges "
+                          f"discard branch shas) — anchored by VERIFIED-AT instead, clean")
+                continue
+            anchor = t.judged_at(tk)
+            if anchor is not None:
+                iso, desc = anchor
+                after = changes_after_time(c, tk, iso)
+                if after:
+                    stale.append((tk, f"{issue['status']} · sha gone · {desc} at "
+                                      f"{iso[:16].replace('T', ' ')}", after))
+                continue
+            unresolved.append((tk,
+                f"REPORT pins {sha[:12]} which no longer exists"
+                + (f" — expected under merge_strategy: {strategy}; QA must record "
+                   f"VERIFIED-AT in REPORT.md (see qa workflow)"
+                   if strategy in ("squash", "rebase")
+                   else " (missing fetch? fetch full history, or add VERIFIED-AT)")))
             continue
-        if issue["status_category"] != "done":
-            continue  # no pinned sha and never judged — nothing to be stale
-        anchor = t.judged_at(tk)
-        if anchor is None:
-            print(f"⚠️  {tk}: judged done but no pinned COMMIT and this tracker keeps "
-                  f"no changelog — cannot date the verdict; pin COMMIT in REPORT.md")
-            continue
-        iso, desc = anchor
-        after = changes_after_time(c, tk, iso)
-        if after:
-            stale.append((tk, f"{issue['status']} · {desc} at {iso[:16].replace('T', ' ')}", after))
 
-    if not stale:
+        if not judged:
+            continue  # no pinned sha and never judged — nothing to be stale
+        if vat:
+            after = changes_after_time(c, tk, vat)
+            if after:
+                stale.append((tk, f"{issue['status']} · VERIFIED-AT "
+                                  f"{vat[:16].replace('T', ' ')}", after))
+            continue
+        anchor = t.judged_at(tk)
+        if anchor is not None:
+            iso, desc = anchor
+            after = changes_after_time(c, tk, iso)
+            if after:
+                stale.append((tk, f"{issue['status']} · {desc} at {iso[:16].replace('T', ' ')}", after))
+            continue
+        unresolved.append((tk, "judged done but no COMMIT pin, no VERIFIED-AT, and this "
+                               "tracker keeps no changelog — the verdict cannot be dated"))
+
+    if unresolved:
+        print(f"❌ {len(unresolved)} judged tickets have UNVERIFIABLE verdicts — "
+              f"\"cannot verify\" is not \"verified clean\":\n")
+        for tk, why in unresolved:
+            print(f"  {tk}  {why}")
+        print()
+
+    if not stale and not unresolved:
         print(f"✅ no stale verdicts — examined {len(tickets)} evidenced tickets")
         return 0
+    if not stale:
+        return 1
 
     print(f"⚠️  {len(stale)} tickets were judged, then the CODE CHANGED\n")
     for tk, ctx_s, commits in stale:
@@ -155,7 +216,9 @@ def main() -> int:
             print(f"  {tk} → In Review, but the comment read-back FAILED — post it by hand")
         else:
             print(f"  {tk} → In Review, commented")
-    return 0
+    # --fix reopens stale tickets, but an unverifiable verdict has nothing to
+    # reopen INTO a known-good state — it stays red until a human anchors it.
+    return 1 if unresolved else 0
 
 
 def _selftest():
@@ -228,8 +291,67 @@ def _selftest():
         assert "- status: In Review" in ticket, ticket
         assert "Auto-reopened" in ticket, "explanatory comment missing from ticket"
         _ = env
+
+    # ── squash-merge repo: the pinned sha is GONE by design ──────────────────
+    def squash_repo(td: str, *, verified_at_line: bool) -> Path:
+        root = Path(td)
+        sh(root, "git", "init", "-q", ".")
+        sh(root, "git", "config", "user.email", "t@t.t")
+        sh(root, "git", "config", "user.name", "t")
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\nproject:\n  key: PROJ\n"
+            "paths:\n  evidence: evd\n  backlog: docs/backlog\n"
+            "git:\n  code_paths: [src/]\n  merge_strategy: squash\n"
+            "tracker:\n  provider: markdown\n  done_statuses: [Done]\n"
+            "  review_status: \"In Review\"\n", encoding="utf-8")
+        (root / "docs" / "backlog").mkdir(parents=True)
+        (root / "docs" / "backlog" / "PROJ-9.md").write_text(
+            "# PROJ-9: squashed\n- status: Done\n\nbody\n", encoding="utf-8")
+        (root / "src").mkdir()
+        (root / "src" / "a.txt").write_text("v1\n", encoding="utf-8")
+        env1 = {**os.environ, "GIT_AUTHOR_DATE": "2026-01-01T10:00:00+00:00",
+                "GIT_COMMITTER_DATE": "2026-01-01T10:00:00+00:00"}
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-qm", "PROJ-9 squashed implementation"],
+                       cwd=root, check=True, capture_output=True, env=env1)
+        ghost = "deadbeef" + "0" * 32  # the branch sha squash-merge threw away
+        report = f"VERDICT: PASS\nCOMMIT: {ghost}\n"
+        if verified_at_line:
+            report += "VERIFIED-AT: 2026-01-01T12:00:00+00:00\n"
+        (root / "evd" / "PROJ-9").mkdir(parents=True)
+        (root / "evd" / "PROJ-9" / "REPORT.md").write_text(report, encoding="utf-8")
+        return root
+
+    with tempfile.TemporaryDirectory() as td:
+        root = squash_repo(td, verified_at_line=True)
+        # green: sha gone, but VERIFIED-AT anchors and nothing changed after it
+        r = run_gate(root)
+        assert r.returncode == 0, f"VERIFIED-AT anchor should rescue squash repos:\n{r.stdout}{r.stderr}"
+        assert "VERIFIED-AT" in r.stdout, r.stdout
+        # mutation: code naming the ticket lands AFTER the verdict → RED via time anchor
+        (root / "src" / "a.txt").write_text("v2\n", encoding="utf-8")
+        env2 = {**os.environ, "GIT_AUTHOR_DATE": "2026-01-02T10:00:00+00:00",
+                "GIT_COMMITTER_DATE": "2026-01-02T10:00:00+00:00"}
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-qm", "PROJ-9 rework after verdict"],
+                       cwd=root, check=True, capture_output=True, env=env2)
+        r = run_gate(root)
+        assert r.returncode == 1 and "PROJ-9" in r.stdout, \
+            f"post-verdict change must RED on the time anchor:\n{r.stdout}{r.stderr}"
+
+    with tempfile.TemporaryDirectory() as td:
+        root = squash_repo(td, verified_at_line=False)
+        # mutation: sha gone AND no VERIFIED-AT AND no changelog → RED, never a
+        # warning (the old warn-and-continue made this gate a green no-op on
+        # every squash-merge repo)
+        r = run_gate(root)
+        assert r.returncode == 1, \
+            f"unanchorable verdict must be RED, not a warning:\n{r.stdout}{r.stderr}"
+        assert "UNVERIFIABLE" in r.stdout and "VERIFIED-AT" in r.stdout, r.stdout
+
     print("stale_verdict_check selftest: OK (pinned verdict green + post-verdict "
-          "code change red + out-of-code-paths ignored + --fix reopens via tracker)")
+          "code change red + out-of-code-paths ignored + --fix reopens via tracker "
+          "+ squash: VERIFIED-AT anchors green/red + unanchorable verdict RED)")
 
 
 if __name__ == "__main__":

@@ -39,7 +39,7 @@ Quality gates (tests, reviews, evidence, challengers) never relax at any level.
 |---|---|
 | `off` | Every outward step waits: merge, ticket transition, ticket creation, decisions |
 | `assisted` | Work proceeds; merge/close/create pause for a yes; due questions are asked, never provisionally decided |
-| `full` | Eligible PRs self-merge; QA-passed tickets self-close; challenger-approved drafts become tickets; due questions get a **provisional decision** with a paper trail (🟡 marker, stated reversal cost, `pending-acceptance` label) |
+| `full` | Eligible PRs self-merge (only if `autonomy.self_merge: true` — the per-project off switch); QA-passed tickets self-close; challenger-approved drafts become tickets; due questions get a **provisional decision** with a paper trail (🟡 marker, stated reversal cost, `pending-acceptance` label) |
 
 **Exemptions (never auto-decided, at any level):** the `autonomy.exemptions` list —
 by default real money / production payment config, legal, purchasing, credentials
