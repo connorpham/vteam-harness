@@ -43,6 +43,8 @@ Claude Code users can install through the plugin instead of the terminal:
 
 ---
 
+**Want proof before belief?** [The 15-minute tour](docs/TUTORIAL.md) — install into a scratch repo and watch every gate refuse you for the right reason, then let you through: DoR red→green, the push fence blocking undossiered code, and a QA verdict that **expires when the code changes after it**. No AI calls, no services.
+
 ## Requirements
 
 | Requirement | Why | If missing |

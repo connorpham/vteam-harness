@@ -1,0 +1,24 @@
+# go profile — go.mod projects (field-trial finding #19: a Go repo on the
+# generic profile went green having run zero verification).
+steps:
+  docs-shrink:
+    run: "bash .vteam/scripts/docs_shrink_check.sh"
+  ledger:
+    run: "python3 .vteam/scripts/log_check.py"
+  verbatim:
+    run: "python3 .vteam/scripts/verbatim_gate.py"
+  vet:
+    run: "go vet ./..."
+    requires: "go.mod"
+    skip_reason: "no go.mod — wrong profile?"
+  unit:
+    run: "go test ./..."
+    requires: "go.mod"
+    skip_reason: "no go.mod — wrong profile?"
+  build:
+    run: "go build ./..."
+    requires: "go.mod"
+    skip_reason: "no go.mod — wrong profile?"
+  race:
+    run: "go test -race ./..."
+    tail: true

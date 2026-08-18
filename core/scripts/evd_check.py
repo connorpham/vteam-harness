@@ -11,7 +11,9 @@ Checks, for {paths.evidence}/<TICKET>/:
   4. Every TC_* folder has manifest.md with a RESULT: line, and — unless BLOCKED —
      ≥1 .png step screenshot that OPENS and is readable (Pillow, ≥400×300,
      non-empty); a *_boxed.png is required on FAIL/NEW-BUG TCs. A TC declaring
-     `TYPE: NON-UI` may skip images but MUST have db_verify.md. A write TC
+     `TYPE: NON-UI` may skip images but MUST have db_verify.md OR cmd_verify.md
+     (pure libraries/CLIs have no database — real command+output transcripts are
+     their honest evidence; field-trial finding #20). A write TC
      (built-in SQL verbs / DB_VERIFY sentinel / locale write_verbs in the
      manifest) needs db_verify.md.
   5. No orphan evidence: REPORT.md §3 (that section, not anywhere) references
@@ -157,8 +159,9 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
         if not blocked:
             for p in pngs:
                 errs.extend(f"{tc.name}/{msg}" for msg in png_problems(p))
-        if non_ui and not (tc / "db_verify.md").is_file():
-            errs.append(f"{tc.name}: declares TYPE: NON-UI, so db_verify.md is "
+        if non_ui and not ((tc / "db_verify.md").is_file() or (tc / "cmd_verify.md").is_file()):
+            errs.append(f"{tc.name}: declares TYPE: NON-UI, so db_verify.md (data checks) "
+                        f"or cmd_verify.md (command+output transcripts) is "
                         f"MANDATORY (the SELECTs actually run + real results)")
         if any(w in res for w in FAIL_WORDS) and not any("_boxed" in p.name for p in pngs):
             errs.append(f"{tc.name}: RESULT={res} but no *_boxed.png marking the "
@@ -243,6 +246,10 @@ def _selftest():
         (tc / "db_verify.md").unlink()
         errs, _ = check_tree(evd, 1, [])
         assert errs, "NON-UI without db_verify should red"
+        (tc / "cmd_verify.md").write_text("$ npx ava -> 2 passed")
+        errs, _ = check_tree(evd, 1, [])
+        assert not any("NON-UI" in e for e in errs), f"cmd_verify.md must satisfy NON-UI: {errs}"
+        (tc / "cmd_verify.md").unlink()
         (tc / "db_verify.md").write_text("SELECT 1; -> 1")
         errs, _ = check_tree(evd, 3, [])
         assert errs, "expect-tcs 3 vs 1 should red"

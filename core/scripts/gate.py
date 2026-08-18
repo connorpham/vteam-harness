@@ -100,7 +100,16 @@ def main() -> int:
         ran.append(name)
     for name, why in skipped:
         print(f"⚠️  skipped {name}: {why}")
-    print(f"GATE: GREEN ({len(ran)} steps ran, {len(skipped)} declared skips)")
+    # Bookkeeping steps guard the ledgers, not the code. A green where ONLY they
+    # ran is honest but weak — say so, loudly (field-trial finding #19: a Go repo
+    # on the generic profile read as plain GREEN with zero verification run).
+    BOOKKEEPING = {"docs-shrink", "ledger", "verbatim"}
+    if all(s in BOOKKEEPING for s in ran):
+        print(f"GATE: GREEN (WEAK — only bookkeeping steps ran, ZERO verification "
+              f"of the code; {len(skipped)} declared skips). Declare test/build "
+              f"entrypoints or switch to a stack profile that runs them.")
+    else:
+        print(f"GATE: GREEN ({len(ran)} steps ran, {len(skipped)} declared skips)")
     return 0
 
 

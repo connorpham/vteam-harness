@@ -92,6 +92,21 @@ export async function doctor(flags) {
     warn("git.hooks: external — hook wiring is yours; make sure your manager runs .githooks/pre-push");
   }
 
+  // 3b. code_paths must match something real — a fence watching nothing is the
+  // silent-skip class this framework exists to kill (field-trial finding #17)
+  if (cfg) {
+    const cps = cfgGet(cfg, "git.code_paths", []);
+    const list = Array.isArray(cps) ? cps.map(String) : [];
+    if (list.length) {
+      const alive = list.filter((cp) => fs.existsSync(path.join(root, cp.replace(/\/$/, ""))));
+      if (!alive.length) {
+        bad(`git.code_paths ${JSON.stringify(list)} matches NOTHING in this repo — the review fence and stale-verdict gate are watching air; point it at where the code actually lives`);
+      } else if (alive.length < list.length) {
+        warn(`git.code_paths: ${list.filter((c) => !alive.includes(c)).join(", ")} do(es) not exist — dead entries watch nothing`);
+      } else ok(`code_paths alive (${alive.join(", ")})`);
+    }
+  }
+
   // 4. model-routing staleness — at the CONFIGURED doctrine path, not a literal
   const teamDir = cfg ? String(cfgGet(cfg, "paths.team", "docs/team")) : "docs/team";
   const routing = cfg ? String(cfgGet(cfg, "models.routing", "default")) : "default";
@@ -114,7 +129,7 @@ export async function doctor(flags) {
       "evd_ui_check.py", "dor_check.py", "comment_check.py", "schedule_check.py",
       "stale_verdict_check.py", "perf_report.py", "model_route.py",
       "lib/ctx.py", "lib/tracker.py"].map((s) => ({ s, cmd: "python3" })),
-    ...["docs_shrink_check.sh", "lib/ctx.sh"].map((s) => ({ s, cmd: "bash" })),
+    ...["docs_shrink_check.sh", "lockfile_check.sh", "lib/ctx.sh"].map((s) => ({ s, cmd: "bash" })),
     { s: "lib/ctx.mjs", cmd: "node" },
   ];
   let stFail = 0, stRun = 0;

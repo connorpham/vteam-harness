@@ -92,8 +92,20 @@ class Provider(Tracker):
         super().__init__(c)
         self.token = c.env("GITHUB_TOKEN") or c.env("GH_TOKEN")
         if not self.token:
-            raise SystemExit("tracker(github): GITHUB_TOKEN (or GH_TOKEN) missing from .env — "
-                             "create a token with Issues read/write on the repo")
+            # Fallback: the developer's own gh CLI session (field-trial friction:
+            # gh was signed in, yet the provider demanded a hand-rolled .env token).
+            # stderr suppressed; a missing/logged-out gh just falls through.
+            import subprocess
+            try:
+                r = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
+                if r.returncode == 0 and r.stdout.strip():
+                    self.token = r.stdout.strip()
+            except FileNotFoundError:
+                pass  # no gh CLI installed — the error below names both paths
+        if not self.token:
+            raise SystemExit("tracker(github): no token — set GITHUB_TOKEN/GH_TOKEN in .env, "
+                             "or sign in once with `gh auth login` (the provider borrows "
+                             "`gh auth token` when the env is empty)")
         self.base = (c.env("GITHUB_API_URL") or "https://api.github.com").rstrip("/")
         if not self.base.startswith("https://"):
             # Bearer auth over plain http mails the token to the network.

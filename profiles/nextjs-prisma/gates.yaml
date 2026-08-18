@@ -12,7 +12,7 @@ steps:
   verbatim:
     run: "python3 .vteam/scripts/verbatim_gate.py"
   lockfile:
-    run: "bash -c 'ls pnpm-lock.yaml yarn.lock bun.lockb 2>/dev/null && { echo \"second package manager lockfile present — one repo, one package manager\"; exit 1; } || true'"
+    run: "bash .vteam/scripts/lockfile_check.sh"
   prisma-generate:
     run: "npx prisma generate"
     requires: "prisma/schema.prisma"
