@@ -37,7 +37,7 @@ git:
   code_paths: [src/]     # "product code" for the review fence + stale-verdict scans
 
 tracker:
-  provider: markdown     # jira | markdown (offline backlog, zero services); github/linear: roadmap v1.1
+  provider: markdown     # jira | github | markdown (offline backlog, zero services); linear: roadmap
                          # init validates this — unshipped providers are rejected at install
   done_statuses: [Done, Closed, Resolved]
   review_status: In Review

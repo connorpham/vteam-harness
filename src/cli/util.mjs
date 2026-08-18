@@ -94,7 +94,7 @@ export function writeFile(file, content) {
 // ---- arg parsing -----------------------------------------------------------
 /** Flags that never take a value — the next token stays positional, so
  * `vteam --yes init` runs init instead of swallowing it as --yes's value. */
-const BOOLEAN_FLAGS = new Set(["yes", "backend", "migrate", "apply", "help"]);
+const BOOLEAN_FLAGS = new Set(["yes", "backend", "migrate", "apply", "help", "json"]);
 
 export function parseArgs(argv) {
   const flags = {};

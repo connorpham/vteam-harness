@@ -1,0 +1,24 @@
+{
+  "name": "vteam-harness",
+  "owner": {
+    "name": "Connor Pham",
+    "url": "https://github.com/connorpham"
+  },
+  "description": "Proof-of-done for AI agents — bootstrap plugin for the vteam harness (15 machine gates, every one with a --selftest mutation proof).",
+  "plugins": [
+    {
+      "name": "vteam",
+      "source": "./plugins/vteam",
+      "description": "Bootstrap vteam proof-of-done in the current repo: /vteam:setup explains the harness, grades the repo, then walks `npx vteam-harness init` and `doctor`.",
+      "author": {
+        "name": "Connor Pham",
+        "url": "https://github.com/connorpham"
+      },
+      "homepage": "https://github.com/connorpham/vteam-harness#readme",
+      "repository": "https://github.com/connorpham/vteam-harness",
+      "license": "MIT",
+      "keywords": ["proof-of-done", "gates", "evidence", "virtual-team", "qa"],
+      "category": "workflow"
+    }
+  ]
+}

@@ -139,6 +139,38 @@ phase; every fix below closes a confirmed finding.
 - locales: first-adopter domain vocabulary removed from core defaults (design
   boundary: zero project specifics); en/vi key parity
 
+## Phase 8 — Proof-of-done campaign ✅ (build + content; posting is owner-gated)
+Positioning shipped: "Proof-of-done for AI agents" — the wedge is the one axis no
+competitor occupies (verified against live GitHub/npm/PyPI data, 2026-08-18).
+- `vteam audit` (src/cli/audit.mjs): top-of-funnel 0-100 accountability grader —
+  six dimensions (gates/hooks/evidence/review-trail/verdicts/self-proof), works on
+  any repo with no install, never writes, `--json`, bounded scan, `--selftest`
+  with a true mutation proof (deleting the high fixture's manifest drops 100→92);
+  wired into bin/vteam.mjs as the first usage line. `doctor --json` added.
+- GitHub Issues tracker provider (providers/tracker/github.py): full Tracker
+  interface over stdlib urllib — PROJ-123 ⇄ issue #123, labels carry the status
+  machine, read-back on every write, honest attach (evidence dir is the record),
+  redirect-refusing token hygiene, `--selftest` against an in-memory GitHub, zero
+  network. init offers `--tracker github`.
+- Zero-gatekeeper install: Claude Code plugin marketplace at the repo root
+  (`/plugin marketplace add connorpham/vteam-harness` → `/plugin install
+  vteam@vteam-harness` → `/vteam:setup`), validated with `claude plugin validate`;
+  SessionStart doctrine re-injection hook template (≤15 lines, survives /clear and
+  compaction) installed per-repo by init — deliberately NOT a plugin-level hook.
+- Content layer: README repositioned (category line, 60-second start, "Who
+  verifies the work?"); docs/COMPARISON.md — the canonical who-verifies-the-work
+  comparison (BMAD #2003/#1332, Spec Kit #1784, Task Master's self-report loop,
+  Agent OS v3 retreat, Ruflo's supply-chain-only verify — all sourced, all
+  star-counts dated, vteam's own limits included); core/doctrine/red-flags.md
+  ("the 12 excuses", each mapped to the gate that catches it; referenced from the
+  dev and qa workflows); npm keywords extended (proof-of-done, quality-gates,
+  ai-accountability, code-review, spec-driven-development, github, jira).
+- Owner-gated (drafts ready in docs/launch/): awesome-claude-code submission
+  (eligibility: 14 days of history or 100 stars), clau.de plugin-directory
+  submission, HN first-person essay (outline from provenance incidents), r/ClaudeAI
+  evidence post (screenshots to capture), X launch thread (GIF to record), npm
+  publish of the release carrying all of the above.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)

@@ -29,7 +29,14 @@
     "cursor",
     "orchestration",
     "spec-driven",
-    "virtual-team"
+    "virtual-team",
+    "quality-gates",
+    "proof-of-done",
+    "ai-accountability",
+    "code-review",
+    "spec-driven-development",
+    "github",
+    "jira"
   ],
   "repository": {
     "type": "git",

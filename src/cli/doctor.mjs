@@ -16,22 +16,32 @@ function runSelftest(cmd, args, cwd) {
 export async function doctor(flags) {
   const root = repoRoot();
   let miss = 0;
-  const ok = (m) => console.log(`✅ ${m}`);
-  const bad = (m) => { console.log(`❌ ${m}`); miss++; };
-  const warn = (m) => console.log(`⚠️  ${m}`);
+  // --json: same checks, machine shape — {ok, checks:[{name,status,detail}]}
+  // on stdout and nothing else (exit codes unchanged).
+  const json = !!flags.json;
+  const checks = [];
+  const record = (status, m) =>
+    checks.push({ name: String(m).split(/ — |: /)[0].slice(0, 80), status, detail: String(m) });
+  const ok = (m) => { record("ok", m); if (!json) console.log(`✅ ${m}`); };
+  const bad = (m) => { record("fail", m); miss++; if (!json) console.log(`❌ ${m}`); };
+  const warn = (m) => { record("warn", m); if (!json) console.log(`⚠️  ${m}`); };
+  const finish = (code) => {
+    if (json) console.log(JSON.stringify({ ok: code === 0, checks }, null, 2));
+    process.exit(code);
+  };
 
   // 0. prerequisites — diagnose a missing python3 instead of crashing on it
   const py = spawnSync("python3", ["--version"], { encoding: "utf8" });
   if (py.error || py.status !== 0) {
     bad("python3 not found on PATH — the gates are Python; install Python 3 (macOS: xcode-select --install / brew install python3, Debian: apt install python3) and re-run");
-    process.exit(1);
+    finish(1);
   }
   ok(`python3 available (${String(py.stdout || py.stderr || "").trim()})`);
 
   // 1. config parses (through the same parser the gates use)
   if (!fs.existsSync(path.join(root, "vteam.config.yaml"))) {
     bad("vteam.config.yaml missing — run `npx vteam init`");
-    process.exit(1);
+    finish(1);
   }
   const p = spawnSync("python3", [path.join(root, ".vteam/scripts/lib/ctx.py"), "version"],
     { cwd: root, encoding: "utf8" });
@@ -118,15 +128,18 @@ export async function doctor(flags) {
   if (!stFail) ok(`gate selftests green (${stRun} checks prove they can red)`);
 
   // 6. provider preflight
-  console.log("── preflight ──");
+  if (!json) console.log("── preflight ──");
   const pf = spawnSync("bash", [path.join(root, ".vteam/scripts/preflight.sh"),
-    ...(flags.backend ? ["--backend"] : [])], { cwd: root, stdio: "inherit" });
+    ...(flags.backend ? ["--backend"] : [])],
+    json ? { cwd: root, encoding: "utf8" } : { cwd: root, stdio: "inherit" });
   if (pf.status !== 0) miss++;
+  if (json) checks.push({ name: "preflight", status: pf.status === 0 ? "ok" : "fail",
+    detail: (String(pf.stdout || "") + String(pf.stderr || "")).trim() });
 
   if (flags.migrate) {
     const { migrate } = await import("./migrate.mjs");
     migrate(flags);
   }
 
-  process.exit(miss ? 1 : 0);
+  finish(miss ? 1 : 0);
 }

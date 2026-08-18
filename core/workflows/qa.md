@@ -52,6 +52,8 @@ describes — without breaking the rest of the screen?**
    phase transition. REPORT.md and the final summary pass the bar: **a
    non-programmer reads 2 minutes and understands everything.**
 
+Tempted to infer a verdict instead of running the step? Your excuse is catalogued in `red-flags.md`, next to the gate that catches it.
+
 Tracker recipes: the configured tracker provider. Evidence tooling:
 `.vteam/scripts/annotate.py` (box + side-by-side diff) and
 `.vteam/scripts/evd_check.py` (machine gate) — use them, don't hand-roll.
