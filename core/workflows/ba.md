@@ -72,6 +72,9 @@ stop without it.
 - Read the relevant spec sections. **Spec not in the repo yet → ask the owner for
   the file location once**, then shard what was read into
   `{paths.specs}/<feature>.md` (B2) — cite the in-repo file from then on.
+  No spec exists ANYWHERE → stop and point at the right intake: `/plan`
+  (greenfield) or `/docs` (undocumented codebase) — /ba shards truth, it never
+  manufactures it.
 - **Upstream and downstream spec disagree on the same requirement → read the
   spec's VERSION HISTORY section before concluding "undecided"** — parent–child
   contradictions are usually a stale parent, and the history records who changed
