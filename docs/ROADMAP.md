@@ -258,6 +258,17 @@ found 10 HIGH answers. This phase closes them:
   drifting "17 vs 18" counts is gone. Counts in earlier phase records are
   point-in-time history, left as written.
 
+## Phase 12 — Team accountability ✅ (the two-humans round)
+`team.size` gains its machinery: ledger row v2 (`| Date | Lane | Actor | Item
+| Result | Link |`, one home in lib/ledger.py incl. `resolve_actor` — VTEAM_ACTOR
+env else `git config user.name`), log_check reds unattributed ledgers at
+size > 1, `doctor --migrate` upgrades legacy ledgers (`—` rows), perf_report
+adds the per-person table + per-human routing 🚩, the board rolls up by actor,
+and init writes a union-merge gitattribute so two appenders never conflict.
+Honesty note ships inside the report: artifacts/tokens/routing per person,
+never chat. Still prose: WIP=size, claim TTL, self-merge review at >1.
+E2E 95 → 104 checks.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)

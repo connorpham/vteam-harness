@@ -213,7 +213,7 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 
 **If you're a developer:** you stop babysitting the agent. Underspecified tickets bounce back to analysis before you waste a session. Reviews come from fresh agents with empty context held to a written standard, so an approval without a "what I tried to break" list is invalid and a fabricated finding voids the whole card. Your PRs carry committed review dossiers anyone can audit months later.
 
-**If you're leading a team:** work-in-progress is limited by design, crashed sessions can't orphan tickets (claims carry timestamps and TTLs), two sessions can't grab the same work, and *"we're on schedule"* becomes a number a script computes from a structured plan rather than a sentence someone typed.
+**If you're leading a team of humans:** every ledger row names its **person** — `VTEAM_ACTOR` env or `git config user.name`, never invented — and with `team.size > 1` that column is a *gate*, not a convention (`log_check` goes red on an unattributed ledger; `doctor --migrate` upgrades old ones). `perf_report` then answers the questions a lead actually has: who did what, in which lanes, at what token cost, with **routing flags per person** — a dev running `frontier` without an approved escalation, a done row with no model recorded, a token outlier worth a look. Two people appending to the same ledger merge conflict-free (union merge, set up by init). One honesty note, stated in the report itself: vteam measures artifacts, tokens and routing — it never reads anyone's chat. Also: crashed sessions can't orphan tickets (claims carry timestamps and TTLs), and *"we're on schedule"* is a number a script computes.
 
 **If you care about cost:** token discipline is a first-class rule set, expensive models are routed only to expensive-if-wrong decisions, and every ticket's tokens and tier land in the ledger — so overspend has nowhere to hide and routing gets tuned from data.
 
@@ -230,7 +230,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 - **Repo-level Claude Code skills with the same names are currently overwritten** by `init` (`team`, `pm`, `ba`, `dev`, `qa`, `verify`, `docs`, `guidelines`). If you have your own skill by one of those names, back it up first. This is a known bug, not a design choice, and it is being fixed.
 - **There is no `uninstall` command yet.** Removing vteam today means deleting `vteam.config.yaml`, `.vteam/`, the rendered tool directories, `.githooks/pre-push`, and resetting `core.hooksPath`.
 - **The CI snippet it writes is GitHub Actions.** On other platforms call `bash .vteam/scripts/gate.sh` from your own pipeline — the gates themselves are platform-agnostic.
-- **One human owner plus agents is the tested shape.** `team.size > 1` is documented but not yet enforced by machinery; treat multi-human support as best-effort.
+- **One human owner plus agents is the most-tested shape.** `team.size > 1` now has real machinery — the mandatory Actor column, per-person reporting and conflict-free ledger merges — but the WIP limit and the 2-hour claim TTL are still doctrine prose the agents follow, not gates; treat >1 as young.
 - **Trackers are markdown, Jira and GitHub Issues.** Linear and Trello are not implemented.
 - **Evidence is committed to git.** If your screenshots would contain regulated or personal data, decide your policy before enabling the screenshot gates — a committed image is permanent.
 

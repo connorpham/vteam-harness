@@ -6,7 +6,12 @@ a rule no machine counts gets eroded (measured in the source project: rows outsi
 the value set, token accounting on 7/20 rows). This gate makes it red-able.
 
 Checks, for every data row of the table in {paths.pm}/log.md:
-  1. Exactly 5 columns; date is ISO YYYY-MM-DD (a range "2026-08-07/08" allowed).
+  1. Column count matches the table's own header — legacy
+     `| Date | Lane | Item | Result | Link |` (5) or v2 with an Actor column
+     (6). With `team.size > 1` the Actor column is MANDATORY (the v2 header +
+     a non-empty Actor cell on every row) — this is the machine consumer the
+     config knob was missing: per-person accountability is a gate, not prose.
+     Date is ISO YYYY-MM-DD (a range "2026-08-07/08" allowed).
   2. Result starts with: done | blocked: | failed:   (the 3 canonical values —
      the grammar lives in lib/ledger.py, the ONE home shared with perf_report
      and mirrored by board.mjs; audit H4).
@@ -37,24 +42,38 @@ from ctx import Ctx  # noqa: E402
 DATE_PAT = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:/\d{2})?$")
 
 
-def check_text(text: str, key: str, adopted: date, root: Path | None) -> tuple[list, list]:
+def check_text(text: str, key: str, adopted: date, root: Path | None,
+               team_size: int = 1) -> tuple[list, list]:
     errs, warns = [], []
-    in_table, prev_date = False, None
+    shape, prev_date = None, None
     # project.key is config-supplied text, not a regex — escape it (audit M15;
     # review_check and stale_verdict_check already do)
     link_pat = re.compile(rf"PR #\d+|{re.escape(key)}-\d+|https?://|[\w./-]+/[\w./-]+")
     for n, line in enumerate(text.splitlines(), 1):
-        if ledger.HEADER_PAT.match(line):
-            in_table = True
+        hs = ledger.header_shape(line)
+        if hs is not None:
+            shape = hs
+            if team_size > 1 and shape == 5:
+                errs.append(f"line {n}: team.size > 1 but the ledger header has no "
+                            f"Actor column — per-person accountability needs "
+                            f"`| Date | Lane | Actor | Item | Result | Link |`")
             continue
-        if not in_table:
+        if shape is None:
             continue
         row = ledger.parse_row(line)
         if row is None:
             continue
         if row.get("malformed"):
-            errs.append(f"line {n}: {row['columns']} columns (need 5)")
+            errs.append(f"line {n}: {row['columns']} columns (need {shape})")
             continue
+        cols = 6 if row["actor"] is not None else 5
+        if cols != shape:
+            errs.append(f"line {n}: {cols} columns under a {shape}-column header — "
+                        f"every row matches the table's own header")
+            continue
+        if shape == 6 and not row["actor"]:
+            errs.append(f"line {n}: empty Actor cell — the row's human is not "
+                        f"optional (VTEAM_ACTOR env or `git config user.name`)")
         day, result, link = row["date"], row["result"], row["link"]
         m = DATE_PAT.match(day)
         if not m:
@@ -97,8 +116,13 @@ def main() -> int:
         print(f"❌ log_check: {log} not found")
         return 1
     adopted = _parse_date(str(c.cfg("project.adopted")))
+    raw_size = c.cfg("team.size", 1)
+    try:
+        team_size = int(raw_size)
+    except (TypeError, ValueError):
+        sys.exit(f"log_check: team.size {raw_size!r} is not an integer")
     errs, warns = check_text(log.read_text(encoding="utf-8"),
-                             str(c.cfg("project.key")), adopted, c.root)
+                             str(c.cfg("project.key")), adopted, c.root, team_size)
     for w in warns:
         print(f"⚠️  {w}")
     if errs:
@@ -138,7 +162,29 @@ def _selftest():
     for name, text in mutations.items():
         errs, _ = check_text(text, "PROJ", adopted, None)
         assert errs, f"mutation {name!r} should have gone red"
-    print("log_check selftest: OK (green fixture + 8 mutations red)")
+
+    # ── the Actor column: team.size is a GATE consumer now, not decoration ──
+    head6 = "| Date | Lane | Actor | Item | Result | Link |\n|---|---|---|---|---|---|\n"
+    good6 = head6 + ("| 2026-01-02 | DEV | An | PROJ-1 | done (workhorse) · tok ≈ 90k | PR #1 |\n"
+                     "| 2026-01-03 | QA | Binh | PROJ-1 | blocked: Q2 open | PROJ-1 |\n")
+    errs, _ = check_text(good6, "PROJ", adopted, None, team_size=2)
+    assert not errs, errs
+    # legacy 5-col ledger stays green for a solo owner…
+    errs, _ = check_text(good, "PROJ", adopted, None, team_size=1)
+    assert not errs, errs
+    # …and goes red the moment the team is real
+    errs, _ = check_text(good, "PROJ", adopted, None, team_size=2)
+    assert errs and "Actor column" in errs[0], errs
+    # v2 mutations
+    errs, _ = check_text(good6.replace("| An |", "|  |"), "PROJ", adopted, None, team_size=2)
+    assert any("empty Actor" in e for e in errs), errs
+    errs, _ = check_text(
+        good6.replace("| 2026-01-03 | QA | Binh | PROJ-1 | blocked: Q2 open | PROJ-1 |",
+                      "| 2026-01-03 | QA | PROJ-1 | blocked: Q2 open | PROJ-1 |"),
+        "PROJ", adopted, None, team_size=2)
+    assert any("5 columns under a 6-column header" in e for e in errs), errs
+    print("log_check selftest: OK (green fixtures 5+6 col + 8 mutations red "
+          "+ actor: legacy-red-at-size>1, empty-actor red, header-mismatch red)")
 
 
 if __name__ == "__main__":

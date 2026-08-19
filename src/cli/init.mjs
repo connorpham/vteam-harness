@@ -301,6 +301,17 @@ models:
   The config records git.hooks: external — vteam will not touch hook wiring.`);
   }
 
+  // ---- .gitattributes: two humans appending to the same ledger must merge
+  // clean — union merge is the standard trick for append-only files ---------------
+  const ga = path.join(root, ".gitattributes");
+  const gaRule = "docs/pm/log.md merge=union";
+  const gaText = fs.existsSync(ga) ? fs.readFileSync(ga, "utf8") : "";
+  if (!gaText.split("\n").some((l) => l.trim() === gaRule)) {
+    fs.appendFileSync(ga, (gaText && !gaText.endsWith("\n") ? "\n" : "") +
+      "# vteam: the dispatch ledger is append-only — union merge keeps two humans' appends conflict-free\n" +
+      gaRule + "\n");
+  }
+
   // ---- .gitignore: evidence images out, text in, .env out -----------------------
   const gi = path.join(root, ".gitignore");
   if (!fs.existsSync(gi) || !fs.readFileSync(gi, "utf8").includes("# vteam:")) {

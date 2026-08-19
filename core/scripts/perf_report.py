@@ -68,7 +68,8 @@ def parse_ledger(text: str) -> list[dict]:
             tier, tier_src = (LEGACY_TIER[lm.group(1).lower()], "legacy") if lm else (None, None)
         rows.append({
             "date": date(int(m.group(1)), int(m.group(2)), int(m.group(3))),
-            "lane": row["lane"].upper(), "item": item, "outcome": row["kind"],
+            "lane": row["lane"].upper(), "actor": row["actor"],
+            "item": item, "outcome": row["kind"],
             "tier": tier, "tier_src": tier_src,
             "tok": row["tok_k"],
             "link": row["link"],
@@ -85,7 +86,8 @@ def flags_for(rows: list[dict], adopted: date | None = None) -> list[str]:
         if adopted and r["date"] < adopted:
             grandfathered += 1
             continue
-        where = f"{r['item']} ({r['date'].isoformat()}, {r['lane']})"
+        who = f", {r['actor']}" if r.get("actor") else ""
+        where = f"{r['item']} ({r['date'].isoformat()}, {r['lane']}{who})"
         if r["tier"] == "frontier":
             out.append(f"🚩 {where}: ran on `frontier` — allowed only after the same work "
                        f"failed twice AND the owner approved the spend (check the decision queue)")
@@ -105,7 +107,8 @@ def flags_for(rows: list[dict], adopted: date | None = None) -> list[str]:
         med = statistics.median(toks)
         for r in rows:
             if r["tok"] and r["tok"] > 2 * med:
-                out.append(f"⚠️  {r['item']}: {r['tok']:.0f}k tokens — >2× the median "
+                who = f" [{r['actor']}]" if r.get("actor") else ""
+                out.append(f"⚠️  {r['item']}{who}: {r['tok']:.0f}k tokens — >2× the median "
                            f"({med:.0f}k); usually extra review rounds — worth a look")
     return out
 
@@ -134,6 +137,26 @@ def build_report(rows: list[dict], prices: dict | None, period: str,
                  f"| {sum(1 for r in lr if r['outcome'] in ('blocked', 'failed'))} "
                  f"| {fmt_tok(sum(lt) if lt else None)} "
                  f"| {fmt_tok(statistics.median(lt) if lt else None)} |")
+    # ── by PERSON — only when the ledger carries the Actor column ────────────
+    if any(r.get("actor") for r in rows):
+        L += ["", "### Who did what (by person)", "",
+              "| Person | Items | Done | Blocked/Failed | Lanes | Σ tok | Median tok | Routing 🚩 |",
+              "|---|---|---|---|---|---|---|---|"]
+        actors = sorted({r["actor"] or "(legacy)" for r in rows})
+        for actor in actors:
+            ar = [r for r in rows if (r["actor"] or "(legacy)") == actor]
+            at = [r["tok"] for r in ar if r["tok"]]
+            lanes = "/".join(sorted({r["lane"] for r in ar}))
+            nflags = sum(1 for f in flags_for(ar, adopted) if f.startswith("🚩"))
+            L.append(f"| {actor} | {len(ar)} | {sum(1 for r in ar if r['outcome'] == 'done')} "
+                     f"| {sum(1 for r in ar if r['outcome'] in ('blocked', 'failed'))} "
+                     f"| {lanes} | {fmt_tok(sum(at) if at else None)} "
+                     f"| {fmt_tok(statistics.median(at) if at else None)} | {nflags or '—'} |")
+        L += ["", "*Routing 🚩 counts that person's rows tripping the model-routing/"
+                  "accounting rules — details under Flags below. What vteam measures "
+                  "per person is artifacts, tokens and routing; it never reads anyone's "
+                  "chat.*"]
+
     L += ["", "### Model usage", "", "| Tier | Rows | Σ tok |", "|---|---|---|"]
     for tier in TIERS + (None,):
         tr = [r for r in rows if r["tier"] == tier]
@@ -244,6 +267,24 @@ def _selftest():
     assert "$0.45" in rpt and "$2.25" in rpt, "cost band 90k×$5/$25 per Mtok"
     clean = parse_ledger(head + "| 2026-01-05 | DEV | P-1 | done (workhorse) · tok ≈ 90k | PR #1 |\n")
     assert not flags_for(clean), "clean row must produce no flags"
+
+    # ── v2 Actor column: per-person accounting and attributed flags ──────────
+    head6 = "| Date | Lane | Actor | Item | Result | Link |\n|---|---|---|---|---|---|\n"
+    v2 = parse_ledger(head6 + "\n".join([
+        "| 2026-01-05 | DEV | An | T-1 | done (workhorse) · tok ≈ 90k | PR #1 |",
+        "| 2026-01-06 | DEV | An | T-2 | done (frontier) · tok ≈ 200k | PR #2 |",
+        "| 2026-01-07 | QA | Binh | T-1 | done (standard) · tok ≈ 20k | T-1 |",
+    ]))
+    assert [r["actor"] for r in v2] == ["An", "An", "Binh"], v2
+    afl = flags_for(v2)
+    assert any("An" in f and "frontier" in f for f in afl), \
+        f"the frontier flag must NAME the human: {afl}"
+    arpt = build_report(v2, None, "test")
+    assert "Who did what (by person)" in arpt, arpt
+    assert "| An | 2 | 2 |" in arpt and "| Binh | 1 | 1 |" in arpt, arpt
+    assert "never reads anyone's" in arpt, "the honesty note about chat must ship with the table"
+    # legacy rows never grow a person table
+    assert "by person" not in build_report(rows, None, "test"), "5-col ledger must not invent people"
     # H4 conformance — the canonical grammar (lib/ledger.py) decides, not a
     # private stricter copy: the reader must agree with the gate row for row
     h4 = parse_ledger(head + "\n".join([

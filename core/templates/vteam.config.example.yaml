@@ -54,7 +54,11 @@ design:
   provider: none         # figma | none
 
 team:
-  size: 1                # 1 is the documented sweet spot; >1 relaxes WIP/claim/ledger invariants
+  size: 1                # 1 is the documented sweet spot. >1 is MACHINE-ENFORCED where it
+                         # matters most: log_check reds any ledger without the Actor column
+                         # (who = VTEAM_ACTOR env, else `git config user.name`); perf_report
+                         # and the board then report per person. WIP limit + claim TTL are
+                         # still agent-prose (see DESIGN §7).
                          # (read by agents in prose — no gate enforces it yet; see ROADMAP)
   capacity_per_day: 0.8  # person-days of throughput per calendar working day
 
