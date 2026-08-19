@@ -55,11 +55,15 @@ design:
 
 team:
   size: 1                # 1 is the documented sweet spot; >1 relaxes WIP/claim/ledger invariants
+                         # (read by agents in prose — no gate enforces it yet; see ROADMAP)
   capacity_per_day: 0.8  # person-days of throughput per calendar working day
 
 autonomy:
   level: assisted
-  self_merge: false      # agent may merge its own green PR (only honored at level: full)        # off: every gate waits for you · assisted: asks at merge/close · full: self-merge/self-close with paper trail
+  # level — off: every gate waits for you · assisted: asks at merge/close ·
+  # full: self-merge/self-close with paper trail
+  self_merge: false      # agent may merge its own green PR (only honored at level: full;
+                         # read by agents via the rendered workflows, not by a gate)
   exemptions:            # NEVER auto-decided regardless of level
     - real-money
     - legal
@@ -68,7 +72,7 @@ autonomy:
     - data-deletion
 
 review:
-  reviewers: 2           # fresh reviewer agents per diff; +1 when high-stakes triggers hit
+  reviewers: 2           # machine-enforced: review_check requires cards R1..RN (+1 high-stakes)
   high_stakes_paths: []          # e.g. ["prisma/schema.prisma", "src/lib/"]
   high_stakes_terms: []          # project vocabulary that means money/irreversibility
 

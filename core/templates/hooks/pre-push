@@ -78,13 +78,24 @@ while read -r _local_ref local_sha remote_ref _remote_sha; do
   # 2) EVERY branch carrying product code — gated by diff CONTENT, not branch name.
   #    (The old name-based guard let `chore/…` branches carry code around the whole
   #    review, without any hatch.)
-  CODE_PATHS=$(python3 - <<'PY' 2>/dev/null || echo '^(src/|prisma/)'
+  CODE_PATHS=$(python3 - <<'PY' 2>/dev/null || true
 import sys; sys.path.insert(0, ".vteam/scripts/lib")
 from ctx import Ctx
-paths = Ctx().cfg("git.code_paths", ["src/", "prisma/"])
-print("^(" + "|".join(str(p) for p in paths) + ")")
+raw = Ctx().cfg("git.code_paths", [])
+raw = raw if isinstance(raw, list) else [raw]
+paths = [str(p) for p in raw if str(p).strip()]
+if paths:
+    print("^(" + "|".join(paths) + ")")
 PY
 )
+  if [[ -z "$CODE_PATHS" ]]; then
+    # FAIL CLOSED: empty git.code_paths (init could not derive it) or an
+    # unreadable config means we cannot tell product code from the rest —
+    # so EVERY path is product code until git.code_paths says otherwise.
+    echo "⚠️  git.code_paths is empty or unreadable — FAILING CLOSED: treating EVERY path as product code."
+    echo "   Set git.code_paths in vteam.config.yaml to scope the fence (an unscoped fence stays SHUT, never silently open)."
+    CODE_PATHS='^'
+  fi
   if git diff --name-only "${DIFF_BASE[@]}" | grep -qE "$CODE_PATHS"; then
     if [[ "${ALLOW_PUSH_NOREVIEW:-}" == "1" ]]; then
       echo "⚠️  ALLOW_PUSH_NOREVIEW=1 — passing on declared intent"

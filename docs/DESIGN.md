@@ -90,7 +90,7 @@ git:
   hooks: managed             # managed | external (repo has real branch protection)
   code_paths: [src/]         # "product code" for the review fence + stale scans
 tracker:
-  provider: jira             # jira | github | linear | markdown
+  provider: jira             # jira | github | markdown (linear: roadmap)
   done_statuses: [Done, Closed, Resolved]
   review_status: "In Review"
 design:
@@ -219,7 +219,9 @@ never parsed.
 The source harness presumes one human owner + one machine (global WIP=1,
 <2h claim-orphan heuristic, single-writer ledger, self-merge). vteam v1 keeps
 this as the **default and documented sweet spot** (`team.size: 1`); `size > 1`
-switches: WIP limit = size, claim TTL configurable, ledger sharded per-lane with
+switches: WIP limit = size, claim TTL configurable (roadmap — today the 2h TTL
+is doctrine prose in raci.md, enforced by the PM recovery lane, not a knob),
+ledger sharded per-lane with
 a merge rule, self-merge downgraded to require human review. Multi-human support
 is explicitly *best-effort* in v1 — stated in README, not hidden.
 

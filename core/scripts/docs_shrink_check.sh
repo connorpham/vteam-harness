@@ -48,8 +48,10 @@ fi
 
 cd "$(vteam_root)"
 
-PM_DIR=$(vteam_cfg paths.pm docs/pm)
-ADR_DIR=$(vteam_cfg paths.adr docs/adr)
+# vteam_cfg refuses flow-style sections loudly (exit 1) rather than misreading
+# them — a gate must then STOP, not silently watch the wrong directories.
+PM_DIR=$(vteam_cfg paths.pm docs/pm) || { echo "docs_shrink: cannot read paths.pm from vteam.config.yaml (flow-style section? see stderr above) — refusing to guess" >&2; exit 1; }
+ADR_DIR=$(vteam_cfg paths.adr docs/adr) || { echo "docs_shrink: cannot read paths.adr — refusing to guess" >&2; exit 1; }
 WATCH="^(${PM_DIR}|${ADR_DIR})/.*\.md$"
 THRESHOLD=20
 fail=0

@@ -280,8 +280,8 @@ export async function audit(flags) {
   console.log("");
   if (fs.existsSync(path.join(root, ".vteam", "manifest.json"))) {
     console.log(report.score < 100
-      ? "vteam is installed — every ❌ above is un-wired accountability. Verify the install: npx vteam doctor"
-      : "Fully machine-checked. Keep the reds honest: npx vteam doctor");
+      ? "vteam is installed — every ❌ above is un-wired accountability. Verify the install: npx vteam-harness doctor"
+      : "Fully machine-checked. Keep the reds honest: npx vteam-harness doctor");
   } else if (report.score < 70) {
     console.log(`Every ❌ above is a claim an AI agent can make without proof.
 Close the gap in one command:  npx vteam-harness init

@@ -15,7 +15,7 @@ export function render(wf, ctx) {
 export function pointers(root) {
   const agents = path.join(root, "AGENTS.md");
   const pointer = "\n## vteam\n\nThis repo runs the vteam virtual-team framework. " +
-    "Workflows: .codex/prompts/ (team, pm, ba, dev, qa, verify). Config: vteam.config.yaml. " +
+    "Workflows: .codex/prompts/ (team, pm, ba, dev, qa, docs, plan, verify, guidelines). Config: vteam.config.yaml. " +
     "Doctrine: the team docs directory named in the config.\n";
   if (!fs.existsSync(agents) || !fs.readFileSync(agents, "utf8").includes("## vteam")) {
     fs.appendFileSync(agents, pointer);

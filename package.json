@@ -1,7 +1,7 @@
 {
   "name": "vteam-harness",
-  "version": "0.6.0",
-  "description": "One command puts a whole virtual AI team to work on your repo — agent-agnostic PM/BA/SA/DEV/QA orchestration with machine gates that can actually go red.",
+  "version": "0.6.1",
+  "description": "One command puts a whole virtual AI team to work on your repo \u2014 agent-agnostic PM/BA/SA/DEV/QA orchestration with machine gates that can actually go red.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -20,7 +20,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node tests/e2e.mjs"
+    "test": "node tests/conformance.mjs && node tests/e2e.mjs"
   },
   "keywords": [
     "ai",

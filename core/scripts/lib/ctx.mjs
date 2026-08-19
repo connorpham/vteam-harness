@@ -1,12 +1,9 @@
 // vteam context (Node) — the ONE place .mjs gates resolve repo root, config
 // and env. Same contract as ctx.py next to it: constrained YAML subset
-// (scalars, nested mappings, inline [a, b] and dash lists, quoted values,
-// comments), inert .env parsing (key=value text — NEVER executed as shell).
-//
-// One deliberate extension over ctx.py: inline flow mappings `{a: b, c: d}`
-// parse as objects (the README shows `stack: { profile: nextjs-prisma }`);
-// ctx.py currently returns that as a raw string — keep block style in configs
-// that Python gates read until ctx.py learns the same.
+// (scalars, nested mappings, inline [a, b] and dash lists, flow mappings
+// `{a: b, c: [x, y]}`, quoted values, comments; tab indentation dies loudly,
+// tabs inside values are fine), inert .env parsing (key=value text — NEVER
+// executed as shell). Parity with ctx.py is fenced by tests/conformance.mjs.
 //
 // Usage:
 //   import { Ctx, parseConfig, repoRoot, loadEnv } from "./ctx.mjs";
@@ -40,21 +37,54 @@ function die(ln, msg) {
   throw new Error(`ctx: ${CONFIG_NAME}:${ln}: ${msg}`);
 }
 
+/** Split a flow body on commas at nesting depth 0 — a comma inside [], {}
+ * or quotes is data, not a separator. Mirrors ctx.py _split_top exactly. */
+function splitTop(s, ln) {
+  const parts = [];
+  let buf = "", depth = 0, quote = "";
+  for (const ch of s) {
+    if (quote) {
+      buf += ch;
+      if (ch === quote) quote = "";
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+      buf += ch;
+    } else if (ch === "[" || ch === "{") {
+      depth++;
+      buf += ch;
+    } else if (ch === "]" || ch === "}") {
+      depth--;
+      if (depth < 0) die(ln, `unbalanced brackets in flow value: ${JSON.stringify(s)}`);
+      buf += ch;
+    } else if (ch === "," && depth === 0) {
+      parts.push(buf);
+      buf = "";
+    } else {
+      buf += ch;
+    }
+  }
+  if (depth !== 0 || quote) die(ln, `unbalanced brackets in flow value: ${JSON.stringify(s)}`);
+  parts.push(buf);
+  return parts;
+}
+
 function parseScalar(s, ln) {
   s = s.trim();
   if ("&*".includes(s[0] ?? "") || s === "|" || s === ">" ||
       s.startsWith("| ") || s.startsWith("> ")) {
     die(ln, `outside the vteam YAML subset (anchors/multiline): ${JSON.stringify(s)}`);
   }
-  if (s.startsWith("[") && s.endsWith("]")) {
+  if (s.startsWith("[")) {
+    if (!s.endsWith("]")) die(ln, `unterminated inline list: ${JSON.stringify(s)}`);
     const inner = s.slice(1, -1).trim();
-    return inner ? inner.split(",").map((x) => parseScalar(x, ln)) : [];
+    return inner ? splitTop(inner, ln).map((x) => parseScalar(x, ln)) : [];
   }
-  if (s.startsWith("{") && s.endsWith("}")) { // flow mapping (extension, see header)
+  if (s.startsWith("{")) { // flow mapping {a: b, c: [x, y]} — same as ctx.py
+    if (!s.endsWith("}")) die(ln, `unterminated flow mapping: ${JSON.stringify(s)}`);
     const inner = s.slice(1, -1).trim();
     const obj = {};
     if (!inner) return obj;
-    for (const part of inner.split(",")) {
+    for (const part of splitTop(inner, ln)) {
       const m = part.match(/^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.+?)\s*$/);
       if (!m) die(ln, `bad flow mapping entry: ${JSON.stringify(part.trim())}`);
       obj[m[1]] = parseScalar(m[2], ln);
@@ -78,7 +108,10 @@ export function parseConfig(text) {
   let ln = 0;
   for (const raw of text.split("\n")) {
     ln++;
-    if (raw.trimStart().startsWith("#")) continue;
+    if (raw.trimStart().startsWith("#") || !raw.trim()) continue;
+    if (raw.slice(0, raw.length - raw.trimStart().length).includes("\t")) {
+      die(ln, "tab indentation is not supported — use spaces"); // tabs INSIDE values stay legal
+    }
     const s = raw.replace(/\s#.*$/, "").trimEnd(); // subset: '#' never appears in values
     if (s.trim()) lines.push([ln, s.length - s.trimStart().length, s.trim()]);
   }
@@ -143,7 +176,7 @@ export class Ctx {
     this.root = repoRoot(start);
     const cfgFile = path.join(this.root, CONFIG_NAME);
     if (!fs.existsSync(cfgFile)) {
-      throw new Error(`ctx: ${CONFIG_NAME} not found at repo root — run \`npx vteam init\``);
+      throw new Error(`ctx: ${CONFIG_NAME} not found at repo root — run \`npx vteam-harness init\``);
     }
     this._cfg = parseConfig(fs.readFileSync(cfgFile, "utf8"));
     this._env = loadEnv(this.root);
@@ -198,10 +231,16 @@ function selftest() {
   assert(cfg.autonomy.exemptions[0] === "real-money", "exemptions");
   assert(cfg.team.capacity_per_day === 0.8, "capacity_per_day");
   assert(JSON.stringify(cfg.review.high_stakes_paths) === "[]", "high_stakes_paths");
-  // flow mapping extension (README config style)
+  // flow mappings (README config style), incl. a 2-element list inside a
+  // flow map — the exact shape README's by_label ships (H3 regression):
   const flow = parseConfig("stack: { profile: nextjs-prisma, package_manager: npm }\n");
   assert(flow.stack.profile === "nextjs-prisma", "flow mapping profile");
   assert(flow.stack.package_manager === "npm", "flow mapping package_manager");
+  const flow2 = parseConfig("docs:\n  task_context:\n    by_label: { payment: [a.md, b.md], auth: [c.md] }\n");
+  assert(JSON.stringify(flow2.docs.task_context.by_label.payment) === '["a.md","b.md"]',
+    "flow map with 2-element list (H3)");
+  assert(JSON.stringify(flow2.docs.task_context.by_label.auth) === '["c.md"]',
+    "flow map with 1-element list");
   // quoted values with the characters init escapes
   const q = parseConfig("project:\n  name: 'My App: The \"Sequel\"'\n");
   assert(q.project.name === 'My App: The "Sequel"', "quoted name with colon+quotes");
@@ -220,7 +259,10 @@ function selftest() {
   }
   // mutation half — a parser that has never been red does not exist:
   let reds = 0;
-  for (const bad of ["b: &anchor x\n", "a:\n  - 1\n - 2\n", "weird ! line\n"]) {
+  for (const bad of ["b: &anchor x\n", "a:\n  - 1\n - 2\n", "weird ! line\n",
+                     "a:\n\tb: 1\n",   // tab indentation must die loudly (H10)
+                     "x: { a }\n",     // flow entry without a value
+                     "x: { a: b\n"]) { // unterminated flow mapping
     try {
       parseConfig(bad);
       console.error(`ctx.mjs selftest FAILED: should have rejected ${JSON.stringify(bad)}`);

@@ -4,7 +4,7 @@
     "name": "Connor Pham",
     "url": "https://github.com/connorpham"
   },
-  "description": "Proof-of-done for AI agents — bootstrap plugin for the vteam harness (15 machine gates, every one with a --selftest mutation proof).",
+  "description": "Proof-of-done for AI agents — bootstrap plugin for the vteam harness (13 machine gates, every one with a --selftest mutation proof).",
   "plugins": [
     {
       "name": "vteam",

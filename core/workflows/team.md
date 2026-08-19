@@ -144,7 +144,7 @@ base:
 5. **Background lanes only when worth it.** ≥2 unblocked items ahead before a
    background lane starts; a thin sprint tail runs sequential — cheaper.
 6. **`/team lite`** — economy mode: background lanes OFF, main track + mandatory
-   gates only (2 reviewers, challengers — quality is not negotiated). For slow,
+   gates only ({review.reviewers} reviewers, challengers — quality is not negotiated). For slow,
    sure progress at minimum cost.
 7. Standing anti-bloat still applies: KB reads index-only; minutes are summary +
    links.

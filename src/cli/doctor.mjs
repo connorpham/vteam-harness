@@ -13,6 +13,30 @@ function runSelftest(cmd, args, cwd) {
   return "";
 }
 
+/** Discover the selftest-bearing gates under a scripts dir: any *.py/*.sh/*.mjs
+ * whose source contains `--selftest`, with the interpreter its extension names.
+ * Sorted for stable output. Exported so tests mirror doctor instead of keeping
+ * a second hardcoded list (the drifting-count trap). */
+export function discoverSelftests(dir) {
+  const INTERP = { ".py": "python3", ".sh": "bash", ".mjs": "node" };
+  const found = [];
+  const walk = (abs, rel) => {
+    let entries = [];
+    try { entries = fs.readdirSync(abs, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const eAbs = path.join(abs, e.name);
+      const eRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(eAbs, eRel);
+      else if (INTERP[path.extname(e.name)] &&
+               fs.readFileSync(eAbs, "utf8").includes("--selftest")) {
+        found.push({ s: eRel, cmd: INTERP[path.extname(e.name)] });
+      }
+    }
+  };
+  walk(dir, "");
+  return found;
+}
+
 export async function doctor(flags) {
   const root = repoRoot();
   let miss = 0;
@@ -40,7 +64,7 @@ export async function doctor(flags) {
 
   // 1. config parses (through the same parser the gates use)
   if (!fs.existsSync(path.join(root, "vteam.config.yaml"))) {
-    bad("vteam.config.yaml missing — run `npx vteam init`");
+    bad("vteam.config.yaml missing — run `npx vteam-harness init`");
     finish(1);
   }
   const p = spawnSync("python3", [path.join(root, ".vteam/scripts/lib/ctx.py"), "version"],
@@ -93,11 +117,15 @@ export async function doctor(flags) {
   }
 
   // 3b. code_paths must match something real — a fence watching nothing is the
-  // silent-skip class this framework exists to kill (field-trial finding #17)
+  // silent-skip class this framework exists to kill (field-trial finding #17).
+  // [] is an honest unknown (init could not derive → WARN, fence fails closed);
+  // a CONFIGURED list matching nothing is a lie in the config → RED.
   if (cfg) {
     const cps = cfgGet(cfg, "git.code_paths", []);
     const list = Array.isArray(cps) ? cps.map(String) : [];
-    if (list.length) {
+    if (!list.length) {
+      warn("git.code_paths is empty — could not derive code_paths — the review fence and stale-verdict gate are OFF until you set git.code_paths in vteam.config.yaml (the pre-push fence fails CLOSED, treating every path as product code, until then)");
+    } else {
       const alive = list.filter((cp) => fs.existsSync(path.join(root, cp.replace(/\/$/, ""))));
       if (!alive.length) {
         bad(`git.code_paths ${JSON.stringify(list)} matches NOTHING in this repo — the review fence and stale-verdict gate are watching air; point it at where the code actually lives`);
@@ -123,24 +151,21 @@ export async function doctor(flags) {
     }
   }
 
-  // 5. selftests — every gate must still prove it can go red (python + shell + node)
-  const selftests = [
-    ...["gate.py", "log_check.py", "verbatim_gate.py", "review_check.py", "evd_check.py",
-      "evd_ui_check.py", "dor_check.py", "comment_check.py", "schedule_check.py",
-      "stale_verdict_check.py", "perf_report.py", "model_route.py",
-      "lib/ctx.py", "lib/tracker.py"].map((s) => ({ s, cmd: "python3" })),
-    ...["docs_shrink_check.sh", "lockfile_check.sh", "lib/ctx.sh"].map((s) => ({ s, cmd: "bash" })),
-    { s: "lib/ctx.mjs", cmd: "node" },
-  ];
+  // 5. selftests — every gate must still prove it can go red (python + shell + node).
+  // DISCOVERED, not hardcoded: every .vteam/scripts file whose source carries
+  // `--selftest` runs with the interpreter its extension names — new gates join
+  // the list by existing, and the printed count cannot drift from reality.
+  const selftests = discoverSelftests(path.join(root, ".vteam", "scripts"));
+  if (!selftests.length) {
+    bad("no --selftest gates found under .vteam/scripts — broken install, re-run vteam update");
+  }
   let stFail = 0, stRun = 0;
   for (const { s, cmd } of selftests) {
-    const file = path.join(root, ".vteam/scripts", s);
-    if (!fs.existsSync(file)) { warn(`selftest SKIP: .vteam/scripts/${s} not installed`); continue; }
-    const red = runSelftest(cmd, [file], root);
+    const red = runSelftest(cmd, [path.join(root, ".vteam/scripts", s)], root);
     stRun++;
     if (red) { bad(`selftest RED: ${s}\n${red}`); stFail++; }
   }
-  if (!stFail) ok(`gate selftests green (${stRun} checks prove they can red)`);
+  if (selftests.length && !stFail) ok(`gate selftests green (${stRun} discovered checks prove they can red)`);
 
   // 6. provider preflight
   if (!json) console.log("── preflight ──");

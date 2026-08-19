@@ -37,7 +37,7 @@ only then reconsider the routing below.
 |---|---|---|
 | DEV **R1 spec reviewer** | `workhorse` | The reviewer must not be weaker than the author; a bug that slips review costs many times the model fee |
 | DEV **R2 challenger** | `standard` | The second reviewer needs a DIFFERENT LENS more than equal IQ |
-| DEV **R3 architecture** (only when the diff touches `review.high_stakes_paths`) | `workhorse` | "Option A vs B, will it scale" is expensive-if-wrong; skipped for routine screens |
+| DEV **R3 architecture** (when the diff touches `review.high_stakes_paths` **or** matches `review.high_stakes_terms` — same triggers review_check enforces) | `workhorse` | "Option A vs B, will it scale" is expensive-if-wrong; skipped for routine screens |
 | ⚠️ **High-stakes exception**: diff matches `review.high_stakes_terms` (money, irreversible state) | R1+R2 both `workhorse` | The project's highest risk class |
 | BA **challenger** | `standard` | AC/INVEST/citation audit — clear checklist work |
 | QA **challenger** | `standard` | Falsifying the verify-sheet — the evidence gate does the mechanical part |

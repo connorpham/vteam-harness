@@ -84,7 +84,10 @@ class Tracker:
     # -- shared helpers --------------------------------------------------------
     def status_category(self, status: str) -> str:
         s = status.strip().lower()
-        done = [str(x).lower() for x in self.c.cfg("tracker.done_statuses", ["Done", "Closed", "Resolved"])]
+        raw = self.c.cfg("tracker.done_statuses", ["Done", "Closed", "Resolved"])
+        if isinstance(raw, str):
+            raw = [raw]  # scalar config value = ONE status, never its characters (H5)
+        done = [str(x).lower() for x in raw]
         review = str(self.c.cfg("tracker.review_status", "In Review")).lower()
         if s in done:
             return "done"
@@ -169,10 +172,12 @@ class MarkdownTracker(Tracker):
         return out
 
     def transition(self, key: str, category: str) -> None:
+        done_raw = self.c.cfg("tracker.done_statuses", ["Done"])
+        if isinstance(done_raw, str):
+            done_raw = [done_raw]  # scalar config value = ONE status name (H5)
         names = {"todo": "To Do", "in_progress": "In Progress",
                  "in_review": str(self.c.cfg("tracker.review_status", "In Review")),
-                 "done": str(self.c.cfg("tracker.done_statuses", ["Done"])[0]
-                             if isinstance(self.c.cfg("tracker.done_statuses", ["Done"]), list) else "Done")}
+                 "done": str(done_raw[0]) if done_raw else "Done"}
         f = self._file(key)
         text = f.read_text(encoding="utf-8")
         new = re.sub(r"^- status:.*$", f"- status: {names[category]}", text, count=1, flags=re.M)
@@ -231,7 +236,7 @@ def load(c: Ctx) -> Tracker:
             mod_path = dev
         else:
             raise SystemExit(f"tracker: provider {name!r} not installed ({mod_path} missing) — "
-                             f"run `npx vteam init` or switch tracker.provider to 'markdown'")
+                             f"run `npx vteam-harness init` or switch tracker.provider to 'markdown'")
     spec = importlib.util.spec_from_file_location(f"tracker_{name}", mod_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
@@ -279,8 +284,24 @@ def _selftest():
         # transition + read-back still work after validation
         t.transition("PROJ-1", "in_review")
         assert t.get_issue("PROJ-1")["status_category"] == "in_review"
+
+        # H5: a SCALAR done_statuses (legal in every config parser) means ONE
+        # status — never its characters. Before this fixture, `done_statuses:
+        # Done` made status_category iterate "D","o","n","e" and the
+        # stale-verdict gate went falsely green on every judged ticket.
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\nproject:\n  key: PROJ\npaths:\n  backlog: docs/backlog\n"
+            "tracker:\n  provider: markdown\n  done_statuses: Finished\n",
+            encoding="utf-8")
+        t2 = MarkdownTracker(Ctx(start=root))
+        t2.transition("PROJ-1", "done")
+        issue = t2.get_issue("PROJ-1")
+        assert issue["status"] == "Finished", \
+            f"transition must honor the scalar done status, wrote {issue['status']!r}"
+        assert issue["status_category"] == "done", \
+            f"scalar done_statuses must categorize as done, got {issue['status_category']!r}"
     print("tracker selftest: OK (markdown comments NEWEST-FIRST incl. >5 window, "
-          "read-back, 6 bad keys × 3 ops all red, transition)")
+          "read-back, 6 bad keys × 3 ops all red, transition, scalar done_statuses)")
 
 
 if __name__ == "__main__":

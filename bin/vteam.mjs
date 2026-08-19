@@ -4,11 +4,11 @@ import { parseArgs } from "../src/cli/util.mjs";
 const HELP = `vteam — a virtual AI team (PM·BA·SA·DEV·QA) for any repo, any agent tool.
 
 Usage:
-  npx vteam audit     grade any repo's AI-agent accountability 0-100 (works without vteam installed)
-  npx vteam init      install into the current repo (interactive; --yes for defaults)
-  npx vteam doctor    preflight + install integrity + gate selftests
-  npx vteam update    refresh framework files (never touches your ledgers/config)
-  npx vteam board     read-only local dashboard: tickets, ledger, evidence verdicts, decision queue
+  npx vteam-harness audit     grade any repo's AI-agent accountability 0-100 (works without vteam installed)
+  npx vteam-harness init      install into the current repo (interactive; --yes for defaults)
+  npx vteam-harness doctor    preflight + install integrity + gate selftests
+  npx vteam-harness update    refresh framework files (never touches your ledgers/config)
+  npx vteam-harness board     read-only local dashboard: tickets, ledger, evidence verdicts, decision queue
 
 audit flags:  --json  machine-readable {score, grade, dimensions} on stdout
 
@@ -18,8 +18,8 @@ board flags:  --port <n>  listen port (default 4177; 127.0.0.1 only — never ex
 init flags (all optional; any given flag skips its prompt):
   --yes                      accept defaults for everything not flagged
   --name <str> --key <PROJ> --language <en|vi|…>
-  --profile <generic|node|python|nextjs-prisma>
-  --tracker <markdown|jira>  --design <none|figma>
+  --profile <generic|node|python|nextjs-prisma|go|rust>
+  --tracker <markdown|jira|github>  --design <none|figma>
   --autonomy <off|assisted|full>
   --tools <csv of: claude-code,cursor,windsurf,codex,copilot>
 

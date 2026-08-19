@@ -19,6 +19,11 @@ steps:
     skip_reason: "no tsconfig.json — plain JS project"
   unit:
     run: "{package_manager} test"
+    # Probe (run silently): package.json must declare scripts.test AND it must
+    # not be an obvious no-op (echo / true / exit 0). This is a TRIPWIRE, not
+    # proof — a cleverer fake still passes it; only a real suite is verification.
+    requires_cmd: node -e 'const s=(require("./package.json").scripts||{}).test;if(!s||/^\s*(echo|true|exit 0)\b/.test(s))process.exit(1)'
+    skip_reason: "no real test script — the repo ships with ZERO verification until one exists (loud)"
   build:
     run: "{package_manager} run build --if-present"
   e2e:

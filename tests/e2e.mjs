@@ -12,6 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { discoverSelftests } from "../src/cli/doctor.mjs";
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = path.join(PKG, "bin", "vteam.mjs");
@@ -38,13 +39,17 @@ function run(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { encoding: "utf8", env: ENV, timeout: 120_000, ...opts });
 }
 function vteam(cwd, ...args) { return run("node", [CLI, ...args], { cwd }); }
-function freshRepo(name) {
+function freshRepo(name, { srcFile = true } = {}) {
   const dir = path.join(TMP, name);
   fs.mkdirSync(dir, { recursive: true });
   run("git", ["init", "-q", "-b", "main", dir]);
   run("git", ["-C", dir, "config", "user.email", "e2e@test"]);
   run("git", ["-C", dir, "config", "user.name", "e2e"]);
   fs.writeFileSync(path.join(dir, "README.md"), "# fixture\n");
+  if (srcFile) { // real source so init's code_paths derivation has something to find
+    fs.mkdirSync(path.join(dir, "src"));
+    fs.writeFileSync(path.join(dir, "src", "index.js"), "export const fixture = true;\n");
+  }
   run("git", ["-C", dir, "add", "-A"]);
   run("git", ["-C", dir, "commit", "-qm", "init"]);
   // a local bare origin so the preflight git leg has something real to ping
@@ -71,17 +76,19 @@ const repo = freshRepo("t1");
   }
   const gi = fs.readFileSync(path.join(repo, ".gitignore"), "utf8");
   check(".gitignore covers .env (tokens never commit)", /^\.env$/m.test(gi), gi);
-  // rendered skills carry no unresolved template vars
+  // rendered skills carry no unresolved template vars — all 7 groups render() substitutes
   let unresolved = [];
   const skills = path.join(repo, ".claude", "skills");
   for (const d of fs.readdirSync(skills)) {
     const t = fs.readFileSync(path.join(skills, d, "SKILL.md"), "utf8");
-    const m = t.match(/\{(paths|project|team|review|git|stack)\.[a-z_]+\}/g);
+    const m = t.match(/\{(paths|project|team|review|git|stack|autonomy)\.[a-z_]+\}/g);
     if (m) unresolved.push(`${d}: ${m.join(", ")}`);
   }
   check("no unresolved {vars} in rendered skills", unresolved.length === 0, unresolved.join("\n"));
   const cfgText = fs.readFileSync(path.join(repo, "vteam.config.yaml"), "utf8");
   check("config carries the chosen key", /key: DEMO/.test(cfgText));
+  check("code_paths derived from the repo's real src/", /code_paths: \[src\/\]/.test(cfgText),
+    cfgText.match(/code_paths.*$/m)?.[0]);
 }
 
 // ── 2. doctor GREEN on that fresh install ───────────────────────────────────
@@ -94,20 +101,51 @@ console.log("2. doctor on the fresh install");
   check("doctor ran the selftests", /gate selftests green/.test(r.stdout), r.stdout);
 }
 
+// ── 2b. src-less repo: honest [] — init warns, doctor warns, fence fails closed ─
+console.log("2b. src-less repo: code_paths [] is a WARN, and the fence fails CLOSED");
+{
+  const dir = freshRepo("t2b", { srcFile: false });
+  const r = vteam(dir, ...INIT_FLAGS);
+  check("init exits 0 on a src-less repo", r.status === 0, r.stdout + r.stderr);
+  check("init warns LOUDLY that derivation found nothing",
+    /could not derive code_paths/.test(r.stdout + r.stderr), r.stdout + r.stderr);
+  check("config carries an honest code_paths: [] (never invented paths)",
+    /code_paths: \[\]/.test(fs.readFileSync(path.join(dir, "vteam.config.yaml"), "utf8")),
+    fs.readFileSync(path.join(dir, "vteam.config.yaml"), "utf8").match(/code_paths.*$/m)?.[0]);
+  const d = vteam(dir, "doctor");
+  check("doctor exits 0 — an honest unknown WARNS, it does not red", d.status === 0,
+    d.stdout + d.stderr);
+  check("doctor's warn names the fix (set git.code_paths)",
+    /code_paths is empty[\s\S]*set git\.code_paths/.test(d.stdout), d.stdout);
+  // fail closed: with [] EVERY path is product code — code on a non-ticket
+  // branch is refused, never silently waved through an open fence
+  run("git", ["-C", dir, "add", "-A"]);
+  run("git", ["-C", dir, "commit", "-qm", "install vteam"]);
+  run("git", ["-C", dir, "checkout", "-qb", "just-a-branch"]);
+  fs.writeFileSync(path.join(dir, "tool.py"), "print('product code')\n");
+  run("git", ["-C", dir, "add", "-A"]);
+  run("git", ["-C", dir, "commit", "-qm", "code without a ticket"]);
+  const p = run("git", ["-C", dir, "push", "origin", "just-a-branch"]);
+  check("push of product code on a non-ticket branch REFUSED (fail closed)",
+    p.status !== 0 && /does not match/.test(p.stdout + p.stderr), p.stdout + p.stderr);
+  check("fence says WHY it failed closed",
+    /FAILING CLOSED: treating EVERY path as product code/.test(p.stdout + p.stderr),
+    p.stdout + p.stderr);
+}
+
 // ── 3. every installed gate selftest passes from the target repo ────────────
-console.log("3. installed gate selftests");
+// The list is DISCOVERED with doctor's own helper (any .vteam/scripts *.py/*.sh/*.mjs
+// carrying --selftest, interpreter by extension) — one home, counts cannot drift.
+console.log("3. installed gate selftests (discovered — mirrors doctor)");
 {
   const dir = path.join(repo, ".vteam", "scripts");
-  const py = fs.readdirSync(dir).filter((f) => f.endsWith(".py"));
-  for (const f of py) {
-    const src = fs.readFileSync(path.join(dir, f), "utf8");
-    if (!src.includes("--selftest")) continue;
-    const r = run("python3", [path.join(dir, f), "--selftest"], { cwd: repo });
-    check(`selftest ${f}`, r.status === 0, r.stdout + r.stderr);
-  }
-  for (const [cmd, f] of [["bash", "docs_shrink_check.sh"], ["bash", "lib/ctx.sh"], ["node", "lib/ctx.mjs"]]) {
-    const r = run(cmd, [path.join(dir, f), "--selftest"], { cwd: repo });
-    check(`selftest ${f}`, r.status === 0, r.stdout + r.stderr);
+  const gates = discoverSelftests(dir);
+  check("discovery finds the full battery (≥ 15, spanning py+sh+mjs)",
+    gates.length >= 15 && ["python3", "bash", "node"].every((c) => gates.some((g) => g.cmd === c)),
+    JSON.stringify(gates));
+  for (const { s, cmd } of gates) {
+    const r = run(cmd, [path.join(dir, s), "--selftest"], { cwd: repo });
+    check(`selftest ${s}`, r.status === 0, r.stdout + r.stderr);
   }
 }
 

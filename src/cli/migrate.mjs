@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { repoRoot } from "./util.mjs";
+import { loadConfig, cfgGet, CONFIG_NAME } from "./config.mjs";
 
 /** Legacy-sentinel rewriter (`vteam doctor --migrate [--apply]`).
  *
@@ -83,13 +84,21 @@ function targets(root, cfg) {
 
 export function migrate(flags) {
   const root = repoRoot();
-  const raw = fs.readFileSync(path.join(root, "vteam.config.yaml"), "utf8");
-  const grab = (k, d) => (raw.match(new RegExp(`^  ${k}:\\s*(.+)$`, "m")) || [])[1]?.trim() || d;
-  const cfg = { pm: grab("pm", "docs/pm"), evidence: grab("evidence", "evd") };
+  // ONE parser behavior everywhere: read config through config.mjs (= ctx.mjs),
+  // never a first-match regex — trailing comments and flow maps parse the same
+  // here as in every gate (a regex grab once false-cleaned the shipped example).
+  const cfg = loadConfig(root);
+  if (cfg === null) {
+    throw new Error(`${CONFIG_NAME} not found at repo root — run \`npx vteam init\` before migrating`);
+  }
+  const dirs = {
+    pm: String(cfgGet(cfg, "paths.pm", "docs/pm")),
+    evidence: String(cfgGet(cfg, "paths.evidence", "evd")),
+  };
   const apply = !!flags.apply;
   let totalHits = 0, changedFiles = 0;
 
-  for (const file of targets(root, cfg)) {
+  for (const file of targets(root, dirs)) {
     const before = fs.readFileSync(file, "utf8");
     let after = before;
     let hits = 0;

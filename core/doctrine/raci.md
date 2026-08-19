@@ -42,7 +42,7 @@ Root law: **no lane moves a ticket into a state another lane controls.**
 | Transition to | Who | Condition |
 |---|---|---|
 | To Do (create) | BA | Story passes DoR (G/W/T AC + estimate + design link if UI + dependencies) |
-| In Progress | DEV | On pickup, **with a claim comment `claimed <timestamp> · <branch>`** — In Progress is a CLAIM: other sessions seeing a claim under the claim TTL keep off; a claim past TTL with no remote branch/worklog is orphaned and handled by the PM recovery lane |
+| In Progress | DEV | On pickup, **with a claim comment `claimed <timestamp> · <branch>`** — In Progress is a CLAIM: other sessions seeing a claim under the claim TTL (**2 hours** — the one home of this number; prose-enforced by the PM recovery lane, not yet a config knob) keep off; a claim past TTL with no remote branch/worklog is orphaned and handled by the PM recovery lane |
 | In Review | DEV | Code done + gate green + reviews APPROVE + PR merged + full report comment |
 | Done | QA | Verdict PASS + PR merged + CI green |
 | To Do + `reopen` label | QA | Verdict FAIL / NEW-BUG — the `reopen` label distinguishes returned work from new work |
