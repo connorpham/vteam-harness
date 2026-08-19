@@ -91,15 +91,18 @@ export async function doctor(flags) {
   if (!manifest) {
     warn(`${MANIFEST_REL} missing (pre-manifest install) — run vteam update once to write it`);
   } else {
-    let gone = 0, edited = 0;
+    const gone = [], edited = [];
     for (const [rel, hash] of Object.entries(manifest.files)) {
       const abs = path.join(root, ...rel.split("/"));
-      if (!fs.existsSync(abs)) gone++;
-      else if (sha256(fs.readFileSync(abs)) !== hash) edited++;
+      if (!fs.existsSync(abs)) gone.push(rel);
+      else if (sha256(fs.readFileSync(abs)) !== hash) edited.push(rel);
     }
-    if (gone) bad(`${gone} manifest-owned file(s) missing — re-run vteam update`);
-    if (edited) warn(`${edited} framework file(s) locally modified — update will keep yours and park new versions as *.new`);
-    if (!gone && !edited) ok(`manifest verified (${Object.keys(manifest.files).length} framework-owned files intact)`);
+    // name the files — "1 file modified" with no name is the silent-ish
+    // reporting this framework exists to kill
+    const list = (a) => a.slice(0, 5).join(", ") + (a.length > 5 ? ` (+${a.length - 5} more)` : "");
+    if (gone.length) bad(`${gone.length} manifest-owned file(s) missing — re-run vteam update: ${list(gone)}`);
+    if (edited.length) warn(`${edited.length} framework file(s) locally modified — update will keep yours and park new versions as *.new: ${list(edited)}`);
+    if (!gone.length && !edited.length) ok(`manifest verified (${Object.keys(manifest.files).length} framework-owned files intact)`);
   }
 
   // 3. hooks fence — only when this install manages hooks (git.hooks: managed)
