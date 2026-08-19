@@ -230,6 +230,34 @@ it fits the world, while the README says "any repo". Known open items, by damage
   impossible for regulated data (PII in git forever) and needs a documented
   answer, not a config flag.
 
+## Phase 11 — One rule, one home ✅ (consistency round)
+A 3-agent adversarial review asked "does the code conflict with itself?" and
+found 10 HIGH answers. This phase closes them:
+- ONE config dialect: ctx.py learned flow mappings (bracket-aware), ctx.mjs
+  stopped splitting on bare commas, both reject tab indentation with the same
+  loud message, ctx.sh refuses flow shapes instead of misreading them, and
+  migrate.mjs lost its private regex parser. `tests/conformance.mjs` (15
+  fixtures, incl. the README's own config verbatim) now runs in `npm test` —
+  the permanent fence against parser drift.
+- ONE ledger grammar: `lib/ledger.py` is the home; log_check, perf_report and
+  the board all read it (the 6 rows the review caught them disagreeing on are
+  now selftest fixtures).
+- H1 (main was RED): init no longer invents code_paths — undetectable → `[]`
+  + loud warning; doctor warns on empty but reds on configured-lies; the
+  pre-push fence FAILS CLOSED on empty. E2E 82 → 95 checks.
+- Scalar config values normalize everywhere a list is expected (a scalar
+  `done_statuses` used to make stale_verdict silently green).
+- review_check reads `review.reviewers` (R1..RN, +1 high-stakes) — the knob is
+  machine-enforced now, not decorative. evd_check enforces BOTH verdict
+  anchors (COMMIT + VERIFIED-AT).
+- Legacy honesty: gates.yaml steps support `requires_cmd` probes; the node
+  profiles skip the unit step LOUDLY when no real test script exists, an
+  `echo`-shaped test script trips a tripwire, and a run where no suite executed
+  prints GREEN (WEAK) naming what did not run.
+- doctor discovers selftests dynamically (19 today) — the root cause of the
+  drifting "17 vs 18" counts is gone. Counts in earlier phase records are
+  point-in-time history, left as written.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)

@@ -2,15 +2,21 @@
 """evd_check.py — machine gate for /qa evidence (prose rules get skipped; this doesn't).
 
 Checks, for {paths.evidence}/<TICKET>/:
-  1. REPORT.md exists, has a verdict in its H1
-     (PASS/FAIL/PARTIAL/NEW-BUG/BLOCKED/UNCLEAR), sections 1–4
-     (5 required when blocked), a pinned `COMMIT: <sha>` line, no <placeholder>
-     tokens; FAIL/NEW-BUG verdicts carry Severity + Origin lines.
+  1. REPORT.md exists, has a verdict in its H1 — word-boundary matched
+     (PASS/FAIL/PARTIAL/NEW-BUG/BLOCKED/UNCLEAR; '# PASSPORT…' is not PASS),
+     sections 1–4 (5 required when blocked), BOTH anchors — a pinned
+     `COMMIT: <sha>` line AND a `VERIFIED-AT: <ISO timestamp>` line (code +
+     clock: squash/rebase merges discard branch shas, and the timestamp is
+     then the only thing that dates the verdict — the two-anchor law) — no
+     <placeholder> tokens; FAIL/NEW-BUG verdicts carry Severity + Origin lines.
   2. A top-level manifest.md exists.
   3. debate.md exists with ≥2 cards (verifier + challenger headings).
   4. Every TC_* folder has manifest.md with a RESULT: line, and — unless BLOCKED —
-     ≥1 .png step screenshot that OPENS and is readable (Pillow, ≥400×300,
-     non-empty); a *_boxed.png is required on FAIL/NEW-BUG TCs. A TC declaring
+     ≥1 .png step screenshot that OPENS, is readable and is not a blank
+     single-color frame (Pillow, ≥400×300, non-empty, <97% one color — same
+     rule as evd_ui_check: the lane issuing the verdict must not accept a
+     blank the DEV lane rejects); a *_boxed.png is required on FAIL/NEW-BUG
+     TCs. A TC declaring
      `TYPE: NON-UI` may skip images but MUST have db_verify.md OR cmd_verify.md
      (pure libraries/CLIs have no database — real command+output transcripts are
      their honest evidence; field-trial finding #20). A write TC
@@ -40,6 +46,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 VERDICTS = ["PASS", "FAIL", "PARTIAL", "NEW-BUG", "BLOCKED", "UNCLEAR"]
+# word-boundary, H1 only — '# PASSPORT verification' is NOT a PASS (board.mjs
+# parseReport mirrors this exactly; audit L1)
+VERDICT_PAT = re.compile(r"\b(" + "|".join(VERDICTS) + r")\b")
 BLOCKED_WORDS = ["BLOCKED", "UNCLEAR"]
 NOT_EXECUTED = ["BLOCK", "UNCLEAR", "PENDING", "N/A", "SKIP"]
 FAIL_WORDS = ["FAIL", "NEW-BUG"]
@@ -74,36 +83,47 @@ def png_problems(p: Path) -> list[str]:
                 f"the gate refuses to guess"]
     try:
         with Image.open(p) as im:
+            im.load()
             w, h = im.size
-            im.verify()
+            small = im.convert("RGB").resize((64, 64))
     except (UnidentifiedImageError, OSError) as exc:
         return [f"{p.name}: does not open as an image ({exc})"]
     if w < 400 or h < 300:
         return [f"{p.name}: too small {w}x{h} (min 400x300) — captured the wrong region?"]
+    # blank/error-page detection — the SAME rule as evd_ui_check.py (red-flags.md
+    # credits both lanes with it): the QA lane issues the verdict, so it must not
+    # accept a blank frame the DEV lane would reject (audit M5)
+    colors = small.getcolors(64 * 64) or []
+    if colors:
+        top = max(n for n, _ in colors)
+        if top / (64 * 64) > 0.97:
+            return [f"{p.name}: >97% a single color — a blank page or an error "
+                    f"screen, not evidence"]
     return []
 
 
 def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list, list]:
     errs, warns = [], []
     text = read(evd / "REPORT.md")
-    verdict_h1 = ""
+    verdict = ""
     if not text:
         errs.append("MISSING REPORT.md — the plain-language report is mandatory (V5b/V7)")
     else:
         h1 = next((l for l in text.splitlines() if l.startswith("# ")), "")
-        verdict_h1 = norm(h1).upper()
-        if not any(v in verdict_h1 for v in VERDICTS):
+        vm = VERDICT_PAT.search(norm(h1).upper())
+        verdict = vm.group(1) if vm else ""
+        if not vm:
             errs.append(f"REPORT.md H1 lacks a verdict (PASS/FAIL/…): {h1!r}")
         for n, pat in SECTION_PATS.items():
             if not re.search(pat, text, re.M):
                 errs.append(f"REPORT.md missing section {n}")
-        if any(w in verdict_h1 for w in BLOCKED_WORDS):
+        if verdict in BLOCKED_WORDS:
             m = re.search(r"^##\s*5[.．][^\n]*\n(.*?)(?=^##|\Z)", text, re.M | re.S)
             if not m or len(m.group(1).strip()) < 20:
                 errs.append("BLOCKED/UNCLEAR verdict but section 5 (why + what's needed) is empty")
         if re.search(r"<[a-zA-Z][^>\n]{0,40}>", text):
             errs.append("REPORT.md still contains an unfilled <placeholder>")
-        if any(w in verdict_h1 for w in FAIL_WORDS):
+        if verdict in FAIL_WORDS:
             if not re.search(r"Severity.*?(Blocker|Critical|Major|Minor)", text, re.S | re.I):
                 errs.append("Failing verdict but no 'Severity: Blocker/Critical/Major/Minor' line (section 4)")
             if not re.search(r"Origin.*?(DEV|BA|spec)", text, re.S | re.I):
@@ -111,6 +131,13 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
         if not re.search(r"COMMIT\s*[:：]\s*[0-9a-f]{7,40}\b", text, re.I):
             errs.append("REPORT.md lacks 'COMMIT: <sha>' — an unpinned verdict names no code "
                         "(the stale-verdict gate needs this line)")
+        # the SECOND anchor (same pattern as stale_verdict_check.py reads): a
+        # squash/rebase merge discards the branch sha the COMMIT pin names, and
+        # then the timestamp is the only thing left that dates the verdict
+        if not re.search(r"VERIFIED-AT\s*[:：]\s*\d{4}-\d{2}-\d{2}[T ][0-9:+.Z-]+", text):
+            errs.append("REPORT.md lacks 'VERIFIED-AT: <ISO timestamp>' — the second "
+                        "anchor of the two-anchor law: squash merges rewrite the pinned "
+                        "sha, and an undatable verdict reads UNVERIFIABLE later")
 
     if not (evd / "manifest.md").is_file():
         errs.append("MISSING manifest.md (requirement overview + TC list + per-TC verdicts)")
@@ -229,11 +256,25 @@ def main():
 
 
 def _selftest():
+    import struct
+    import zlib
+
+    def _png(w, h, px):
+        """A real PNG from the stdlib — no Pillow needed to BUILD fixtures."""
+        def chunk(t, d):
+            return (struct.pack(">I", len(d)) + t + d
+                    + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff))
+        raw = b"".join(b"\x00" + b"".join(px(x, y) for x in range(w)) for y in range(h))
+        return (b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
     with tempfile.TemporaryDirectory() as td:
         evd = Path(td) / "PROJ-1"
         tc = evd / "TC_1"
         tc.mkdir(parents=True)
         report = ("# Verification report PROJ-1 — PASS\nCOMMIT: abc1234\n"
+                  "VERIFIED-AT: 2026-01-01T12:00:00Z\n"
                   "## 1. What\nx\n## 2. How\nx\n## 3. Evidence\nTC_1: db_verify.md\n## 4. Conclusion\nok\n")
         (evd / "REPORT.md").write_text(report)
         (evd / "manifest.md").write_text("overview")
@@ -259,7 +300,33 @@ def _selftest():
         (evd / "REPORT.md").write_text(report.replace("PASS", "FAIL"))
         errs, _ = check_tree(evd, 1, [])
         assert any("Severity" in e for e in errs), "FAIL without Severity should red"
-    print("evd_check selftest: OK (fixture green + 4 mutations red)")
+        (evd / "REPORT.md").write_text(report.replace("VERIFIED-AT: 2026-01-01T12:00:00Z\n", ""))
+        errs, _ = check_tree(evd, 1, [])
+        assert any("VERIFIED-AT" in e for e in errs), \
+            "missing VERIFIED-AT (the second anchor) should red"
+        (evd / "REPORT.md").write_text(report.replace(
+            "# Verification report PROJ-1 — PASS", "# PASSPORT verification PROJ-1"))
+        errs, _ = check_tree(evd, 1, [])
+        assert any("lacks a verdict" in e for e in errs), \
+            "'# PASSPORT…' must not read as PASS (word boundary)"
+        # a blank single-color frame must red in the QA lane too (same rule as
+        # evd_ui_check); without Pillow the gate refuses to guess — also loud
+        try:
+            import PIL  # noqa: F401
+            has_pil = True
+        except ImportError:
+            has_pil = False
+        blank = evd / "blank.png"
+        blank.write_bytes(_png(500, 400, lambda x, y: b"\xff\xff\xff"))
+        probs = png_problems(blank)
+        assert probs, "a blank png must never pass silently"
+        assert any(("single color" if has_pil else "CANNOT CHECK") in m for m in probs), probs
+        if has_pil:
+            varied = evd / "varied.png"
+            varied.write_bytes(_png(500, 400,
+                                    lambda x, y: bytes((x % 256, y % 256, (x * y) % 256))))
+            assert png_problems(varied) == [], png_problems(varied)
+    print("evd_check selftest: OK (fixture green + 7 mutations red)")
 
 
 if __name__ == "__main__":

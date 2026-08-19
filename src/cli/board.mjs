@@ -32,11 +32,12 @@
 //   statuses, a 3-row ledger, evd/ with one REPORT), asserts the parses, then
 //   the mutations that must NOT crash or pass silently: POST → 405,
 //   /../etc/passwd → 404, a malformed ticket file → a `warnings` entry.
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { repoRoot } from "./util.mjs";
 import { loadConfig, cfgGet, CONFIG_NAME } from "./config.mjs";
 
@@ -141,11 +142,14 @@ function readTicketsPanel(root, cfg, warnings) {
 }
 
 // ---- ledger ----------------------------------------------------------------
+// MUST match core/scripts/lib/ledger.py — conformance fixtures in
+// ledger.py --selftest cover both (the selftest below asserts this mirror
+// against `ledger.py --fixtures`, so the two grammars cannot drift silently).
 export function resultKind(result) {
   const r = String(result).trim();
   if (/^done\b/.test(r)) return "done";
-  if (/^blocked:/.test(r)) return "blocked";
-  if (/^failed:/.test(r)) return "failed";
+  if (/^blocked:\s*\S/.test(r)) return "blocked";   // a bare 'blocked:' has no reason
+  if (/^failed:\s*\S/.test(r)) return "failed";
   return "other";          // log_check reds these; the board shows them as-is
 }
 
@@ -159,8 +163,11 @@ export function parseLedger(text) {
     const cells = line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
     if (cells.length !== 5) { rows.push({ malformed: true, raw: line.trim(), columns: cells.length }); continue; }
     const [date, lane, item, result, link] = cells;
-    const tok = (result.match(/tok\s*≈\s*([\d.]+\s*k?)/i) || [])[1] || null;
-    rows.push({ date, lane, item, result, result_kind: resultKind(result), tok: tok ? tok.trim() : null, link });
+    // token accounting — ledger.py's space rule: exactly one space each side
+    // of ≈, optional case-insensitive k suffix ('tok≈90k' is malformed → null)
+    const tokM = result.match(/tok ≈ (\d+(?:\.\d+)?)([kK])?\b/);
+    const tok = tokM ? tokM[1] + (tokM[2] || "") : null;
+    rows.push({ date, lane, item, result, result_kind: resultKind(result), tok, link });
   }
   return rows;
 }
@@ -241,15 +248,14 @@ function walkFiles(absDir, baseAbs, out) {
   }
 }
 
-/** VERDICT + pinned COMMIT out of an evd REPORT.md (same lines evd_check reds on). */
+/** VERDICT + pinned COMMIT out of an evd REPORT.md — from the H1 line ONLY,
+ * word-boundary matched, mirroring evd_check.py: a `VERDICT:` line elsewhere in
+ * the file (which evd_check reds) must not display as a verdict here, and
+ * '# PASSPORT verification' is not PASS. */
 export function parseReport(text) {
   const h1 = (text.split("\n").find((l) => l.startsWith("# ")) || "");
-  const up = h1.toUpperCase();
-  let verdict = VERDICTS.find((v) => up.includes(v)) || null;
-  if (!verdict) {
-    const m = text.match(/(?:VERDICT|RESULT)\s*[:：]\s*([^\n]+)/i);
-    if (m) verdict = (VERDICTS.find((v) => m[1].toUpperCase().includes(v)) || m[1].trim().slice(0, 40));
-  }
+  const m = h1.toUpperCase().match(new RegExp("\\b(" + VERDICTS.join("|") + ")\\b"));
+  const verdict = m ? m[1] : null;
   const commit = (text.match(/COMMIT\s*[:：]\s*([0-9a-f]{7,40})\b/i) || [])[1] || null;
   return { verdict, commit, h1: h1.replace(/^#\s*/, "").trim() };
 }
@@ -624,6 +630,27 @@ async function selftest() {
   const assert = (cond, msg) => {
     if (!cond) { console.error(`board selftest FAILED: ${msg}`); process.exit(1); }
   };
+
+  // ---- H4 conformance: this file MIRRORS core/scripts/lib/ledger.py ---------
+  // The canonical grammar emits its fixture table (the 6 rows the audit caught
+  // three parsers disagreeing on); the mirror must reproduce it exactly.
+  // python3 is a hard dependency of the framework (every gate is python), so a
+  // failed spawn here is a real red, not an environment quirk to paper over.
+  const ledgerPy = fileURLToPath(new URL("../../core/scripts/lib/ledger.py", import.meta.url));
+  assert(fs.existsSync(ledgerPy), `canonical grammar file missing: ${ledgerPy}`);
+  const px = spawnSync("python3", [ledgerPy, "--fixtures"], { encoding: "utf8" });
+  assert(px.status === 0, `python3 ledger.py --fixtures failed: ${px.stderr || px.error}`);
+  const fixtures = JSON.parse(px.stdout);
+  assert(fixtures.length === 6, `expected 6 conformance rows, got ${fixtures.length}`);
+  const hdr = "| Date | Lane | Item | Result | Link |\n|---|---|---|---|---|\n";
+  for (const f of fixtures) {
+    const row = parseLedger(hdr + `| 2026-01-02 | DEV | X-1 | ${f.result} | PR #1 |\n`)[0];
+    assert(row.result_kind === f.kind,
+      `H4 drift on ${JSON.stringify(f.result)}: board kind ${row.result_kind} vs canonical ${f.kind}`);
+    assert(row.tok === f.tok,
+      `H4 drift on ${JSON.stringify(f.result)}: board tok ${JSON.stringify(row.tok)} vs canonical ${JSON.stringify(f.tok)}`);
+  }
+
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vteam-board-selftest-"));
   let server = null;
   try {
@@ -710,6 +737,17 @@ async function selftest() {
     assert(s3.tickets.tickets.length === 2, "the two good tickets must still parse");
     reds += 2;
 
+    // verdicts come from the H1 ONLY, word-boundary matched (mirrors evd_check):
+    // '# PASSPORT…' is not PASS, and a VERDICT: line outside the H1 — which
+    // evd_check reds — must not display as a verdict here either
+    put(tmp, "evd/DEMO-4/REPORT.md",
+      "# PASSPORT verification sweep\nVERDICT: PASS\nCOMMIT: abc1234\n");
+    const sV = JSON.parse((await httpReq(port, "/api/state")).body);
+    const dV = sV.evidence.tickets.find((t) => t.key === "DEMO-4");
+    assert(dV && dV.report.exists && dV.report.verdict === null,
+      `PASSPORT/body-verdict must not read as PASS: ${JSON.stringify(dV && dV.report)}`);
+    reds++;
+
     // non-markdown tracker: tickets null + the v1 note, never invented rows
     put(tmp, "vteam.config.yaml",
       fs.readFileSync(path.join(tmp, "vteam.config.yaml"), "utf8").replace("provider: markdown", "provider: jira"));
@@ -726,7 +764,7 @@ async function selftest() {
       "unparseable config must surface as a warning");
     reds++;
 
-    console.log(`board selftest: OK (state parse green: 2 tickets/3 ledger rows/1 OPEN decision/1 evd verdict; ${reds} mutations red — 4 non-GET methods 405, 6 traversal/static paths 404, malformed ticket + stray file warned, jira provider null, bad config degraded)`);
+    console.log(`board selftest: OK (ledger grammar conforms to ledger.py's 6 H4 fixtures; state parse green: 2 tickets/3 ledger rows/1 OPEN decision/1 evd verdict; ${reds} mutations red — 4 non-GET methods 405, 6 traversal/static paths 404, malformed ticket + stray file warned, PASSPORT/body verdict null, jira provider null, bad config degraded)`);
   } finally {
     if (server) await new Promise((done) => server.close(done));
     fs.rmSync(tmp, { recursive: true, force: true });

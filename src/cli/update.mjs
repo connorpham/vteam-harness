@@ -15,7 +15,7 @@ export async function update(_flags) {
   const root = repoRoot();
   const cfgFile = path.join(root, "vteam.config.yaml");
   if (!fs.existsSync(cfgFile)) {
-    console.log("vteam.config.yaml missing — run `npx vteam init` first.");
+    console.log("vteam.config.yaml missing — run `npx vteam-harness init` first.");
     process.exit(1);
   }
   let userCfg;

@@ -104,13 +104,24 @@ export class ManifestGuard {
   }
 }
 
+/** Build junk that must never be copied into an install or recorded in the
+ * manifest: python regenerates .pyc with a fresh source-mtime header, so a
+ * copied one is guaranteed to read as "locally modified" on the next doctor —
+ * exactly the false alarm that broke CI (a __pycache__ created in the package
+ * tree by a prior test run rode forceDir into the manifest). */
+const JUNK_DIRS = new Set(["__pycache__"]);
+const JUNK_FILES = /\.(pyc|pyo)$|^\.DS_Store$/;
+
 /** Repo-relative file listing, always forward-slash (manifest keys are portable). */
 export function walkFiles(dir, prefix = "") {
   const out = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const rel = prefix ? `${prefix}/${e.name}` : e.name;
-    if (e.isDirectory()) out.push(...walkFiles(path.join(dir, e.name), rel));
-    else out.push(rel);
+    if (e.isDirectory()) {
+      if (!JUNK_DIRS.has(e.name)) out.push(...walkFiles(path.join(dir, e.name), rel));
+    } else if (!JUNK_FILES.test(e.name)) {
+      out.push(rel);
+    }
   }
   return out;
 }

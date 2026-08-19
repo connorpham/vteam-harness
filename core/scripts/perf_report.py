@@ -4,7 +4,10 @@ model, was the routing sane, and where the tokens went.
 
 Reads {paths.pm}/log.md (the same table log_check guards — this tool is the
 READER that makes the accounting convention pay off) and prints a markdown
-report block for the desk report / the 14-day framework review.
+report block for the desk report / the 14-day framework review. Row grammar
+(result kinds, `tok ≈` accounting) comes from lib/ledger.py — the ONE home the
+gate enforces (audit H4: this file once kept a stricter private copy that
+flagged rows the gate had passed).
 
 Sections:
   1. Summary        — items, done/blocked/failed, total tokens, period
@@ -34,45 +37,41 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import ledger  # noqa: E402 — the canonical row grammar (one rule, one home)
 
 TIERS = ("frontier", "workhorse", "standard", "utility")
 ROW_TIER = re.compile(r"\((frontier|workhorse|standard|utility)\)")
 # Ledgers written before vteam name models directly — map them so history reads.
 LEGACY_TIER = {"fable": "frontier", "opus": "workhorse", "sonnet": "standard", "haiku": "utility"}
 LEGACY_RE = re.compile(r"\b(fable|opus|sonnet|haiku)\b", re.I)
-ROW_TOK = re.compile(r"tok\s*≈\s*(\d+(?:\.\d+)?)\s*k")
 DATE_PAT = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
 
 
 def parse_ledger(text: str) -> list[dict]:
     rows, in_table = [], False
     for line in text.splitlines():
-        if re.match(r"^\|\s*Date\s*\|", line, re.I):
+        if ledger.HEADER_PAT.match(line):
             in_table = True
             continue
-        if not in_table or not line.startswith("|") or line.startswith("|---"):
+        if not in_table:
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) != 5:
+        row = ledger.parse_row(line)
+        if row is None or row.get("malformed"):
             continue
-        day, lane, item, result, link = cells
-        m = DATE_PAT.match(day)
+        m = DATE_PAT.match(row["date"])
         if not m:
             continue
-        outcome = ("done" if result.startswith("done")
-                   else "blocked" if result.startswith("blocked")
-                   else "failed" if result.startswith("failed") else "other")
+        result, item = row["result"], row["item"]
         tier, tier_src = (ROW_TIER.search(result) or [None, None])[1], "explicit"
         if tier is None:
             lm = LEGACY_RE.search(result) or LEGACY_RE.search(item)
             tier, tier_src = (LEGACY_TIER[lm.group(1).lower()], "legacy") if lm else (None, None)
-        tokm = ROW_TOK.search(result)
         rows.append({
             "date": date(int(m.group(1)), int(m.group(2)), int(m.group(3))),
-            "lane": lane.upper(), "item": item, "outcome": outcome,
+            "lane": row["lane"].upper(), "item": item, "outcome": row["kind"],
             "tier": tier, "tier_src": tier_src,
-            "tok": float(tokm.group(1)) if tokm else None,
-            "link": link,
+            "tok": row["tok_k"],
+            "link": row["link"],
         })
     return rows
 
@@ -245,7 +244,22 @@ def _selftest():
     assert "$0.45" in rpt and "$2.25" in rpt, "cost band 90k×$5/$25 per Mtok"
     clean = parse_ledger(head + "| 2026-01-05 | DEV | P-1 | done (workhorse) · tok ≈ 90k | PR #1 |\n")
     assert not flags_for(clean), "clean row must produce no flags"
-    print("perf_report selftest: OK (parse + 5 flag classes + cost band + clean path)")
+    # H4 conformance — the canonical grammar (lib/ledger.py) decides, not a
+    # private stricter copy: the reader must agree with the gate row for row
+    h4 = parse_ledger(head + "\n".join([
+        "| 2026-03-01 | DEV | H-1 | done (workhorse) · tok≈90k | PR #1 |",
+        "| 2026-03-02 | DEV | H-2 | done (workhorse) · tok ≈ 90 | PR #2 |",
+        "| 2026-03-03 | DEV | H-3 | donezo · tok ≈ 90k | PR #3 |",
+        "| 2026-03-04 | BA | H-4 | blockedish reason | X |",
+    ]))
+    assert h4[0]["tok"] is None, "tok≈ without the space rule must NOT count"
+    assert h4[1]["tok"] == 0.09, "un-suffixed `tok ≈ 90` is 90 tokens, not missing accounting"
+    assert h4[2]["outcome"] == "other", "donezo is not done (word boundary)"
+    assert h4[3]["outcome"] == "other", "blockedish is not blocked (word boundary)"
+    assert any("no `tok ≈`" in f for f in flags_for([h4[0]])), "malformed tok on a done row must flag"
+    assert not flags_for([h4[1]]), f"a gate-green row must not be flagged here: {flags_for([h4[1]])}"
+    print("perf_report selftest: OK (parse + 5 flag classes + cost band + clean path "
+          "+ H4 grammar conformance)")
 
 
 if __name__ == "__main__":

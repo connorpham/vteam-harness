@@ -36,7 +36,8 @@ Hard rules:
 - **Every claim must point at a command** (anti-fabrication): a CONFIRMED carries
   its reproducing command + output pasted into the card; every tried-to-break item
   names the exact command/input actually run (test pattern, curl, which mutation at
-  which file:line) — not "tried the edge cases". A card with fewer than 2
+  which file:line) — not "tried the edge cases". The machine minimums
+  (review_check): ≥3 "tried to break" bullets per card, and a card with fewer than 2
   command/file:line traces is VOID.
   **Honest statement of machine scope:** the review gate checks the card's FORM
   (exists in the commit, sections present, ≥2 traces, file:line targets real) — a

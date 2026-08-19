@@ -5,9 +5,11 @@ Replaces two bug classes from the source harness (see docs/DESIGN.md §2):
   - hand-rolled load_env() duplicated in 6 scripts
 
 Config is a constrained YAML subset (what vteam.config.example.yaml uses):
-scalars, nested mappings, inline [a, b] and dash lists. No anchors, no
-multiline strings, no '#' inside values — the parser fails loudly on anything
-outside the subset rather than guessing.
+scalars, nested mappings, inline [a, b] and dash lists, and flow mappings
+{a: b, c: [x, y]} — same behavior as ctx.mjs, fenced by tests/conformance.mjs.
+No anchors, no multiline strings, no '#' inside values, no tab indentation
+(tabs inside values are fine) — the parser fails loudly on anything outside
+the subset rather than guessing.
 
 Usage:
     from ctx import Ctx
@@ -46,14 +48,61 @@ def _die(ln: int, msg: str):
     sys.exit(f"ctx: {CONFIG_NAME}:{ln}: {msg}")
 
 
+def _split_top(s: str, ln: int) -> list[str]:
+    """Split a flow body on commas at nesting depth 0 — a comma inside [], {}
+    or quotes is data, not a separator. Mirrors ctx.mjs splitTop exactly."""
+    parts, buf, depth, quote = [], [], 0, ""
+    for ch in s:
+        if quote:
+            buf.append(ch)
+            if ch == quote:
+                quote = ""
+        elif ch in ("'", '"'):
+            quote = ch
+            buf.append(ch)
+        elif ch in "[{":
+            depth += 1
+            buf.append(ch)
+        elif ch in "]}":
+            depth -= 1
+            if depth < 0:
+                _die(ln, f"unbalanced brackets in flow value: {s!r}")
+            buf.append(ch)
+        elif ch == "," and depth == 0:
+            parts.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    if depth != 0 or quote:
+        _die(ln, f"unbalanced brackets in flow value: {s!r}")
+    parts.append("".join(buf))
+    return parts
+
+
 def _parse_scalar(s: str, ln: int):
     s = s.strip()
     if s[:1] in ("&", "*") or s in ("|", ">") or s[:2] in ("| ", "> "):
         _die(ln, f"outside the vteam YAML subset (anchors/multiline): {s!r}")
-    if s.startswith("[") and s.endswith("]"):
+    if s.startswith("["):
+        if not s.endswith("]"):
+            _die(ln, f"unterminated inline list: {s!r}")
         inner = s[1:-1].strip()
-        return [] if not inner else [_parse_scalar(x, ln) for x in inner.split(",")]
-    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        return [] if not inner else [_parse_scalar(x, ln) for x in _split_top(inner, ln)]
+    if s.startswith("{"):  # flow mapping {a: b, c: [x, y]} — same as ctx.mjs
+        if not s.endswith("}"):
+            _die(ln, f"unterminated flow mapping: {s!r}")
+        inner = s[1:-1].strip()
+        obj: dict = {}
+        if not inner:
+            return obj
+        for part in _split_top(inner, ln):
+            m = re.fullmatch(r"\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.+?)\s*", part)
+            if not m:
+                _die(ln, f"bad flow mapping entry: {part.strip()!r}")
+            obj[m.group(1)] = _parse_scalar(m.group(2), ln)
+        return obj
+    if ((s.startswith('"') and s.endswith('"')) or
+            (s.startswith("'") and s.endswith("'"))) and len(s) >= 2:
         return s[1:-1]
     if s in ("true", "True"):
         return True
@@ -70,8 +119,10 @@ def parse_config(text: str) -> dict:
     """Parse the vteam YAML subset. Fails loudly on anything outside it."""
     lines: list[tuple[int, int, str]] = []  # (lineno, indent, stripped)
     for ln, raw in enumerate(text.splitlines(), 1):
-        if raw.lstrip().startswith("#"):
+        if raw.lstrip().startswith("#") or not raw.strip():
             continue
+        if "\t" in raw[:len(raw) - len(raw.lstrip())]:  # tabs INSIDE values stay legal
+            _die(ln, "tab indentation is not supported — use spaces")
         s = re.sub(r"\s#.*$", "", raw).rstrip()  # subset: '#' never appears in values
         if s.strip():
             lines.append((ln, len(s) - len(s.lstrip(" ")), s.strip()))
@@ -119,7 +170,7 @@ class Ctx:
         self.root = repo_root(start)
         cfg_file = self.root / CONFIG_NAME
         if not cfg_file.exists():
-            sys.exit(f"ctx: {CONFIG_NAME} not found at repo root — run `npx vteam init`")
+            sys.exit(f"ctx: {CONFIG_NAME} not found at repo root — run `npx vteam-harness init`")
         self._cfg = parse_config(cfg_file.read_text(encoding="utf-8"))
         self._env = dict(os.environ)
         env_file = self.root / ".env"
@@ -174,12 +225,27 @@ def _selftest():
     assert cfg["autonomy"]["exemptions"][0] == "real-money"
     assert cfg["team"]["capacity_per_day"] == 0.8
     assert cfg["review"]["high_stakes_paths"] == []
+    # flow mappings — parity with ctx.mjs (H2), incl. a 2-element list inside
+    # a flow map, the exact shape README's by_label ships (H3):
+    flow = parse_config(
+        "stack: { profile: node, package_manager: npm }\n"
+        "docs:\n  task_context:\n"
+        "    by_label: { payment: [a.md, b.md], auth: [c.md] }\n"
+    )
+    assert flow["stack"]["profile"] == "node"
+    assert flow["stack"]["package_manager"] == "npm"
+    assert flow["docs"]["task_context"]["by_label"]["payment"] == ["a.md", "b.md"]
+    assert flow["docs"]["task_context"]["by_label"]["auth"] == ["c.md"]
     # mutation half — a gate that has never been red does not exist:
-    for bad in ("b: &anchor x\n", "a:\n  - 1\n - 2\n", "weird ! line\n"):
+    bads = ("b: &anchor x\n", "a:\n  - 1\n - 2\n", "weird ! line\n",
+            "a:\n\tb: 1\n",          # tab indentation must die loudly (H10)
+            "x: { a }\n",            # flow entry without a value
+            "x: { a: b\n")           # unterminated flow mapping
+    for bad in bads:
         r = subprocess.run([sys.executable, __file__, "--parse-stdin"],
                            input=bad, capture_output=True, text=True)
         assert r.returncode != 0, f"selftest: should have rejected {bad!r}"
-    print("ctx.py selftest: OK (parse green + 3 mutations red)")
+    print(f"ctx.py selftest: OK (parse green + flow mappings + {len(bads)} mutations red)")
 
 
 if __name__ == "__main__":

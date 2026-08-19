@@ -58,12 +58,12 @@ tools:
     frontier: claude-fable-5
     workhorse: claude-opus-5
     standard: claude-sonnet-5
-    utility: claude-haiku-4.5
+    utility: claude-haiku-4-5
   windsurf:
     frontier: claude-fable-5
     workhorse: claude-opus-5
     standard: claude-sonnet-5
-    utility: claude-haiku-4.5
+    utility: claude-haiku-4-5
   codex:
     frontier: SET-ME
     workhorse: SET-ME

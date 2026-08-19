@@ -1,7 +1,7 @@
 ---
 name: dev
 command: /dev
-description: Ticket-driven DEV pipeline, end-to-end — preflight (tracker/design-source/git/DB pinged for real) → fetch the ticket → read spec + schema (the ticket is a claim, the spec is the spec) → UI tickets pull the design from the ticket's design link (design source = visual oracle; exact colors/spacing/text from node data) → implement on a feature branch → /verify gate + evidence → self-review with machine-measured design fidelity → TWO fresh review agents must approve (three on high-stakes diffs; committed review trail enforced at pre-push) → push + PR → mandatory 7-part plain-language report comment on the ticket, then transition to In Review (Done belongs to /qa). Runs the machine DoR gate and claims the ticket before coding.
+description: Ticket-driven DEV pipeline, end-to-end — preflight (tracker/design-source/git/DB pinged for real) → fetch the ticket → read spec + schema (the ticket is a claim, the spec is the spec) → UI tickets pull the design from the ticket's design link (design source = visual oracle; exact colors/spacing/text from node data) → implement on a feature branch → /verify gate + evidence → self-review with machine-measured design fidelity → {review.reviewers} fresh review agents must approve (+1 on high-stakes diffs; committed review trail enforced at pre-push) → push + PR → mandatory 7-part plain-language report comment on the ticket, then transition to In Review (Done belongs to /qa). Runs the machine DoR gate and claims the ticket before coding.
 args: "<TICKET: {project.key}-nnn | tracker URL> [assignee=<name>] [branch=feat|fix]"
 ---
 
@@ -149,8 +149,9 @@ spec); otherwise proceed.
   commit on the protected branch).
 - **UI work — design from the design source, consistency from the design
   language, quality from the UI rules:**
-  0. Read the fidelity reference FIRST (`.vteam/references/ui-fidelity.md`) —
-     measurable beauty, the fidelity tiers, the authority ladder. Write
+  0. Read the design language FIRST ({paths.design}/design-language.md —
+     generated from the design source at install; if absent, say so in the
+     task sheet rather than inventing tolerances). Write
      `{paths.evidence}/<TICKET>/dev/fidelity.json` AS you build the layout
      (selectors + expected values from the design node data) — know what the
      screen will be measured on before coding it.
@@ -184,7 +185,7 @@ spec); otherwise proceed.
   in the task-sheet. New behavior needs a new test whose expected value cites
   spec/schema.
 - **UI change → PROPER EVIDENCE, machine-guarded:**
-  1. Start the dev server, capture with `node .vteam/scripts/ui-evidence.mjs` —
+  1. Start the dev server, capture with `node .vteam/profiles/nextjs-prisma/scripts/ui-evidence.mjs` —
      it signs in through the app's REAL auth flow (the profile's auth strategy),
      no forged cookies, so the images show what a real user sees. Images go to
      `{paths.evidence}/<TICKET>/dev/` — the root layer belongs to QA; two lanes,
@@ -230,7 +231,7 @@ NOT DONE = NO REVIEWERS YET:
    - `fidelity.json` — key elements' selectors + expected values **taken from the
      design node data** (never from your own code — measuring code with code is
      self-grading).
-   - `node .vteam/scripts/ui_fidelity.mjs <TICKET>` → generates `fidelity.md`.
+   - `node .vteam/profiles/nextjs-prisma/scripts/ui_fidelity.mjs <TICKET>` → generates `fidelity.md`.
      WRONG deviations → fix code, re-measure. Justified deviations → declare an
      `intent` from the CLOSED list (`a11y:` / `spec:` / `responsive:` + reason) —
      the tool rejects intents outside the list.
@@ -304,7 +305,9 @@ APPROVE does the pipeline proceed to T5. Unresolvable disagreement → the user.
    conditions hold — every review card APPROVE + the PR's CI green + the /verify
    gate green + **no unanswered human comment on the PR** (a human comment is
    priority input: handle it via /pm's PR-FEEDBACK protocol FIRST, then merge) —
-   squash-merge without waiting. Any condition missing (or autonomy below full)
+   merge per `git.merge_strategy` without waiting (on squash/rebase the
+   VERIFIED-AT anchor keeps the QA verdict alive — qa workflow V5b). Any
+   condition missing (or autonomy below full)
    → leave the PR open + record why in the session minutes.
    `git switch <protected> && git pull` after merging.
 4. List every side finding from T3 and what was done with it.

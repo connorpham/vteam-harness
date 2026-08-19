@@ -10,7 +10,8 @@ Checks {paths.evidence}/<TICKET>/dev/review.md:
   1. The file exists IN THE PUSHED COMMIT (`git show <sha>:path`, never the
      worktree — uncommitted is nonexistent to this gate). Drafting at T4b? run
      with `--sha WORKTREE` to self-check first.
-  2. Cards for R1 and R2 (headings containing R1/R2), each with ≥1 valid APPROVE.
+  2. Cards for R1..RN — N is `review.reviewers` (default 2; the config knob is
+     read HERE, not just rendered into prose) — each with ≥1 valid APPROVE.
   3. A valid APPROVE has a "tried to break" section with ≥3 bullets, and the card
      carries ≥2 verifiable traces (a `command` in backticks or a file:line ref) —
      of which ≥1 MUST be file:line (backtick-only cards can't be cross-checked).
@@ -19,13 +20,16 @@ Checks {paths.evidence}/<TICKET>/dev/review.md:
   3c. Verdict APPROVE-WITH-QUESTIONS → review.md must contain an
      "Answered QUESTIONS" block — questions never evaporate silently pre-merge.
   4. The diff vs base touches `review.high_stakes_paths` OR its content matches
-     `review.high_stakes_terms` → an R3 card is REQUIRED, and it must compare
-     options ("option" / "A vs B") — an R3 that only praises did no work.
+     `review.high_stakes_terms` → ONE MORE card (R{N+1}, the architecture
+     reviewer) is REQUIRED, and it must compare options ("option" / "A vs B") —
+     an extra reviewer that only praises did no work.
 
 Usage: review_check.py <TICKET | branch-name> [--base origin/<protected>] [--sha <commit>|WORKTREE]
 Exit 0 = dossier complete; 1 = exactly what's missing.
 Selftest: --selftest (valid card green + 5 mutations red).
 """
+from __future__ import annotations
+
 import argparse
 import re
 import subprocess
@@ -35,13 +39,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from ctx import Ctx  # noqa: E402
 
-CARD_HEAD = re.compile(r"^#{2,4}\s.*\b(R1|R2|R3)\b", re.M)
+CARD_HEAD = re.compile(r"^#{2,4}\s.*\b(R\d+)\b", re.M)
 BULLET = re.compile(r"^\s*[-*•]\s+\S", re.M)
 # A "command" trace must look like a command (whitespace or ./path inside), not a
 # lone word in backticks — the loose version let 8-line fabricated cards through.
 EVIDENCE_CMD = re.compile(r"`[^`\n]*[\s/][^`\n]*`")
 EVIDENCE_LOC = re.compile(r"\b[\w./-]+\.(?:ts|tsx|js|jsx|mjs|py|sh|go|rs|java|kt|rb|php|prisma|sql|md):\d+")
 TRIED = re.compile(r"(tried[\s-]to[\s-]break|TRIED[\s-]TO[\s-]BREAK)(.*)", re.S | re.I)
+
+# Card thresholds — the machine's HOUSE OF RECORD (review-standard.md describes
+# what is checked; the exact numbers live here and only here — audit M13):
+MIN_TRIED_BULLETS = 3   # "tried to break" bullets per card
+MIN_TRACES = 2          # `command` / file:line traces per card
+MIN_FILE_LINE = 1       # …of which at least this many must be file:line
 
 
 def sh(root: Path, *args: str) -> tuple[int, str]:
@@ -84,24 +94,67 @@ def card_is_valid_approve(card: str) -> tuple[bool, list[str]]:
     if not m:
         probs.append("APPROVE without a 'tried to break' section — invalid card "
                      "(review-standard §1)")
-    elif len(BULLET.findall(m.group(2))) < 3:
-        probs.append("'tried to break' has <3 bullets — that's not trying")
+    elif len(BULLET.findall(m.group(2))) < MIN_TRIED_BULLETS:
+        probs.append(f"'tried to break' has <{MIN_TRIED_BULLETS} bullets — that's not trying")
     n_cmd, n_loc = len(EVIDENCE_CMD.findall(card)), len(EVIDENCE_LOC.findall(card))
-    if n_cmd + n_loc < 2:
-        probs.append("card has <2 verifiable traces (`command` / file:line) — "
-                     "testimony without commands is just prose")
-    if n_loc < 1:
+    if n_cmd + n_loc < MIN_TRACES:
+        probs.append(f"card has <{MIN_TRACES} verifiable traces (`command` / file:line) — "
+                     f"testimony without commands is just prose")
+    if n_loc < MIN_FILE_LINE:
         probs.append("card has no file:line trace — bare backticks can't be "
                      "cross-checked against the code (anti-fabrication rule 3b)")
     return len(probs) == 0, probs
+
+
+def required_cards(n_reviewers: int, need_extra: bool) -> list[str]:
+    """R1..RN from review.reviewers; a high-stakes diff adds one more (R{N+1})."""
+    return [f"R{i}" for i in range(1, n_reviewers + (2 if need_extra else 1))]
+
+
+def card_gaps(cards: dict[str, list[str]], required: list[str],
+              hs_card: str | None) -> list[str]:
+    """Missing/invalid cards against the required list. hs_card names the extra
+    high-stakes (architecture) card, or None when the diff doesn't need one."""
+    errs: list[str] = []
+    for r in required:
+        if r not in cards:
+            why = (" (diff hits high-stakes paths/terms — the architecture card "
+                   "is mandatory)") if r == hs_card else ""
+            errs.append(f"missing card {r}{why}")
+            continue
+        ok_any, probs_last = False, []
+        for card in cards[r]:
+            ok, probs = card_is_valid_approve(card)
+            if ok:
+                ok_any = True
+                break
+            probs_last = probs
+        if not ok_any:
+            errs.extend(f"{r}: {p}" for p in (probs_last or ["no valid APPROVE card"]))
+        if r == hs_card and ok_any and not re.search(r"option|\bA vs B\b", " ".join(cards[r]), re.I):
+            errs.append(f"{hs_card}: card compares no options (A vs B) — an extra "
+                        f"reviewer that only praises did no work")
+    return errs
 
 
 def main() -> int:
     c = Ctx()
     key = str(c.cfg("project.key"))
     protected = str(c.cfg("git.protected_branch", "main"))
-    hs_paths = [str(p) for p in c.cfg("review.high_stakes_paths", [])]
-    hs_terms = [str(t) for t in c.cfg("review.high_stakes_terms", [])]
+    hs_paths = c.cfg("review.high_stakes_paths", [])
+    hs_terms = c.cfg("review.high_stakes_terms", [])
+    hs_paths = [str(p) for p in ([hs_paths] if isinstance(hs_paths, str) else hs_paths)]
+    hs_terms = [str(t) for t in ([hs_terms] if isinstance(hs_terms, str) else hs_terms)]
+    # ^ scalar config value = ONE entry, never its characters (H5)
+    try:
+        n_rev = int(str(c.cfg("review.reviewers", 2)))
+    except ValueError:
+        print(f"❌ review_check: review.reviewers "
+              f"{c.cfg('review.reviewers')!r} is not a number")
+        return 1
+    if n_rev < 1:
+        print(f"❌ review_check: review.reviewers must be ≥ 1 (got {n_rev})")
+        return 1
 
     ap = argparse.ArgumentParser()
     ap.add_argument("ticket_or_branch")
@@ -147,7 +200,8 @@ def main() -> int:
             code, diff_text = sh(c.root, "git", "diff", args.base, ref)
         if code == 0 and re.search("|".join(re.escape(t) for t in hs_terms), diff_text or "", re.I):
             need_r3 = True
-    required = ["R1", "R2"] + (["R3"] if need_r3 else [])
+    required = required_cards(n_rev, need_r3)
+    hs_card = f"R{n_rev + 1}" if need_r3 else None
 
     for ref in re.findall(r"\b([\w./-]+\.(?:ts|tsx|js|jsx|mjs|py|sh|go|rs|java|kt|rb|php|prisma|sql)):\d+", text):
         if not (c.root / ref).is_file():
@@ -157,23 +211,7 @@ def main() -> int:
         errs.append("APPROVE-WITH-QUESTIONS present but no 'Answered QUESTIONS' "
                     "block — reviewer questions never evaporate silently")
 
-    for r in required:
-        if r not in cards:
-            why = " (diff hits high-stakes paths/terms — architecture R3 mandatory)" if r == "R3" else ""
-            errs.append(f"missing card {r}{why}")
-            continue
-        ok_any, probs_last = False, []
-        for card in cards[r]:
-            ok, probs = card_is_valid_approve(card)
-            if ok:
-                ok_any = True
-                break
-            probs_last = probs
-        if not ok_any:
-            errs.extend(f"{r}: {p}" for p in (probs_last or ["no valid APPROVE card"]))
-        if r == "R3" and ok_any and not re.search(r"option|\bA vs B\b", " ".join(cards["R3"]), re.I):
-            errs.append("R3: card compares no options (A vs B) — an R3 that only "
-                        "praises did no work")
+    errs.extend(card_gaps(cards, required, hs_card))
 
     if errs:
         print(f"❌ review_check: {ticket} — {len(errs)} gaps")
@@ -181,7 +219,7 @@ def main() -> int:
             print(f"   - {e}")
         return 1
     print(f"✅ review_check: {ticket} — dossier complete ({', '.join(required)}"
-          f"{'' if need_r3 else '; R3 not required for this diff'})")
+          f"{'' if need_r3 else f'; R{n_rev + 1} (high-stakes) not required for this diff'})")
     return 0
 
 
@@ -207,7 +245,27 @@ Traces: src/auth.ts:42
         assert not ok, f"mutation {name!r} should have gone red"
     cards = parse_cards(good + "\n### R2 challenger\nAPPROVE\n")
     assert set(cards) == {"R1", "R2"}, cards
-    print("review_check selftest: OK (valid card green + 4 mutations red + parser)")
+
+    # H6: review.reviewers drives the required list — it is READ, not prose.
+    # A two-card dossier under reviewers=3 must RED on the missing R3…
+    two_valid = good + "\n" + good.replace("## R1 — spec reviewer", "## R2 — challenger")
+    cards = parse_cards(two_valid)
+    assert required_cards(2, False) == ["R1", "R2"]
+    assert required_cards(3, False) == ["R1", "R2", "R3"]
+    assert required_cards(3, True) == ["R1", "R2", "R3", "R4"], \
+        "high-stakes adds ONE MORE card on top of review.reviewers"
+    gaps = card_gaps(cards, required_cards(3, False), None)
+    assert any("missing card R3" in g for g in gaps), \
+        f"reviewers=3 + 2-card dossier must RED: {gaps}"
+    # …and the same dossier under reviewers=2 is complete
+    assert not card_gaps(cards, required_cards(2, False), None), \
+        card_gaps(cards, required_cards(2, False), None)
+    # the extra high-stakes card must compare options, whatever its number
+    r3 = good.replace("## R1 — spec reviewer", "## R3 — architecture")
+    gaps = card_gaps(parse_cards(two_valid + "\n" + r3), required_cards(2, True), "R3")
+    assert any("compares no options" in g for g in gaps), gaps
+    print("review_check selftest: OK (valid card green + 4 mutations red + parser "
+          "+ reviewers=3 dossier red)")
 
 
 if __name__ == "__main__":

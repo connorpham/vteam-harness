@@ -103,7 +103,7 @@ appendix; it commits with the V7.4 dossier so the link outlives the session):
   data; ② else look the frame up by screen code in the design index. A UI TC
   compares the real screen against it (`annotate.py diff` → `design_vs_app.png`),
   judged at block/color/text level. The dev submitted a committed `fidelity.md`
-  → READ it: re-run `node .vteam/scripts/ui_fidelity.mjs <TICKET>` to confirm the
+  → READ it: re-run `node .vteam/profiles/nextjs-prisma/scripts/ui_fidelity.mjs <TICKET>` to confirm the
   numbers still hold on the build being verified, and audit the INTENTIONAL
   deviation lines — does the declared reason stand (real a11y/spec, or an
   excuse)? QA still designs its own boundaries — never take TCs from the dev's
