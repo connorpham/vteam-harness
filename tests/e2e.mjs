@@ -394,5 +394,64 @@ console.log("15. board — read-only dashboard");
   }
 }
 
+// ── 16. team.size > 1: the Actor column is machinery, not prose ──────────────
+console.log("16. team accountability — actor column, migrate, per-person report");
+{
+  // fresh installs ship the v2 header (actor costs a solo owner nothing)
+  const tpl = fs.readFileSync(path.join(repo, "docs", "pm", "log.md"), "utf8");
+  check("fresh ledger header carries Actor", /\| Date \| Lane \| Actor \|/.test(tpl), tpl.slice(0, 200));
+  check("init wrote the union-merge attribute (two humans append conflict-free)",
+    fs.existsSync(path.join(repo, ".gitattributes")) &&
+    /log\.md merge=union/.test(fs.readFileSync(path.join(repo, ".gitattributes"), "utf8")));
+
+  // a real 2-human repo with a legacy ledger: red → migrate → green → per-person
+  const dir = freshRepo("t16");
+  const r0 = vteam(dir, "init", "--yes", "--key", "TT", "--tracker", "markdown",
+    "--design", "none", "--profile", "generic", "--tools", "claude-code");
+  check("init exits 0", r0.status === 0, r0.stdout + r0.stderr);
+  fs.writeFileSync(path.join(dir, "vteam.config.yaml"),
+    fs.readFileSync(path.join(dir, "vteam.config.yaml"), "utf8").replace("size: 1", "size: 2"));
+  fs.writeFileSync(path.join(dir, "docs", "pm", "log.md"),
+    "# Dispatch ledger\n\n| Date | Lane | Item | Result | Link |\n|---|---|---|---|---|\n" +
+    "| 2026-12-01 | DEV | TT-1 | done (workhorse) · tok ≈ 90k | PR #1 |\n");
+  const red = run("python3", [path.join(dir, ".vteam", "scripts", "log_check.py")], { cwd: dir });
+  check("legacy ledger + team.size 2 → log_check RED naming the Actor column",
+    red.status === 1 && /Actor column/.test(red.stdout), red.stdout + red.stderr);
+  const mig = vteam(dir, "doctor", "--migrate", "--apply");
+  check("doctor --migrate --apply rewrites the ledger", mig.status === 0 || /APPLIED/.test(mig.stdout),
+    mig.stdout + mig.stderr);
+  const green = run("python3", [path.join(dir, ".vteam", "scripts", "log_check.py")], { cwd: dir });
+  check("migrated ledger is green (legacy rows carry — )", green.status === 0,
+    green.stdout + green.stderr);
+  fs.appendFileSync(path.join(dir, "docs", "pm", "log.md"),
+    "| 2026-12-02 | DEV | An | TT-2 | done (frontier) · tok ≈ 200k | PR #2 |\n");
+  const pr = run("python3", [path.join(dir, ".vteam", "scripts", "perf_report.py")], { cwd: dir });
+  check("perf_report groups by person and attributes the frontier flag",
+    /Who did what \(by person\)/.test(pr.stdout) && /\| An \|/.test(pr.stdout) &&
+    /An.*frontier/.test(pr.stdout), pr.stdout.slice(0, 600));
+  check("the per-person table ships the never-reads-chat honesty note",
+    /never reads anyone's chat/.test(pr.stdout));
+  // board rollup
+  const probe16 = `
+    import { createServer } from ${JSON.stringify(path.join(PKG, "src", "cli", "board.mjs"))};
+    import http from "node:http";
+    const srv = createServer(process.cwd());
+    await new Promise((d) => srv.listen(0, "127.0.0.1", d));
+    const port = srv.address().port;
+    const body = await new Promise((res, rej) => {
+      http.get({ host: "127.0.0.1", port, path: "/api/state" }, (x) => {
+        let b = ""; x.on("data", (d) => b += d); x.on("end", () => res(b));
+      }).on("error", rej);
+    });
+    await new Promise((d) => srv.close(d));
+    console.log(JSON.stringify(JSON.parse(body).ledger.by_actor));
+  `;
+  const bp = run("node", ["--input-type=module", "-e", probe16], { cwd: dir });
+  let ba = null;
+  try { ba = JSON.parse(String(bp.stdout).trim().split("\n").pop()); } catch { /* below */ }
+  check("board rolls the ledger up by actor", !!ba && ba["An"] && ba["An"].items === 1 &&
+    ba["—"] && ba["—"].items === 1, bp.stdout + bp.stderr);
+}
+
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);
 process.exit(failed === 0 ? 0 : 1);

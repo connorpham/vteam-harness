@@ -153,7 +153,9 @@ export function resultKind(result) {
   return "other";          // log_check reds these; the board shows them as-is
 }
 
-/** Parse the {paths.pm}/log.md dispatch table: | Date | Lane | Item | Result | Link |. */
+/** Parse the {paths.pm}/log.md dispatch table. Two shapes, same as ledger.py:
+ * v2     | Date | Lane | Actor | Item | Result | Link |
+ * legacy | Date | Lane | Item | Result | Link |        (actor -> null) */
 export function parseLedger(text) {
   const rows = [];
   let inTable = false;
@@ -161,13 +163,15 @@ export function parseLedger(text) {
     if (/^\|\s*Date\s*\|/i.test(line)) { inTable = true; continue; }
     if (!inTable || !line.startsWith("|") || line.startsWith("|---")) continue;
     const cells = line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
-    if (cells.length !== 5) { rows.push({ malformed: true, raw: line.trim(), columns: cells.length }); continue; }
-    const [date, lane, item, result, link] = cells;
+    let date, lane, actor, item, result, link;
+    if (cells.length === 6) [date, lane, actor, item, result, link] = cells;
+    else if (cells.length === 5) { [date, lane, item, result, link] = cells; actor = null; }
+    else { rows.push({ malformed: true, raw: line.trim(), columns: cells.length }); continue; }
     // token accounting — ledger.py's space rule: exactly one space each side
     // of ≈, optional case-insensitive k suffix ('tok≈90k' is malformed → null)
     const tokM = result.match(/tok ≈ (\d+(?:\.\d+)?)([kK])?\b/);
     const tok = tokM ? tokM[1] + (tokM[2] || "") : null;
-    rows.push({ date, lane, item, result, result_kind: resultKind(result), tok, link });
+    rows.push({ date, lane, actor, item, result, result_kind: resultKind(result), tok, link });
   }
   return rows;
 }
@@ -183,7 +187,20 @@ function readLedgerPanel(root, cfg) {
   const all = parseLedger(text);
   const totals = { done: 0, blocked: 0, failed: 0, other: 0, malformed: 0 };
   for (const r of all) totals[r.malformed ? "malformed" : r.result_kind]++;
-  return { source, exists: true, rows: all.slice(-LEDGER_ROWS), rows_total: all.length, totals,
+  // per-person rollup — only when the Actor column exists (team.size > 1 installs)
+  let by_actor = null;
+  if (all.some((r) => !r.malformed && r.actor)) {
+    by_actor = {};
+    for (const r of all) {
+      if (r.malformed) continue;
+      const who = r.actor || "(legacy)";
+      by_actor[who] ??= { items: 0, done: 0, tok_k: 0 };
+      by_actor[who].items++;
+      if (r.result_kind === "done") by_actor[who].done++;
+      if (r.tok) by_actor[who].tok_k += /[kK]$/.test(r.tok) ? parseFloat(r.tok) : parseFloat(r.tok) / 1000;
+    }
+  }
+  return { source, exists: true, rows: all.slice(-LEDGER_ROWS), rows_total: all.length, totals, by_actor,
     note: all.length ? null : `${source} exists but has no data rows yet` };
 }
 

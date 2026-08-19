@@ -43,8 +43,10 @@ and keeps the beat:
    (`{paths.pm}/decisions.md`) + the "Your desk" table at session end. The owner
    never has to read the tracker/PRs/logs to know what they must do.
 5. **The ledger:** every dispatched item writes 1 row to `{paths.pm}/log.md`
-   (`date | lane | item | result | link`) — progress reports come from the books,
-   not memory. The result column accepts EXACTLY 3 machine-countable values:
+   (`date | lane | actor | item | result | link`) — progress reports come from
+   the books, not memory. Actor is the HUMAN behind this session: `VTEAM_ACTOR`
+   env if set, else `git config user.name` — read it, never invent it (an
+   unresolvable actor is a question for the owner, not a blank cell). The result column accepts EXACTLY 3 machine-countable values:
    `done` · `blocked: <Qn/reason>` · `failed: <which gate went red>` — DEV rows
    append the model tier used, e.g. `done (workhorse)`, to tune routing with data.
 6. **Visible process** (framework-wide): one `▶` line per phase; the final report

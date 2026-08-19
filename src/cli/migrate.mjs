@@ -112,6 +112,24 @@ export function migrate(flags) {
       if (joined !== after) hits++;
       after = joined;
     }
+    // ledger v2: insert the Actor column (legacy rows get "—" — honest
+    // "unattributed history", never an invented person). Runs only on the
+    // dispatch ledger and only when its header is still the 5-column one.
+    if (file.endsWith("log.md") && /^\|\s*Date\s*\|\s*Lane\s*\|\s*Item\s*\|/im.test(after)) {
+      let inTable = false;
+      after = after.split("\n").map((line) => {
+        if (/^\|\s*Date\s*\|\s*Lane\s*\|\s*Item\s*\|/i.test(line)) {
+          inTable = true; hits++;
+          return line.replace(/^(\|\s*Date\s*\|\s*Lane\s*)\|/i, "$1| Actor |");
+        }
+        if (!inTable || !line.startsWith("|")) return line;
+        if (/^\|---/.test(line)) return line.replace("|---|", "|---|---|");
+        const cells = line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|");
+        if (cells.length !== 5) return line;
+        hits++;
+        return "| " + [cells[0].trim(), cells[1].trim(), "—", ...cells.slice(2).map((c) => c.trim())].join(" | ") + " |";
+      }).join("\n");
+    }
     if (after !== before) {
       changedFiles++;
       totalHits += hits;

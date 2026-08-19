@@ -218,12 +218,24 @@ never parsed.
 
 The source harness presumes one human owner + one machine (global WIP=1,
 <2h claim-orphan heuristic, single-writer ledger, self-merge). vteam v1 keeps
-this as the **default and documented sweet spot** (`team.size: 1`); `size > 1`
-switches: WIP limit = size, claim TTL configurable (roadmap — today the 2h TTL
-is doctrine prose in raci.md, enforced by the PM recovery lane, not a knob),
-ledger sharded per-lane with
-a merge rule, self-merge downgraded to require human review. Multi-human support
-is explicitly *best-effort* in v1 — stated in README, not hidden.
+this as the **default and documented sweet spot** (`team.size: 1`).
+
+What `size > 1` does TODAY, as machinery (the team round, 2026-08):
+- the ledger's **Actor column becomes mandatory** — log_check reds a legacy
+  header and any empty Actor cell; identity is `VTEAM_ACTOR` env, else
+  `git config user.name`, never invented (lib/ledger.py `resolve_actor`)
+- `doctor --migrate --apply` upgrades a legacy ledger (rows get `—`,
+  honest "unattributed history")
+- perf_report grows a **per-person table** (items, lanes, Σ/median tokens,
+  routing 🚩 per human) and attributes every flag to its person; the board
+  rolls the ledger up by actor
+- two humans appending the same ledger merge conflict-free: init writes a
+  `merge=union` gitattribute for the append-only file
+
+Still prose, not gates (stated here so nobody oversells): WIP limit = size,
+the 2h claim TTL (raci.md is its one home; the PM recovery lane enforces it),
+and self-merge-requires-human-review at size > 1. vteam measures artifacts,
+tokens and routing per person — never anyone's chat.
 
 ## 8. Adapter contract
 
