@@ -222,12 +222,14 @@ function pyTree(repo) {
     `sys.path.insert(0, ${JSON.stringify(LIB)})\n` +
     "from ctx import Ctx\n" +
     'print(json.dumps(Ctx()._cfg, separators=(",", ":")))\n';
-  const r = spawnSync("python3", ["-c", code], { cwd: repo, encoding: "utf8" });
+  const r = spawnSync("python3", ["-c", code], { cwd: repo, encoding: "utf8",
+    env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }); // never litter the package tree with __pycache__
   return { status: r.status, stdout: r.stdout, stderr: (r.stderr || "").trim() };
 }
 
 function pyCli(repo, key) {
-  const r = spawnSync("python3", [CTX_PY, key], { cwd: repo, encoding: "utf8" });
+  const r = spawnSync("python3", [CTX_PY, key], { cwd: repo, encoding: "utf8",
+    env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
   return { status: r.status, out: (r.stdout || "").replace(/\r?\n$/, "") };
 }
 
