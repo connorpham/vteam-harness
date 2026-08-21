@@ -100,6 +100,7 @@ team:
   size: 1                    # >1 relaxes single-writer/claim invariants (§7)
   capacity_per_day: 0.8
   hours_per_day: 8           # a workday in hours; plan costs "12h" ÷ this → days
+  loop_budget_per_day: 4     # graph_check reds >N same-item dispatches/day (MAST 1.5)
 autonomy:
   level: full                # off | assisted | full
   self_merge: true           # per-project off switch for agent-merged PRs (level: full only)

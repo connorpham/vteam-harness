@@ -222,6 +222,9 @@ team:
   # a workday is this many hours — plan costs written as "12h" divide by it
   # (schedule_check normalizes h and d onto one person-day scale)
   hours_per_day: 8
+  # termination as DATA (MAST 1.5): graph_check reds an item dispatched more
+  # than this many times in one day — thrash, not persistence
+  loop_budget_per_day: 4
 
 autonomy:
   level: ${autonomy}

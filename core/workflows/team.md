@@ -51,6 +51,9 @@ SKIP for today, don't re-ask this session.
 
 Loop until: no unblocked work, `n=N` reached (default **5** items; `full` = no
 soft cap but a hard ceiling of 12 — see loop guards), or the user interrupts.
+The per-item ceiling is DATA, not prose: `team.loop_budget_per_day` (config,
+default 4) — graph_check reds an item dispatched past it in one day, and an
+identical repeated dispatch row reds immediately (MAST 1.3/1.5).
 The default 5 is /team's OWN cap, deliberately higher than /pm's `run n=3`
 because /team is "a full workday" — an intentional override, not a
 contradiction.

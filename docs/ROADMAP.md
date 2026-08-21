@@ -291,6 +291,30 @@ Five owner asks, each shipped with its proof:
   append the same KB file, merge lands clean with both lines.
 E2E 108 checks; doctor discovers 21 selftests.
 
+## Phase 14 — The graph round ✅ (MAST closure)
+Sources: MAST (arXiv 2503.13657, NeurIPS 2025 — the 14-mode failure taxonomy),
+Anthropic's "Building Effective Agents" (complexity only when it pays). Ten of
+the 14 MAST modes already had a vteam gate; this round closes the four that
+need graph structure, and makes the implicit graph visible:
+- `vteam graph` (mirror, always exit 0): READY/BLOCKED tables computed from
+  backlog + plan + ledger + evidence; findings = dangling edges, dependency
+  cycles (SCC-based, budgeted), Done-without-verdict. --json byte-stable
+  pinned to the commit; --dot for Graphviz. blocked_by parsing lives in ONE
+  home (board.parseTicket, mirroring tracker.py).
+- `graph_check.py` (gate, exit 1): dangling/cycle edges; done ⇒ PASS verdict
+  in the H1 (MAST 1.2 — closure outside RACI rights); byte-identical repeated
+  dispatch (MAST 1.3); `team.loop_budget_per_day` exceeded (MAST 1.5 —
+  termination as a NUMBER in config, machine-consumed from birth); commits
+  outside the tasksheet's declared `CODE-SCOPE:` (MAST 2.3 — self-expansion;
+  undeclared scope = loud note, never silent). Remote trackers: edge/closure
+  checks skip LOUDLY, ledger checks still run.
+- Mirror and gate are fenced together: graph.mjs's selftest runs graph_check
+  against its own fixture and asserts finding-for-finding agreement.
+- Deliberately NOT built (Anthropic's rule — no complexity without proof):
+  routing engines, parallel fan-out, plan.yaml `dependencies` (next: Phase 15
+  candidate), LangGraph-style orchestration.
+E2E 109 → 119; doctor discovers 22 selftests.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)

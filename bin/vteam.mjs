@@ -9,11 +9,16 @@ Usage:
   npx vteam-harness doctor    preflight + install integrity + gate selftests
   npx vteam-harness update    refresh framework files (never touches your ledgers/config)
   npx vteam-harness board     read-only local dashboard: tickets, ledger, evidence verdicts, decision queue
+  npx vteam-harness graph     the work graph made visible: what can start now, what is blocked, what is broken
 
 audit flags:  --json  machine-readable {score, grade, dimensions} on stdout
 
 board flags:  --port <n>  listen port (default 4177; 127.0.0.1 only — never exposed off-host)
               read-only by construction: GET / and GET /api/state, no write endpoint at all
+
+graph flags:  --json  {generated_at_commit, nodes, edges, findings} on stdout — sorted, no timestamp, diffable
+              --dot   Graphviz digraph: npx vteam-harness graph --dot | dot -Tsvg > graph.svg
+              read-only, ALWAYS exits 0 — graph is a mirror; the gate is .vteam/scripts/graph_check.py
 
 init flags (all optional; any given flag skips its prompt):
   --yes                      accept defaults for everything not flagged
@@ -45,6 +50,9 @@ try {
   } else if (cmd === "board") {
     const { board } = await import("../src/cli/board.mjs");
     await board(flags);
+  } else if (cmd === "graph") {
+    const { graph } = await import("../src/cli/graph.mjs");
+    await graph(flags);
   } else if (cmd === "update") {
     const { update } = await import("../src/cli/update.mjs");
     await update(flags);

@@ -484,5 +484,54 @@ console.log("16. team accountability — actor column, migrate, per-person repor
     ba["—"] && ba["—"].items === 1, bp.stdout + bp.stderr);
 }
 
+// ── 17. graph: the implicit work graph, made visible (reports, never gates) ──
+console.log("17. graph — the work graph made visible");
+{
+  const st = run("node", [path.join(PKG, "src", "cli", "graph.mjs"), "--selftest"]);
+  check("graph --selftest green (ready/dangling/cycle/verdict + 9 mutations red)", st.status === 0,
+    st.stdout + st.stderr);
+
+  // a real chain in the installed t1 repo: DEMO-1 Done → DEMO-2 ready → DEMO-3 blocked + dangling
+  const bl = path.join(repo, "docs", "backlog");
+  fs.writeFileSync(path.join(bl, "DEMO-1.md"), "# DEMO-1: schema\n- status: Done\n");
+  // a Done ticket needs its QA verdict or graph_check (correctly) reds MAST 1.2
+  fs.mkdirSync(path.join(repo, "evd", "DEMO-1"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "evd", "DEMO-1", "REPORT.md"),
+    "# Verification report DEMO-1 — PASS\nCOMMIT: deadbeef\nVERIFIED-AT: 2026-01-02T10:00:00+00:00\n");
+  fs.writeFileSync(path.join(bl, "DEMO-2.md"), "# DEMO-2: api\n- status: To Do\n- blocked-by: DEMO-1\n");
+  fs.writeFileSync(path.join(bl, "DEMO-3.md"), "# DEMO-3: ui\n- status: To Do\n- blocked-by: DEMO-2, GHOST-9\n");
+
+  const g = vteam(repo, "graph", "--json");
+  check("graph --json exits 0 (a mirror never fails the build)", g.status === 0, g.stdout + g.stderr);
+  let m = null;
+  try { m = JSON.parse(g.stdout); } catch { /* reported below */ }
+  check("graph --json is valid JSON on stdout", m !== null, g.stdout.slice(0, 400));
+  check("ready is machine-computed, not guessed",
+    !!m && m.nodes.filter((x) => x.ready === true).map((x) => x.key).join() === "DEMO-2",
+    JSON.stringify(m && m.nodes.map((x) => [x.key, x.ready])));
+  check("dangling blocked-by is a loud finding",
+    !!m && m.findings.dangling.length === 1 && m.findings.dangling[0].to === "GHOST-9",
+    JSON.stringify(m && m.findings));
+  check("--json is byte-stable on one commit (no timestamp)",
+    vteam(repo, "graph", "--json").stdout === g.stdout);
+
+  const d = vteam(repo, "graph", "--dot");
+  check("graph --dot emits a digraph", d.status === 0 && /^digraph vteam_graph \{/.test(d.stdout) &&
+    d.stdout.trimEnd().endsWith("}"), d.stdout.slice(0, 300));
+
+  const h = vteam(repo, "graph");
+  check("graph human report names its sources and exits 0",
+    h.status === 0 && /── READY/.test(h.stdout) && /docs\/backlog\/<KEY>\.md/.test(h.stdout),
+    h.stdout.slice(0, 600));
+
+  // and the GATE sees the same dangling edge as a failure (mirror vs gate)
+  const gc = run("python3", [path.join(repo, ".vteam", "scripts", "graph_check.py")], { cwd: repo });
+  check("graph_check (the gate) reds the same dangling edge the mirror reported",
+    gc.status === 1 && /GHOST-9/.test(gc.stdout), gc.stdout + gc.stderr);
+  fs.unlinkSync(path.join(bl, "DEMO-3.md"));
+  const gc2 = run("python3", [path.join(repo, ".vteam", "scripts", "graph_check.py")], { cwd: repo });
+  check("dropping the bad edge turns the gate green", gc2.status === 0, gc2.stdout + gc2.stderr);
+}
+
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);
 process.exit(failed === 0 ? 0 : 1);

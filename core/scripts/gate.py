@@ -132,7 +132,7 @@ def main() -> int:
     # on the generic profile read as plain GREEN with zero verification run).
     # lockfile guards the dependency ledger, not behavior — it counts as
     # bookkeeping too (audit L5).
-    BOOKKEEPING = {"docs-shrink", "ledger", "verbatim", "lockfile"}
+    BOOKKEEPING = {"docs-shrink", "ledger", "verbatim", "lockfile", "graph"}
     skipped_names = {s for s, _ in skipped}
     if all(s in BOOKKEEPING for s in ran):
         print(f"GATE: GREEN (WEAK — only bookkeeping steps ran, ZERO verification "
