@@ -1,6 +1,7 @@
 # Sprint plan — the STRUCTURED contract schedule_check.py reads.
 # Markdown views may be generated from this file; they are never parsed.
-# Item lines are "KEY day-cost" strings. Example:
+# Item lines are "KEY <cost>" strings — cost in days ("1.5" or "1.5d") or hours
+# ("12h"; a workday = team.hours_per_day, default 8). Example:
 #
 # sprint-1:
 #   start: 2026-01-05

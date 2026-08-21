@@ -269,6 +269,28 @@ Honesty note ships inside the report: artifacts/tokens/routing per person,
 never chat. Still prose: WIP=size, claim TTL, self-merge review at >1.
 E2E 95 → 104 checks.
 
+## Phase 13 — Scale round ✅ (hours, 24/7, cross-model review, code map, shared-file merges)
+Five owner asks, each shipped with its proof:
+- `team.hours_per_day: 8` — plan costs accept `12h` alongside `1.5d`;
+  schedule_check normalizes onto one person-day scale (selftest: rescale at
+  4h/day, unknown unit red).
+- 24/7 on a subscription: `ops-247.md` — shifts-not-a-daemon, per-OS recipes
+  (launchd+caffeinate / systemd timer+inhibit / cron+lock), what never relaxes
+  at 03:00, and the honest limit: unattended continuity, not unlimited
+  throughput. Every recipe linted (plutil / bash -n / systemd by hand).
+- Cross-model review: `review.external.<id>` + `external_review.mjs` — the
+  brief goes to the external CLI on stdin, the returned card is validated
+  against review_check's own bar BEFORE it is written (12 red mutations in the
+  selftest); an invalid card is never written, so the fence stays shut.
+- Code map (CPG-lite): `code_map.py build/query` — stdlib symbol+import index,
+  paths-only answers capped and loud on truncation; /dev T1 and /docs D0 read
+  the map's answer instead of the tree. Named honestly: lexical, not Joern.
+- Union-merge extended to every append-only shared file (ledger, hatch-log,
+  knowledge-base, known-issues; decisions.md deliberately excluded — its
+  in-place status edits deserve real conflicts). Proven in e2e: two branches
+  append the same KB file, merge lands clean with both lines.
+E2E 108 checks; doctor discovers 21 selftests.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)

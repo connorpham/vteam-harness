@@ -39,7 +39,11 @@ Hard rules:
   which file:line) — not "tried the edge cases". The machine minimums
   (review_check): ≥3 "tried to break" bullets per card, and a card with fewer than 2
   command/file:line traces is VOID.
-  **Honest statement of machine scope:** the review gate checks the card's FORM
+  **Honest statement of machine scope:** an external card (`## R2 — external (<model>)`,
+  written via `review.external.<id>`) is held to the same FORM bar — but the heading
+  proves the card's shape, not its author: no gate cross-checks the MODEL stamp
+  against config. Provenance rests on the committed trail, as with every card.
+  The review gate checks the card's FORM
   (exists in the commit, sections present, ≥2 traces, file:line targets real) — a
   clever template can pass the machine; truth of CONTENT rests on the committed
   trail (auditable later), QA's independent re-run, and §3's total-void rule.

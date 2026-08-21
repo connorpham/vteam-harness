@@ -89,6 +89,7 @@ git:
                              # verdict is RED, never a warning
   hooks: managed             # managed | external (repo has real branch protection)
   code_paths: [src/]         # "product code" for the review fence + stale scans
+                             # + the code map's scan roots (§6) — no new key
 tracker:
   provider: jira             # jira | github | markdown (linear: roadmap)
   done_statuses: [Done, Closed, Resolved]
@@ -98,6 +99,7 @@ design:
 team:
   size: 1                    # >1 relaxes single-writer/claim invariants (§7)
   capacity_per_day: 0.8
+  hours_per_day: 8           # a workday in hours; plan costs "12h" ÷ this → days
 autonomy:
   level: full                # off | assisted | full
   self_merge: true           # per-project off switch for agent-merged PRs (level: full only)
@@ -106,6 +108,9 @@ review:
   reviewers: 2               # fresh reviewer agents per diff (+1 high-stakes)
   high_stakes_paths: ["prisma/schema.prisma", "src/lib/"]
   high_stakes_terms: [wallet, topup, refund, balance]  # the project's own risk vocabulary
+  external: {}               # optional: card id → {command, model} — a cross-model reviewer
+                             # (Codex &c); the CLI is YOURS to install and authenticate,
+                             # vteam pipes the brief on stdin and VALIDATES the card first
 models:
   routing: default           # points at a data file, not doctrine (§6)
 ```
@@ -197,6 +202,17 @@ strategy** replaces the hardcoded Auth.js csrf→callback sequence), prisma/post
 oracle steps (qa V3b clean-DB branch collapses gracefully when the profile has no
 migration tool — but the skip is loud, never silent).
 
+**Code map (CPG-lite) — `code_map.py`:** a token-discipline context selector, NOT a
+Code Property Graph — python symbols/imports from a real `ast` parse, js/ts symbols
+from conservative regexes (**lexical, not semantic**), markdown headings + ticket
+keys + backticked paths as doc→code edges; no data-flow, no call graph, no Joern
+frontend (those need per-language compiler frontends — zero-dependency doctrine).
+`query <ticket key + domain terms>` ranks files, expands ONE import hop, and prints
+capped **paths + line ranges, never content**, so `/dev` T1 and `/docs` D0 read ~10
+files instead of the tree. Roots reuse `git.code_paths` + `paths.specs` (no new
+key); `.vteam/map.json` is fully sorted, and a map older than the code it indexes
+warns loudly (`--strict` = exit 1) instead of quietly answering for a moved repo.
+
 **Gate manifest:** `gate.sh`'s *order and philosophy* (cheapest, most
 blind-spot-covering first; ledgers → lockfile → lint → types → unit → build →
 reality checks → integration → e2e) becomes `profiles/<name>/gates.yaml`:
@@ -205,7 +221,8 @@ ordered steps, per-step `requires`, and `skip_reason` mandatory for absent steps
 
 **Do not ship:** `sprint_plan.py` story data (keep only the dependency-aware
 bin-packer, reading a structured plan file); model prices as doctrine
-(`model-routing` becomes a data file with a staleness warning); macOS keepawake
+(`model-routing` becomes a data file with a staleness warning); macOS keepawake and per-OS scheduling live in core/doctrine/ops-247.md
+(the 24/7 appendix — launchd/systemd/cron + locks); historical note: keepawake
 specifics (move to an ops appendix per-OS); `annotate.py` zen-qa residue;
 project anecdotes inline (→ provenance.md).
 

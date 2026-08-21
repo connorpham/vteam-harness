@@ -68,6 +68,11 @@ whole repo. Announce:
   manifests: <N> | entrypoints: <N> | existing docs: <N files> | commits scanned: <N>
 ```
 
+**Build the code map first** — `python3 .vteam/scripts/code_map.py build` (needs
+`git.code_paths`; on a repo where that is still empty, build it right after step 1
+names where code lives): it is the cheap index for every read below —
+`code_map.py query <term>` answers with paths + line ranges instead of a tree walk.
+
 Read, in this order — each line is a source, not a suggestion:
 
 1. **Structure** — the directory tree to a sensible depth, with the generated /

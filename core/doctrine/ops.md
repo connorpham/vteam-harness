@@ -71,6 +71,7 @@ self-contradicting rules that make its own DoD unsatisfiable (see provenance).
 | Bug severity levels + SLA | `roles/qa.md` |
 | Reviewer/challenger standard | `review-standard.md` |
 | Model routing | `model-routing.md` |
+| Per-OS 24/7 scheduling + keep-awake recipes | `ops-247.md` |
 
 ## 5. Git fence
 
@@ -93,6 +94,10 @@ prose, and prose rules get skipped. Escape hatches exist by design, are named
 | Backlog refinement | BA lane dispatched when the next sprint lacks ready tickets | Mid-sprint | Yes |
 | Review / demo | Acceptance dossier (`{paths.pm}/acceptance.md` demo checklist + sign-off log) | When backlog drains | Yes |
 | Retrospective | **Framework review**: survey the process itself with its own data (ledger, minutes, KB, git history) — hunt for gates that cannot go red and rules being skipped | Every 14 days; the PM lane checks the date of the latest review file and treats an overdue retro as priority UNBLOCKED work | Yes |
+
+**Running this cadence unattended** (scheduled headless sessions, subscription usage
+windows, per-OS scheduler + keep-awake recipes, and what still cannot relax at 03:00):
+`ops-247.md`.
 
 ## 7. Token accounting & team performance
 

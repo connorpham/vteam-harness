@@ -400,9 +400,40 @@ console.log("16. team accountability — actor column, migrate, per-person repor
   // fresh installs ship the v2 header (actor costs a solo owner nothing)
   const tpl = fs.readFileSync(path.join(repo, "docs", "pm", "log.md"), "utf8");
   check("fresh ledger header carries Actor", /\| Date \| Lane \| Actor \|/.test(tpl), tpl.slice(0, 200));
-  check("init wrote the union-merge attribute (two humans append conflict-free)",
-    fs.existsSync(path.join(repo, ".gitattributes")) &&
-    /log\.md merge=union/.test(fs.readFileSync(path.join(repo, ".gitattributes"), "utf8")));
+  {
+    const gat = fs.existsSync(path.join(repo, ".gitattributes"))
+      ? fs.readFileSync(path.join(repo, ".gitattributes"), "utf8") : "";
+    check("init wrote union-merge attributes for ALL append-only shared files (ledger, hatch-log, KB, known-issues)",
+      /docs\/pm\/log\.md merge=union/.test(gat) &&
+      /hatch-log\.md merge=union/.test(gat) &&
+      /knowledge-base\.md merge=union/.test(gat) &&
+      /known-issues\.md merge=union/.test(gat), gat);
+    check("decisions.md is deliberately NOT union-merged (in-place status edits need real conflict resolution)",
+      !/decisions\.md merge=union/.test(gat), gat);
+  }
+
+  // union merge PROVEN, not promised: two humans append to the same knowledge
+  // file on parallel branches; the merge must land clean with BOTH lines.
+  {
+    // both "humans" branch from the SAME baseline commit (t1's main never had
+    // the install committed — going through it would sweep docs/qa off disk)
+    const dir = repo;
+    run("git", ["-C", dir, "add", "-A"]);
+    run("git", ["-C", dir, "commit", "-qm", "baseline for union proof"]);
+    const base = run("git", ["-C", dir, "rev-parse", "HEAD"]).stdout.trim();
+    const kb = path.join(dir, "docs", "qa", "knowledge-base.md");
+    run("git", ["-C", dir, "checkout", "-qb", "human-a", base]);
+    fs.appendFileSync(kb, "\n- lesson from A: retry the flaky webhook test\n");
+    run("git", ["-C", dir, "commit", "-aqm", "A lesson"]);
+    run("git", ["-C", dir, "checkout", "-qb", "human-b", base]);
+    fs.appendFileSync(kb, "\n- lesson from B: seed the db before e2e\n");
+    run("git", ["-C", dir, "commit", "-aqm", "B lesson"]);
+    const mg = run("git", ["-C", dir, "merge", "--no-edit", "human-a"]);
+    const merged = fs.readFileSync(kb, "utf8");
+    check("two humans appending the same KB file merge WITHOUT conflict (union)",
+      mg.status === 0 && merged.includes("lesson from A") && merged.includes("lesson from B"),
+      mg.stdout + mg.stderr);
+  }
 
   // a real 2-human repo with a legacy ledger: red → migrate → green → per-person
   const dir = freshRepo("t16");
