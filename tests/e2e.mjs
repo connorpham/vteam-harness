@@ -533,5 +533,90 @@ console.log("17. graph — the work graph made visible");
   check("dropping the bad edge turns the gate green", gc2.status === 0, gc2.stdout + gc2.stderr);
 }
 
+// ── 18. measured usage: session logs → vteam usage → perf_report merge ──────
+// The chain the team-accountability promise stands on: the agent CLI's own
+// logs (ground truth) → `usage --json/--sync` (per person, counts only) →
+// perf_report putting claimed `tok ≈` next to measured. Both cross-check
+// flags are proven to fire AND to stay quiet on an honest history.
+console.log("18. measured usage history (vteam usage + perf_report merge)");
+{
+  const repo18 = freshRepo("t18");
+  vteam(repo18, ...INIT_FLAGS);
+  // usage resolves the root via git, which returns the REAL path (/private/var
+  // on macOS, not the /var symlink) — the fixture logs must be keyed the same way
+  const realRepo18 = fs.realpathSync(repo18);
+  const claudeDir = path.join(TMP, "t18-claude");
+  const codexDir = path.join(TMP, "t18-codex");
+  const proj = path.join(claudeDir, "projects", realRepo18.replace(/[^A-Za-z0-9]/g, "-"));
+  fs.mkdirSync(proj, { recursive: true });
+  const asst = (id, out, ts) => JSON.stringify({
+    type: "assistant", requestId: `r-${id}`, timestamp: ts, gitBranch: "main",
+    message: { id, model: "claude-fable-5", usage: { input_tokens: 100,
+      cache_read_input_tokens: 5000, cache_creation_input_tokens: 50, output_tokens: out } } });
+  fs.writeFileSync(path.join(proj, "sess1.jsonl"), [
+    asst("a1", 40000, "2026-08-10T02:00:00Z"),
+    asst("a1", 40000, "2026-08-10T02:00:01Z"), // same message, second content block
+    asst("a2", 30000, "2026-08-10T03:00:00Z"),
+  ].join("\n"));
+  const cxd = path.join(codexDir, "sessions", "2026", "08", "11");
+  fs.mkdirSync(cxd, { recursive: true });
+  fs.writeFileSync(path.join(cxd, "rollout-x.jsonl"), [
+    JSON.stringify({ type: "session_meta", payload: { cwd: realRepo18, timestamp: "2026-08-11T05:00:00Z" } }),
+    JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.5" } }),
+    JSON.stringify({ type: "event_msg", timestamp: "2026-08-11T05:02:00Z",
+      payload: { type: "token_count", info: { last_token_usage:
+        { input_tokens: 2000, cached_input_tokens: 1500, output_tokens: 500 } } } }),
+  ].join("\n"));
+  const env18 = { ...ENV, CLAUDE_CONFIG_DIR: claudeDir, CODEX_HOME: codexDir, VTEAM_ACTOR: "An Nguyen" };
+  const u18 = (...a) => run("node", [CLI, "usage", ...a], { cwd: repo18, env: env18 });
+
+  const st = u18("--selftest");
+  check("usage --selftest is green", st.status === 0 && /selftest: OK/.test(st.stdout), st.stdout + st.stderr);
+
+  let j = JSON.parse(u18("--json", "--since", "2026-08-01").stdout);
+  check("both sources are read: fable-5 (claude) and gpt-5.5 (codex)",
+    j.models.map((m) => m.model).sort().join() === "claude-fable-5,gpt-5.5", JSON.stringify(j.models));
+  check("duplicate content-block lines count ONCE (2 msgs, 70k out, not 3/110k)",
+    j.models.find((m) => m.model === "claude-fable-5").msgs === 2 &&
+    j.models.find((m) => m.model === "claude-fable-5").output === 70000, JSON.stringify(j.models));
+  check("70k-output day with an empty ledger is flagged as unlogged work",
+    j.cross_check.flags.some((f) => f.includes("2026-08-10") && f.includes("no row")),
+    JSON.stringify(j.cross_check));
+
+  // an honest ledger clears the flag; a done row on a sessionless day raises the other one
+  fs.writeFileSync(path.join(repo18, "docs", "pm", "log.md"), [
+    "| Date | Lane | Actor | Item | Result | Link |", "|---|---|---|---|---|---|",
+    "| 2026-08-10 | DEV | An Nguyen | DEMO-1 | done · tok ≈ 60k | PR #1 |",
+    "| 2026-08-15 | DEV | An Nguyen | DEMO-2 | done · tok ≈ 40k | PR #2 |",
+    "| 2026-08-11 | QA | Binh | DEMO-1 | done · tok ≈ 9k | DEMO-1 |", ""].join("\n"));
+  j = JSON.parse(u18("--json", "--since", "2026-08-01").stdout);
+  check("logged day no longer flagged; done-day-without-session now is",
+    !j.cross_check.flags.some((f) => f.includes("2026-08-10")) &&
+    j.cross_check.flags.some((f) => f.includes("2026-08-15") && f.includes("NO AI session")),
+    JSON.stringify(j.cross_check.flags));
+
+  const sy = u18("--sync", "--since", "2026-08-01");
+  const syncFile = path.join(repo18, "docs", "pm", "usage", "an-nguyen.md");
+  check("--sync writes one file per person under docs/pm/usage/",
+    sy.status === 0 && fs.existsSync(syncFile), sy.stdout + sy.stderr);
+  const body1 = fs.readFileSync(syncFile, "utf8");
+  u18("--sync", "--since", "2026-08-01");
+  check("sync is idempotent (re-run writes byte-identical content)",
+    fs.readFileSync(syncFile, "utf8") === body1);
+  check("sync file carries ACTOR, the daily table and the honesty boundary",
+    /^ACTOR: An Nguyen$/m.test(body1) &&
+    /\| 2026-08-10 \| claude \| claude-fable-5 \| 1 \| 2 \| 200 \| 10000 \| 100 \| 70000 \|/.test(body1) &&
+    /NEVER chat content/.test(body1), body1.slice(0, 700));
+
+  const pr = run("python3", [path.join(repo18, ".vteam", "scripts", "perf_report.py")], { cwd: repo18 });
+  check("perf_report merges the synced file: person × model measured row",
+    pr.status === 0 && /\| An Nguyen \| claude \| claude-fable-5 \| 1 \| 2 \| 0k \| 10k \| 70k \|/.test(pr.stdout),
+    pr.stdout.slice(-1500));
+  check("claimed tok ≈ sits NEXT TO measured, per person",
+    /An Nguyen\*\*: claimed `tok ≈` 100k · measured in\+out 71k/.test(pr.stdout), pr.stdout.slice(-1500));
+  check("a person with ledger rows but no synced file is named",
+    /\*\*Binh\*\* has ledger rows but NO synced usage file/.test(pr.stdout), pr.stdout.slice(-1500));
+}
+
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);
 process.exit(failed === 0 ? 0 : 1);

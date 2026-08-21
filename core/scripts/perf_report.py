@@ -117,8 +117,85 @@ def fmt_tok(v: float | None) -> str:
     return f"{v:.0f}k" if v is not None else "—"
 
 
+# ── measured usage — the antidote to self-reporting ─────────────────────────
+# `vteam usage --sync` publishes each member's MEASURED session-log numbers
+# (model × day × tokens, counted from the agent CLI's own logs, never chat
+# content) into {paths.pm}/usage/<actor>.md. Raw logs stay on each machine;
+# only counts reach the repo. This reader merges every member's file so the
+# lead sees the whole team, and puts the self-reported `tok ≈` next to the
+# measured number — the gap is the honesty signal.
+USAGE_ROW = re.compile(
+    r"^\|\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(\S+)\s*\|\s*(\S+)\s*\|"
+    r"\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|$")
+
+
+def parse_usage_dir(pm: Path) -> list[dict]:
+    """One dict per synced file: {actor, rows:[{date, source, model, sessions,
+    msgs, input, cache_read, cache_write, output}]}. Files without an ACTOR:
+    line or any parseable row are ignored — hand-edits don't crash the report."""
+    out = []
+    d = pm / "usage"
+    if not d.is_dir():
+        return out
+    for f in sorted(d.glob("*.md")):
+        text = f.read_text(encoding="utf-8")
+        am = re.search(r"^ACTOR:\s*(.+)$", text, re.M)
+        rows = []
+        for line in text.splitlines():
+            m = USAGE_ROW.match(line.strip())
+            if m:
+                rows.append({"date": m.group(1), "source": m.group(2), "model": m.group(3),
+                             "sessions": int(m.group(4)), "msgs": int(m.group(5)),
+                             "input": int(m.group(6)), "cache_read": int(m.group(7)),
+                             "cache_write": int(m.group(8)), "output": int(m.group(9))})
+        if am and rows:
+            out.append({"actor": am.group(1).strip(), "rows": rows})
+    return out
+
+
+def measured_section(measured: list[dict], ledger_rows: list[dict]) -> list[str]:
+    """Person × model measured totals + claimed-vs-measured per person."""
+    L = ["", "### Measured usage (session logs, synced per person)", ""]
+    if not measured:
+        L.append("- none synced yet — each member runs `npx vteam-harness usage --sync` "
+                 "at day close and commits the file. Measured beats self-reported.")
+        return L
+    L += ["| Person | Source | Model | Sessions | Msgs | Σ in | Σ cache-read | Σ out |",
+          "|---|---|---|---|---|---|---|---|"]
+    for m in measured:
+        agg: dict[tuple, dict] = {}
+        for r in m["rows"]:
+            a = agg.setdefault((r["source"], r["model"]),
+                               {"sessions": 0, "msgs": 0, "input": 0, "cache_read": 0, "output": 0})
+            for k in a:
+                a[k] += r[k]
+        for (src, model), a in sorted(agg.items()):
+            L.append(f"| {m['actor']} | {src} | {model} | {a['sessions']} | {a['msgs']} "
+                     f"| {a['input']/1000:.0f}k | {a['cache_read']/1000:.0f}k | {a['output']/1000:.0f}k |")
+    L.append("")
+    synced = {m["actor"] for m in measured}
+    for m in measured:
+        io_k = sum(r["input"] + r["output"] for r in m["rows"]) / 1000
+        claimed = sum(r["tok"] for r in ledger_rows
+                      if r.get("actor") == m["actor"] and r["tok"])
+        if claimed:
+            pct = f" ({claimed / io_k * 100:.0f}% accounted)" if io_k else ""
+            L.append(f"- **{m['actor']}**: claimed `tok ≈` {claimed:.0f}k · measured in+out "
+                     f"{io_k:.0f}k{pct}")
+        else:
+            L.append(f"- **{m['actor']}**: measured in+out {io_k:.0f}k · no `tok ≈` claimed "
+                     f"in the ledger this period")
+    unsynced = sorted({r["actor"] for r in ledger_rows if r.get("actor")} - synced)
+    for who in unsynced:
+        L.append(f"- ⚠️  **{who}** has ledger rows but NO synced usage file — "
+                 f"ask them to run `npx vteam-harness usage --sync`")
+    L.append("- *Measured = the agent CLI's own session logs (counts only, never chat). "
+             "Cache reads are listed but excluded from in+out — they are re-reads, not new spend.*")
+    return L
+
+
 def build_report(rows: list[dict], prices: dict | None, period: str,
-                 adopted: date | None = None) -> str:
+                 adopted: date | None = None, measured: list[dict] | None = None) -> str:
     L: list[str] = [f"## Team performance — {period}", ""]
     if not rows:
         return "\n".join(L + ["(no ledger rows in this period)"])
@@ -166,6 +243,8 @@ def build_report(rows: list[dict], prices: dict | None, period: str,
         legacy = sum(1 for r in tr if r.get("tier_src") == "legacy")
         note = f" ({legacy} via legacy model names)" if legacy else ""
         L.append(f"| {tier or '(unrecorded)'} | {len(tr)}{note} | {fmt_tok(sum(tt) if tt else None)} |")
+    if measured is not None:
+        L += measured_section(measured, rows)
     fl = flags_for(rows, adopted)
     L += ["", "### Routing & accounting flags", ""]
     L += [f"- {f}" for f in fl] if fl else ["- none — routing and accounting look sane ✅"]
@@ -230,7 +309,15 @@ def main() -> int:
     ad = c.cfg("project.adopted", None)
     if ad:
         adopted = date.fromisoformat(str(ad))
-    print(build_report(rows, load_prices(c.root), period, adopted))
+    # measured usage obeys the same period filter as the ledger rows
+    measured = parse_usage_dir(c.path("pm"))
+    for m in measured:
+        if args.month:
+            m["rows"] = [r for r in m["rows"] if r["date"].startswith(args.month)]
+        if args.since:
+            m["rows"] = [r for r in m["rows"] if r["date"] >= args.since]
+    measured = [m for m in measured if m["rows"]]
+    print(build_report(rows, load_prices(c.root), period, adopted, measured))
     return 0
 
 
@@ -299,8 +386,36 @@ def _selftest():
     assert h4[3]["outcome"] == "other", "blockedish is not blocked (word boundary)"
     assert any("no `tok ≈`" in f for f in flags_for([h4[0]])), "malformed tok on a done row must flag"
     assert not flags_for([h4[1]]), f"a gate-green row must not be flagged here: {flags_for([h4[1]])}"
+
+    # ── measured usage: synced session-log files vs the self-reported ledger ─
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        pm = Path(td)
+        (pm / "usage").mkdir()
+        (pm / "usage" / "an.md").write_text(
+            "# Measured AI usage — An\n\nACTOR: An\nUPDATED: 2026-01-10\n\n"
+            "## Daily by model\n\n"
+            "| Date | Source | Model | Sessions | Msgs | Input | CacheRead | CacheWrite | Output |\n"
+            "|---|---|---|---|---|---|---|---|---|\n"
+            "| 2026-01-05 | claude | claude-fable-5 | 2 | 40 | 30000 | 900000 | 20000 | 170000 |\n"
+            "| 2026-01-06 | codex | gpt-5.5 | 1 | 8 | 50000 | 10000 | 0 | 50000 |\n",
+            encoding="utf-8")
+        (pm / "usage" / "junk.md").write_text("no actor line, no table\n", encoding="utf-8")
+        mu = parse_usage_dir(pm)
+        assert len(mu) == 1 and mu[0]["actor"] == "An" and len(mu[0]["rows"]) == 2, mu
+    mrpt = build_report(v2, None, "test", measured=mu)
+    assert "Measured usage" in mrpt and "| An | claude | claude-fable-5 | 2 | 40 | 30k | 900k | 170k |" in mrpt, mrpt
+    # An claimed 290k in v2; measured in+out = 300k → the gap is printed, per person
+    assert "claimed `tok ≈` 290k · measured in+out 300k (97% accounted)" in mrpt, mrpt
+    # Binh has ledger rows but never synced — the report must name the gap
+    assert "**Binh** has ledger rows but NO synced usage file" in mrpt, mrpt
+    assert "never chat" in mrpt, "the honesty boundary must ship with the measured table"
+    empty = build_report(v2, None, "test", measured=[])
+    assert "none synced yet" in empty and "usage --sync" in empty, empty
+    assert "Measured usage" not in build_report(v2, None, "test"), \
+        "no usage dir at all (measured=None) must not invent the section"
     print("perf_report selftest: OK (parse + 5 flag classes + cost band + clean path "
-          "+ H4 grammar conformance)")
+          "+ H4 grammar conformance + measured-vs-claimed merge)")
 
 
 if __name__ == "__main__":
