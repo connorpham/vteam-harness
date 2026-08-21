@@ -10,8 +10,18 @@ Usage:
   npx vteam-harness update    refresh framework files (never touches your ledgers/config)
   npx vteam-harness board     read-only local dashboard: tickets, ledger, evidence verdicts, decision queue
   npx vteam-harness graph     the work graph made visible: what can start now, what is blocked, what is broken
+  npx vteam-harness usage     MEASURED AI usage for this repo: who ran which model, when, at what token
+                              cost — read from the agent CLIs' own session logs, not from self-reports
 
 audit flags:  --json  machine-readable {score, grade, dimensions} on stdout
+
+usage flags:  --since <YYYY-MM-DD>  window start (default: last 90 days)
+              --json                machine-readable {models, daily, sessions, cross_check}
+              --sync                publish counts to {paths.pm}/usage/<you>.md — one file per
+                                    person (conflict-free); commit it so the lead sees the team.
+                                    Counts only: models, tokens, times. NEVER chat content.
+              cross-checks the ledger: done rows on days with no recorded session, and heavy
+              AI days with no ledger row, are flagged. Sources: Claude Code + Codex.
 
 board flags:  --port <n>  listen port (default 4177; 127.0.0.1 only — never exposed off-host)
               read-only by construction: GET / and GET /api/state, no write endpoint at all
@@ -56,6 +66,9 @@ try {
   } else if (cmd === "update") {
     const { update } = await import("../src/cli/update.mjs");
     await update(flags);
+  } else if (cmd === "usage") {
+    const { usage } = await import("../src/cli/usage.mjs");
+    await usage(flags);
   } else {
     console.log(HELP);
     process.exit(cmd ? 1 : 0);

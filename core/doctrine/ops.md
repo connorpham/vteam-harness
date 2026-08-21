@@ -112,6 +112,13 @@ windows, per-OS scheduler + keep-awake recipes, and what still cannot relax at 0
 - The desk report pastes the flags each session (pm P4.5); the full report is a
   mandatory input of the 14-day framework review — routing table changes are
   argued FROM this report, never from vibes.
+- **`tok ≈` is self-reported; `vteam usage` is measured.** Each member runs
+  `npx vteam-harness usage --sync` at day close: it reads the agent CLIs' own
+  session logs on that machine (Claude Code, Codex), aggregates counts only —
+  who ran which model, when, at what token cost, never chat content — and
+  writes `{paths.pm}/usage/<actor>.md` (one file per person = conflict-free).
+  perf_report merges those files and prints claimed-vs-measured per person;
+  the gap between the two numbers is the honesty signal.
 - Read trends by WORK TYPE (schema groundwork vs screens vs docs), not per
   ticket — the biggest variable is the number of review rounds. After ~10
   tickets, the desk report starts estimating "a ticket this size ≈ Yk tokens"

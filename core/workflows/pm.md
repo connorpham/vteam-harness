@@ -298,6 +298,12 @@ capacity). Then exactly 3 sections, plain language:
    routing table, where the tokens went). Any 🚩 flag is a desk-report line, not
    a footnote. The FULL report (`perf_report.py` with no filter) is a mandatory
    input of the 14-day framework review (`ops.md` §6).
+6. **Sync measured usage** — run `npx vteam-harness usage --sync` and commit the
+   `{paths.pm}/usage/<actor>.md` it writes. This publishes MEASURED numbers from
+   the agent CLI's own session logs (models, tokens, session times — never chat
+   content) so perf_report can put the self-reported `tok ≈` next to ground
+   truth. Any 🚩 it prints (a done day with no recorded session; a heavy AI day
+   with no ledger row) goes on the desk report.
 
 Before printing: update the ledger (+1 row per dispatched item). **Token
 accounting:** each row closes with `· tok ≈ <N>k` (main-loop estimate + subagent
