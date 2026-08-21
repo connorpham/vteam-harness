@@ -8,7 +8,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 - [Requirements](#requirements)
 - [The problem it solves](#the-problem-it-solves)
 - [The five laws](#the-five-laws)
-- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [gates](#gates-14-checks-that-exit-non-zero) · [board](#the-board) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control)
+- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [gates](#gates-14-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
 - [Configuration](#configuration)
 - [Command reference](#command-reference)
 - [What you get out of it](#what-you-get-out-of-it)
@@ -128,18 +128,6 @@ Plus the **pre-push fence** (`.githooks/pre-push`): no direct pushes to the prot
 
 Three more gates ship with the `nextjs-prisma` profile: design-token drift, UI fidelity measured against the design's own node data, and browser evidence capture.
 
-### Cross-model review
-
-You run vteam on Claude, but the code review doesn't have to be. A review card is just a file, so any tool that can write a conforming one can hold a reviewer seat — and two agents on the same model share their blind spots. Point a card id at an external CLI (`review.external.r2: {command: "codex exec", model: "gpt-5-codex"}`) and run `node .vteam/scripts/external_review.mjs <TICKET> R2`: vteam pipes the brief — `review-standard.md` verbatim, the card contract with the gate's real numbers, and the diff — to the tool on stdin, then validates what it prints against `review_check`'s own bar before writing `## R2 — external (gpt-5-codex)` into the dossier. An invalid card is never written: no card means the push fence blocks, exactly as for a missing Claude card. The CLI is yours to install and authenticate — vteam refuses loudly when the binary isn't on PATH rather than silently reviewing with one fewer pair of eyes.
-
-### The code map (CPG-lite)
-
-`python3 .vteam/scripts/code_map.py build` walks your `git.code_paths` + `paths.specs` and writes a sorted `.vteam/map.json`: files, symbols, import edges, doc anchors. Then `code_map.py query PROJ-42 wallet topup` ranks the files that actually matter, expands one import hop, and prints a capped table of **paths and line ranges — never file content** — ending in "read THESE, not the tree". `/dev` and `/docs` start there instead of walking the directory tree, which is where most of an agent's context budget quietly goes. It is honest about what it is: Python is really parsed (`ast`), JS/TS symbols come from conservative regexes, markdown contributes headings and ticket keys as doc→code edges. No data-flow, no call graph, not a Joern CPG — a real one needs per-language compiler frontends, and vteam ships zero dependencies. A stale map warns loudly and still answers; `--strict` turns that into exit 1 for CI.
-
-### Running it 24/7 on a subscription
-
-The "24/7 scheduled sessions" above is not one immortal process — it is short shifts on a clock: open the repo, read the board, run `/team`, print the desk report, exit. The ledger, the In Progress claim with its TTL, and the decision queue are what make a shift resumable from cold, so a spent usage window or a closed laptop costs you a break, not an incident. `docs/team/ops-247.md` (rendered at install) is the copy-paste appendix: a launchd plist plus `caffeinate` for macOS, a systemd user timer plus `systemd-inhibit` for Linux, a cron line plus a lock anywhere — so two shifts can never collide on one repo. It is honest about the limit: a subscription meters usage in rolling windows, so you get *unattended continuity, not unlimited throughput* — and about what never relaxes at 03:00: every gate, the push fence, and the exemptions. Questions still wait for you; the morning ritual is still one desk report.
-
 ### The graph
 
 The dependency graph of your project already exists — scattered across `- blocked-by:` lines, the sprint plan, the ledger and the evidence tree. `npx vteam-harness graph` computes what nobody reads together: a **READY table** (tickets whose every blocker is provably Done, with sprint and cost), a **BLOCKED table** (who waits on whom), and the findings a human eye misses — edges pointing at tickets that don't exist, cycles where two tickets block each other forever, Done tickets with no PASS in their evidence. Every panel names the file it was read from. It is read-only and **always exits 0** — the graph is a mirror; the gate that fails the build on the same findings is `graph_check.py`, and the two are held together by a conformance selftest. `--json` for a stable, diffable dump pinned to the commit; `--dot | dot -Tsvg > graph.svg` to see it.
@@ -153,6 +141,14 @@ npx vteam-harness board          # http://127.0.0.1:4177
 The proof trail as one local page: ticket columns by status, ledger rows with `done`/`blocked`/`failed` badges and token accounting, evidence per ticket with its verdict and pinned commit, and the decision queue front and centre whenever something needs you.
 
 Read-only **by construction**: it binds `127.0.0.1` only, answers exactly `GET /` and `GET /api/state`, serves no files, and has no mutating endpoint at all — every write attempt gets a 405, because a board that could transition a ticket would be a second write path around the gates. Every panel names the file it read; empty panels tell you which file to create instead of rendering a plausible blank.
+
+### The code map (CPG-lite)
+
+`python3 .vteam/scripts/code_map.py build` walks your `git.code_paths` + `paths.specs` and writes a sorted `.vteam/map.json`: files, symbols, import edges, doc anchors. Then `code_map.py query PROJ-42 wallet topup` ranks the files that actually matter, expands one import hop, and prints a capped table of **paths and line ranges — never file content** — ending in "read THESE, not the tree". `/dev` and `/docs` start there instead of walking the directory tree, which is where most of an agent's context budget quietly goes. It is honest about what it is: Python is really parsed (`ast`), JS/TS symbols come from conservative regexes, markdown contributes headings and ticket keys as doc→code edges. No data-flow, no call graph, not a Joern CPG — a real one needs per-language compiler frontends, and vteam ships zero dependencies. A stale map warns loudly and still answers; `--strict` turns that into exit 1 for CI.
+
+### Cross-model review
+
+You run vteam on Claude, but the code review doesn't have to be. A review card is just a file, so any tool that can write a conforming one can hold a reviewer seat — and two agents on the same model share their blind spots. Point a card id at an external CLI (`review.external.r2: {command: "codex exec", model: "gpt-5-codex"}`) and run `node .vteam/scripts/external_review.mjs <TICKET> R2`: vteam pipes the brief — `review-standard.md` verbatim, the card contract with the gate's real numbers, and the diff — to the tool on stdin, then validates what it prints against `review_check`'s own bar before writing `## R2 — external (gpt-5-codex)` into the dossier. An invalid card is never written: no card means the push fence blocks, exactly as for a missing Claude card. The CLI is yours to install and authenticate — vteam refuses loudly when the binary isn't on PATH rather than silently reviewing with one fewer pair of eyes.
 
 ### The paper trail
 
@@ -168,6 +164,10 @@ python3 .vteam/scripts/model_route.py dev-r2 --tool claude-code --high-stakes   
 ```
 
 Because the ledger records tokens and tier per ticket, `perf_report.py` answers questions instead of guessing: who did what at what cost, whether the model choice was sane (flagging frontier use without an approved escalation trail, or a cheap model doing DEV work), where the tokens went (outliers above 2× the median, monthly trend, a cost band honestly labelled an estimate). Routing changes get argued from that report, never from vibes.
+
+### Running it 24/7 on a subscription
+
+The "24/7 scheduled sessions" above is not one immortal process — it is short shifts on a clock: open the repo, read the board, run `/team`, print the desk report, exit. The ledger, the In Progress claim with its TTL, and the decision queue are what make a shift resumable from cold, so a spent usage window or a closed laptop costs you a break, not an incident. `docs/team/ops-247.md` (rendered at install) is the copy-paste appendix: a launchd plist plus `caffeinate` for macOS, a systemd user timer plus `systemd-inhibit` for Linux, a cron line plus a lock anywhere — so two shifts can never collide on one repo. It is honest about the limit: a subscription meters usage in rolling windows, so you get *unattended continuity, not unlimited throughput* — and about what never relaxes at 03:00: every gate, the push fence, and the exemptions. Questions still wait for you; the morning ritual is still one desk report.
 
 ---
 
@@ -190,6 +190,12 @@ git:
 tracker:  { provider: markdown }                          # markdown | jira | github
 design:   { provider: none }                              # none | figma
 autonomy: { level: assisted, self_merge: false }          # gates never relax; merges can stay human
+team:
+  size: 1                                                 # >1 makes the ledger's Actor column a GATE
+  hours_per_day: 8                                        # plan costs accept "1.5d" or "12h"
+  loop_budget_per_day: 4                                  # >N dispatches of one item in a day = thrash
+specs:
+  sources: []                                             # the ORIGINAL docs shards are checked against
 review:
   reviewers: 2
   high_stakes_paths: ["prisma/schema.prisma"]             # a diff here gets an extra reviewer
@@ -200,12 +206,14 @@ docs:
     by_label: { payment: [docs/specs/billing.md] }
 ```
 
-Four knobs worth setting deliberately:
+Knobs worth setting deliberately:
 
 - **`git.merge_strategy`** — `squash` and `rebase` discard branch commits when a PR lands, so verdicts anchor by timestamp instead of by sha. Set this to match your repo or the stale-verdict gate will tell you it cannot anchor.
 - **`autonomy.self_merge`** — whether an agent may merge its own green PR. Only honoured at `level: full`, and you can keep it `false` there.
 - **`review.high_stakes_terms`** — the words that mean money or irreversibility *in your product*. A diff mentioning them gets an extra reviewer at a higher tier.
 - **`docs.task_context`** — which background documents `/dev` must read for which kind of ticket. A file listed here but missing is reported loudly, never guessed around.
+- **`team.size`** — set it to your real headcount. Above 1, the ledger's `Actor` column becomes mandatory (a gate, not a convention) and reporting splits per person.
+- **`team.hours_per_day` / `team.loop_budget_per_day`** — a workday in hours (so estimates can be written `12h`), and the per-item daily dispatch ceiling above which `graph_check` calls thrash what it is.
 
 Supported surfaces: **agent tools** Claude Code (native skills and subagents), Cursor, Windsurf, Codex and Copilot (the last two with a documented sequential-review fallback where subagents don't exist); **trackers** Jira (ADF flattening, attachment read-back, link-direction verification), GitHub Issues (`PROJ-123` ⇄ issue `#123`, labels carry the status machine) or a markdown backlog that needs no external service at all; **design source** Figma (fidelity measured against the design's own node data, because measuring code with code is self-grading) or none.
 
@@ -250,13 +258,15 @@ Stated plainly, because a framework about honest reporting should be honest abou
 - **The CI snippet it writes is GitHub Actions.** On other platforms call `bash .vteam/scripts/gate.sh` from your own pipeline — the gates themselves are platform-agnostic.
 - **One human owner plus agents is the most-tested shape.** `team.size > 1` now has real machinery — the mandatory Actor column, per-person reporting and conflict-free ledger merges — but the WIP limit and the 2-hour claim TTL are still doctrine prose the agents follow, not gates; treat >1 as young.
 - **Trackers are markdown, Jira and GitHub Issues.** Linear and Trello are not implemented.
+- **The graph's edges come from `blocked-by` only.** `plan.yaml` has no `dependencies` field yet, so sprint-level ordering is not part of the graph — `vteam graph` computes the ready set from ticket blockers, not from a critical path.
+- **An external review card proves its shape, not its author.** `graph_check`/`review_check` hold a card written by Codex to the same bar as one written by Claude, but no gate cross-checks the `MODEL:` stamp against your config — provenance rests on the committed trail, as it does for every card.
 - **Evidence is committed to git.** If your screenshots would contain regulated or personal data, decide your policy before enabling the screenshot gates — a committed image is permanent.
 
 ---
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **95 checks** plus a 15-fixture parser-conformance suite (the Python, Node and shell config readers must agree byte-for-byte, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **119 checks** plus a 15-fixture parser-conformance suite (the Python, Node and shell config readers must agree byte-for-byte, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 
@@ -273,7 +283,7 @@ adapters/    one renderer module per tool — see adapters/README.md to add your
 profiles/    stack profiles for the verification gate (generic, node, python, nextjs-prisma)
 providers/   tracker and design-source adapters (markdown, jira, github / figma, none)
 plugins/     the Claude Code plugin
-bin/, src/   the installer CLI (audit · init · doctor · update · board · doctor --migrate)
+bin/, src/   the installer CLI (audit · init · doctor · update · board · graph · doctor --migrate)
 tests/       the end-to-end suite behind every claim above
 ```
 
