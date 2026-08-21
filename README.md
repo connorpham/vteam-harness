@@ -9,6 +9,16 @@
 
 vteam installs a virtual software team into your repository — a PM, a BA, an architect, a developer and a QA — together with **14 machine gates that exit non-zero** when work is claimed but not proven. It runs on Claude Code, Cursor, Windsurf, Codex and Copilot, and it was extracted from a harness that ran a real project autonomously: 37+ merged PRs, 113+ confirmed review findings, 24/7 scheduled sessions, one human owner spending ~15 minutes a day. Every rule exists because something specific broke without it.
 
+### Five things nothing else here does
+
+|  | | |
+|---|---|---|
+| **Done is an exit code** | A gate exits non-zero. A push is refused. There is nothing to argue with. | [see the 14 gates ↓](#gates-14-checks-that-exit-non-zero) |
+| **A verdict dies when the code moves** | QA passed it, one commit landed on top — the pass expired by itself and the ticket came back. | [watch it happen ↓](#what-it-actually-looks-like) |
+| **Every gate proves it can fail** | Each one ships a `--selftest` that feeds it a violating input and checks it goes red. A gate that has never been red gets deleted. | [the law ↓](#the-five-laws) |
+| **QA tests like a person, not a route** | Reaching a screen by typing its address is *refused* — name the button a user clicks, or the test proved the URL and nothing else. | [what proof means ↓](#what-a-verdict-has-to-carry) |
+| **Measure your gap in 10 seconds** | `npx vteam-harness audit` grades any repo 0–100 without installing anything, and names the artifact each ❌ is missing. | [start here ↓](#install-and-first-run) |
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/lifecycle.svg" alt="One ticket's path through vteam: /ba, then dor_check exits 1 on a vague ticket; /dev, then /verify plus the push fence refuse code with no committed review dossier; /qa, then evd_check demands a verdict pinned to both a commit and a timestamp; Done. When code changes after the verdict, stale_verdict_check expires it and the ticket comes back to /dev." width="100%">
 </p>
@@ -17,7 +27,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 - [Requirements](#requirements)
 - [The problem it solves](#the-problem-it-solves)
 - [The five laws](#the-five-laws)
-- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [gates](#gates-14-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
+- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [gates](#gates-14-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [evidence](#what-a-verdict-has-to-carry) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
 - [Configuration](#configuration)
 - [Command reference](#command-reference)
 - [What you get out of it](#what-you-get-out-of-it)
@@ -158,17 +168,41 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 
 ### Workflows (9, rendered for YOUR tool)
 
-| Command | Role | What it does |
-|---|---|---|
-| `/team` | Everyone | A full **workday**: clears your decision queue first, then works every unblocked item — dev tickets sequentially, BA drafts and architecture records in parallel background lanes, QA between dev tasks — until only *you* can move things forward. Ends with a one-page desk report. |
-| `/pm` | Project manager | Reads the tracker, sprint plan and decision queue, picks the highest-value unblocked work, dispatches it, and funnels everything needing a human into ONE table. Never invents answers. |
-| `/ba` | Business analyst | Turns a spec into a runnable backlog: byte-checked verbatim spec shards, user stories with *testable* Given/When/Then criteria, every gap becoming a structured question instead of a guess. Challenger-reviewed before tickets are filed. |
-| `/dev` | Developer | Ticket → branch → minimal implementation → verification gate → self-review with machine-measured design fidelity → two fresh reviewer agents (three on high-stakes diffs) → PR → a 7-part plain-language report on the ticket. |
-| `/qa` | QA engineer | Verify-only: derives expectations from the SPEC, never the ticket prose; runs 2–5 test cases in a real browser; collects annotated evidence; cross-checks every claim; gets a challenger sign-off; writes a report a non-programmer understands in two minutes. Never touches product code. |
-| `/docs` | Docs bootstrapper | Reads the codebase, interviews you once in a batched table, writes spec shards, decision seeds, known-issues and a **proposed** config patch — split `DRAFT-FROM-CODE` vs `OWNER-CONFIRMED`, and it never edits your config itself. |
-| `/plan` | Greenfield intake | For projects with neither code nor docs: interviews you through a five-field kernel with a steering menu per section, writes brief → coded PRD → optional architecture spine, challenger-reviewed, and arms the verbatim gate by registering the PRD as a source document. Never invents a requirement — unanswered questions go to the decision queue. |
-| `/verify` | The gate | Lint → types → unit → build → reality checks → integration → e2e, cheapest-first. A skipped step must declare why; a silent skip is a failure. |
-| `guidelines` | Method | Behavioural defaults that prevent classic LLM coding mistakes: think first, surgical diffs, red-first tests. |
+<p align="center">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/team.svg" alt="The nine workflows and how work moves: /plan and /docs build the oracle; /pm dispatches one coding item at a time; /ba shards specs into tickets; /dev implements and gets reviewed by two fresh agents; /qa verifies from the spec. dor_check guards the BA-to-DEV hand-off, review_check guards the push, evd_check guards Done. /verify and guidelines are shared tools any lane calls." width="100%">
+</p>
+
+Each lane is one command in your agent tool. What matters is not the persona — it is **what each one leaves behind in your repo**, and **which gate refuses the hand-off** when it isn't there.
+
+#### Getting an oracle to judge against
+
+**`/plan` — you have an idea, no code, no docs.** It interviews you through five fields (Why · Capabilities · Constraints · Non-goals · Success signal) with a one-round steering menu after each drafted section, then writes a brief, a PRD whose requirement rows carry machine-checkable codes, and an architecture spine when your answers earn one.
+*Writes:* `docs/specs/` brief + PRD · *Then:* the PRD registers as a source document, so the verbatim gate guards every shard `/ba` later cuts from it. Planning output that is load-bearing, not decorative.
+
+**`/docs` — you have a mature codebase and no documentation.** It reads the code first (every inference marked `⚠ UNVERIFIED`), then asks you **one batched round** of questions, then writes what the other lanes assume already exists.
+*Writes:* spec shards, decision seeds, `known-issues.md`, a **proposed** config patch · *Never:* edits your config itself, or mixes what it guessed with what you confirmed — each sentence is marked `DRAFT-FROM-CODE` or `OWNER-CONFIRMED`.
+
+#### Turning that into shipped work
+
+**`/pm` — the dispatcher.** Reads the tracker, the sprint plan and the decision queue; picks the highest-value item whose blockers are actually Done; funnels everything needing a human into **one** table with proposals and reversal costs attached.
+*Writes:* a ledger row per dispatch, the decision queue, session minutes · *Never invents an answer* — a silent spec becomes a question, not a guess.
+
+**`/ba` — spec into a runnable backlog.** Cuts byte-checked verbatim shards from the source documents, writes user stories with *testable* Given/When/Then criteria, and turns every gap into a structured question instead of a guess. A challenger agent reviews the batch before tickets are filed.
+*Gated by:* `verbatim_gate` (a shard that drifted from its source is red) and `dor_check` at the hand-off — **a vague ticket does not reach the developer.**
+
+**`/dev` — ticket to reviewed PR.** Claims the ticket, branches, reads the code map instead of walking your tree, writes a task-sheet *before* touching code, implements the minimum, runs `/verify`, self-reviews with machine-measured design fidelity, then spawns **two fresh reviewer agents** (three when the diff touches your declared high-stakes paths or vocabulary) whose approval must carry a "what I tried to break" list.
+*Writes:* the branch, the committed review dossier, a 7-part plain-language report on the ticket · *Gated by:* the push fence — **code with no committed dossier does not leave the machine.**
+
+**`/qa` — independent verification.** Derives what to expect **from the spec, never from the ticket prose or the dev's claim**; designs 2–5 test cases; runs them in a real browser as a real user; collects annotated evidence; cross-checks every claim in the ticket against a file that proves it; gets a fresh challenger to try to falsify the verdict; writes a report a non-programmer understands in two minutes.
+*Writes:* `evd/<TICKET>/` — see [what a verdict has to carry](#what-a-verdict-has-to-carry) · *Never touches product code.*
+
+#### Running it, and staying honest
+
+**`/team` — a full workday on top of `/pm`.** Clears your decision queue first, then works every unblocked item — dev tickets sequentially (one coding item at a time, by design), BA drafts and architecture records in parallel background lanes, QA between dev tasks — until the only thing left needs *you*. Ends with a one-page desk report.
+
+**`/verify` — the gate, on demand.** Lint → types → unit → build → reality checks → integration → e2e, cheapest-first. A skipped step must declare why; a silent skip is a failure. On a repo with no test suite it prints `GREEN (WEAK — no test suite ran)` instead of a green that lies.
+
+**`guidelines` — the method, not a role.** Behavioural defaults that prevent classic LLM coding mistakes: think before writing, surgical diffs, red-first tests.
 
 ### Gates (14 checks that exit non-zero)
 
@@ -196,6 +230,20 @@ Each one ships a `--selftest` that feeds it a violating input and proves it goes
 Plus the **pre-push fence** (`.githooks/pre-push`): no direct pushes to the protected branch, no product code on a branch outside your configured grammar, no push without its review dossier — and a **secret scan with no escape hatch that fails closed**: if the diff base is unavailable it scans the full outgoing content rather than passing.
 
 Three more gates ship with the `nextjs-prisma` profile: design-token drift, UI fidelity measured against the design's own node data, and browser evidence capture.
+
+### What a verdict has to carry
+
+A "PASS" is worth exactly as much as the folder behind it. This is that folder — and every field in it is demanded by `evd_check`, not by a style guide.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/evidence.svg" alt="Anatomy of one QA test case: the evidence folder with REPORT.md, per-step screenshots named for what they show, and a boxed verdict screenshot; the journey fields the gate demands — AS which account and role, PRECONDITION, ENTRY the screen and the control clicked, AFTER what changed including survives-a-reload, BACK where Back and Cancel land; and why an ENTRY that is only a URL is refused." width="100%">
+</p>
+
+**The journey, not the route.** Every executed UI test case states who was signed in (`AS:` — half of all UI bugs are role-shaped), what had to exist first (`PRECONDITION:`), and **where the user started and what they clicked** (`ENTRY:`). An `ENTRY:` that is only a URL is **refused**: typing a screen's address proves the address, not the product — a menu item missing for that role, a wrong permission, an unreachable row, all three hide behind a deep link. Keep the URL beside the click path if it's useful; it just can't be the only path.
+
+**Finish the motion a person finishes.** `AFTER:` records what actually changed — the confirmation message, the list row behind, and whether the value **survives a reload** (a save that dies on refresh is not a save). `BACK:` records where Back and Cancel land you, and with what state — is the filter preserved, does Cancel actually cancel. Those four moves find more real defects than any boundary table.
+
+**Evidence a stranger can read.** Screenshots are named for what they show (`01_orders_list.png`, not `01.png`). The step that carried the verdict gets a **red box with a caption** — required on every UI case, not just failures, because an unannotated full-page shot makes the reader guess which pixels mattered. And the verdict itself pins two anchors: the `COMMIT:` it examined and the `VERIFIED-AT:` clock — so it can expire.
 
 ### The graph
 

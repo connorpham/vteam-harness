@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" width="960" height="420" role="img" aria-label="The nine vteam workflows and how work moves between them: /plan and /docs create the oracle, /pm dispatches from it, /ba shards specs into tickets, /dev implements and is reviewed, /qa verifies independently, /team runs the whole workday, and /verify plus guidelines are shared tools. Every hand-off between lanes is guarded by a named gate.">
+  <style>
+    .ink{fill:#1C1F22}.muted{fill:#5A6065}.card{fill:#FFFFFF;stroke:#C9CBC4}
+    .line{stroke:#9BA1A7}.intake{fill:#EFF3F8;stroke:#3C6E9F}.intakex{fill:#2C5B8A}
+    .lane{fill:#FFFFFF;stroke:#C9CBC4}.orch{fill:#F5EDDA;stroke:#9A6A00}.orchx{fill:#7A5400}
+    .gatex{fill:#C03B2B}.tool{fill:#F4F4F1;stroke:#C9CBC4}
+    @media (prefers-color-scheme: dark){
+      .ink{fill:#E8E6E1}.muted{fill:#9BA1A7}.card{fill:#1D2024;stroke:#3A3E43}
+      .line{stroke:#6B7278}.intake{fill:#1B2733;stroke:#6FA3D4}.intakex{fill:#8FBEE8}
+      .lane{fill:#1D2024;stroke:#3A3E43}.orch{fill:#33301E;stroke:#D9A94B}.orchx{fill:#E0BE6A}
+      .gatex{fill:#E4604F}.tool{fill:#22252A;stroke:#3A3E43}
+    }
+    text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  </style>
+  <defs>
+    <marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9BA1A7"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="32" class="ink" font-size="17" font-weight="700">Nine workflows, one workday — and a named gate on every hand-off</text>
+  <text x="24" y="53" class="muted" font-size="12.5">Each lane writes files, not chat. The red label under an arrow is the gate that refuses the hand-off when the files are not there.</text>
+
+  <!-- intake row -->
+  <rect x="24" y="80" width="176" height="62" rx="8" class="intake" stroke-width="1.5"/>
+  <text x="40" y="103" class="intakex mono" font-size="13" font-weight="700">/plan</text>
+  <text x="40" y="121" class="muted" font-size="10.5">idea → brief + coded PRD</text>
+  <text x="40" y="135" class="muted" font-size="10.5">(no code, no docs yet)</text>
+
+  <rect x="24" y="156" width="176" height="62" rx="8" class="intake" stroke-width="1.5"/>
+  <text x="40" y="179" class="intakex mono" font-size="13" font-weight="700">/docs</text>
+  <text x="40" y="197" class="muted" font-size="10.5">existing code → spec shards</text>
+  <text x="40" y="211" class="muted" font-size="10.5">(mature repo, no docs)</text>
+
+  <text x="112" y="240" class="muted" font-size="11" text-anchor="middle">the oracle everything is judged against</text>
+
+  <!-- pm -->
+  <path d="M200,111 L246,111 Q262,111 262,127 L262,145" class="line" stroke-width="1.5" fill="none" marker-end="url(#t)"/>
+  <path d="M200,187 L246,187 Q262,187 262,171 L262,153" class="line" stroke-width="1.5" fill="none" marker-end="url(#t)"/>
+  <rect x="206" y="286" width="176" height="58" rx="8" class="orch" stroke-width="1.5"/>
+  <text x="222" y="309" class="orchx mono" font-size="13" font-weight="700">/pm</text>
+  <text x="222" y="327" class="muted" font-size="10.5">picks the next unblocked item,</text>
+  <text x="222" y="340" class="muted" font-size="10.5">batches every question for you</text>
+
+  <rect x="206" y="360" width="176" height="46" rx="8" class="orch" stroke-width="1.5"/>
+  <text x="222" y="382" class="orchx mono" font-size="13" font-weight="700">/team</text>
+  <text x="222" y="398" class="muted" font-size="10.5">a full workday on top of /pm</text>
+
+  <!-- lanes -->
+  <rect x="262" y="120" width="150" height="58" rx="8" class="lane" stroke-width="1.5"/>
+  <text x="278" y="143" class="ink mono" font-size="13" font-weight="700">/ba</text>
+  <text x="278" y="161" class="muted" font-size="10.5">spec → tickets with</text>
+  <text x="278" y="174" class="muted" font-size="10.5">testable criteria</text>
+
+  <rect x="492" y="120" width="150" height="58" rx="8" class="lane" stroke-width="1.5"/>
+  <text x="508" y="143" class="ink mono" font-size="13" font-weight="700">/dev</text>
+  <text x="508" y="161" class="muted" font-size="10.5">branch → code →</text>
+  <text x="508" y="174" class="muted" font-size="10.5">2 fresh reviewers</text>
+
+  <rect x="722" y="120" width="150" height="58" rx="8" class="lane" stroke-width="1.5"/>
+  <text x="738" y="143" class="ink mono" font-size="13" font-weight="700">/qa</text>
+  <text x="738" y="161" class="muted" font-size="10.5">verifies from the SPEC,</text>
+  <text x="738" y="174" class="muted" font-size="10.5">never the ticket prose</text>
+
+  <!-- gates on hand-offs -->
+  <line x1="412" y1="149" x2="486" y2="149" class="line" stroke-width="1.5" marker-end="url(#t)"/>
+  <text x="449" y="141" class="gatex mono" font-size="10" text-anchor="middle">dor_check</text>
+  <text x="449" y="168" class="muted" font-size="9.5" text-anchor="middle">vague ticket</text>
+  <text x="449" y="180" class="muted" font-size="9.5" text-anchor="middle">bounces back</text>
+
+  <line x1="642" y1="149" x2="716" y2="149" class="line" stroke-width="1.5" marker-end="url(#t)"/>
+  <text x="679" y="141" class="gatex mono" font-size="10" text-anchor="middle">review_check</text>
+  <text x="679" y="168" class="muted" font-size="9.5" text-anchor="middle">no dossier,</text>
+  <text x="679" y="180" class="muted" font-size="9.5" text-anchor="middle">no push</text>
+
+  <line x1="872" y1="149" x2="916" y2="149" class="line" stroke-width="1.5" marker-end="url(#t)"/>
+  <text x="906" y="176" class="gatex mono" font-size="10" text-anchor="middle">evd_check</text>
+  <text x="906" y="141" class="ink" font-size="12" font-weight="650" text-anchor="middle">Done</text>
+
+  <!-- dispatch arrows from pm up to the lanes -->
+  <path d="M294,286 L294,186" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#t)"/>
+  <path d="M340,286 Q340,240 520,240 Q567,240 567,186" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#t)"/>
+  <path d="M370,290 Q370,214 700,214 Q797,214 797,186" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#t)"/>
+  <text x="560" y="262" class="muted" font-size="10" text-anchor="middle">/pm dispatches — one coding item at a time</text>
+
+  <!-- shared tools -->
+  <rect x="492" y="330" width="180" height="46" rx="8" class="tool" stroke-width="1.5"/>
+  <text x="508" y="352" class="ink mono" font-size="12" font-weight="650">/verify</text>
+  <text x="508" y="368" class="muted" font-size="10">lint → types → tests → build</text>
+
+  <rect x="692" y="330" width="180" height="46" rx="8" class="tool" stroke-width="1.5"/>
+  <text x="708" y="352" class="ink mono" font-size="12" font-weight="650">guidelines</text>
+  <text x="708" y="368" class="muted" font-size="10">think first, surgical diffs</text>
+
+  <text x="492" y="400" class="muted" font-size="10.5">shared tools — any lane calls them</text>
+</svg>
