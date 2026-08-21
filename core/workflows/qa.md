@@ -125,8 +125,27 @@ Plan in the verify-sheet — usually 2–5 TCs:
 - ④ **Write → read-only DB verify** — if the feature writes, verify the row via
   a read-only query AFTER the UI action; and the rollback path if the spec
   defines one.
-- Per TC: account + role, exact URL/steps/inputs, the spec-cited expected, the
-  region to box.
+- **Per TC, the JOURNEY — you are a person using the product, not a script
+  hitting routes.** `evd_check` demands these by name, because asking politely
+  did not get them written:
+  - **AS** — which account and which role is signed in. A verdict with no actor
+    is untraceable, and half of all UI bugs are role-shaped.
+  - **PRECONDITION** — what must already be true: the record exists, in which
+    state, created by whom. Resolve it now (read-only); never trust an id from
+    the ticket to still exist.
+  - **ENTRY** — where the user *starts* and what they *click* to arrive: sign in
+    → which list → which row → which button. **Typing the screen's address
+    proves the address, not the product**: if the menu item is missing, the
+    permission is wrong, or the row is unreachable, a deep link hides all three.
+    Keep the deep link if you like — as a SECOND path, never the only one.
+  - **STEPS** — numbered, each one screenshotted, in the order a person does them.
+  - **EXPECTED** — spec-cited, and the region to box.
+  - **AFTER** — what changed once the action landed: the message, the list row,
+    the value **still there after a reload** (a save that dies on refresh is not
+    a save), the neighbouring screen that reads the same data.
+  - **BACK** — how the user leaves: Back, Cancel, browser back. What state do
+    they return to — is the filter preserved, is a half-typed draft lost, does
+    Cancel actually cancel? This is where "it works" usually stops working.
 - **Data check (read-only):** does the needed data exist? Never trust values in
   the ticket to still exist — resolve a currently-valid key; an empty list from
   stale data = "data moved", not a bug.
@@ -189,9 +208,14 @@ db_verify.md to satisfy the gate — the file names must stay honest.
 
 ## V4 — RUN THE VERIFICATION, HEADED (the actual test)
 
-Announce each run in one line (TC / account / what it proves). For each TC from
-V2: drive the steps in the browser, screenshot each meaningful step as
-`01_<what>.png`, `02_<what>.png`… then annotate the verdict region:
+Announce each run in one line (TC / account / what it proves). Walk the journey
+you wrote in V2 — from ENTRY, clicking what a user clicks. For each TC:
+screenshot every meaningful step as `01_<what>.png`, `02_<what>.png`… — name the
+files after what they SHOW (`01_orders_list.png`, not `01.png`), because the
+filenames are the first thing the reader sees — then box the region that carries
+the verdict. **Required on every executed UI TC, not just failures**: an
+unannotated full-page shot makes the reader guess which pixels mattered, and the
+caption is what a stranger reads instead of asking you.
 
 ```bash
 python3 .vteam/scripts/annotate.py box \
@@ -207,8 +231,19 @@ Evidence layout (one folder per TC):
 ├── debate.md              # V6 cards (verifier + challenger)
 ├── data_prep/             # V3 runs, if any
 └── TC_<n>/
-    ├── manifest.md        # what it verifies, steps, expected (spec §), actual, RESULT: PASS|FAIL|BLOCKED
-    ├── 01_*.png …         # per-step screenshots (+ *_boxed.png on the verdict step)
+    ├── manifest.md        # the journey, in plain language — gate-checked:
+    │                     #   RESULT: PASS|FAIL|BLOCKED
+    │                     #   AS: staff@demo (role STAFF)
+    │                     #   PRECONDITION: order #4102 exists, state PENDING
+    │                     #   ENTRY: signed in → Orders list → row #4102 → Edit
+    │                     #   STEPS: 1 change qty 2→3 · 2 press Save
+    │                     #   EXPECTED (spec §3.2): total recalculates to 450,000
+    │                     #   ACTUAL: total shows 450,000, success message shown
+    │                     #   AFTER: 'Saved' toast · list shows 3 · survives reload
+    │                     #   BACK: Back → Orders list, filter preserved
+    ├── 01_*.png …         # per-step shots, named for what they show
+    │                     #   (+ *_boxed.png REQUIRED on the verdict step, with
+    │                     #    a caption — a red box with no words explains nothing)
     └── db_verify.md       # write TCs only: the read-only SELECT + rows after the action
 ```
 
@@ -341,6 +376,8 @@ verify-sheet · spec §/schema citations · debate.md · remaining evidence file
       write gate (ask when present / minutes-first when absent), ZZTEST-marked,
       cleaned up
 - [ ] V5 table: every ticket/dev claim mapped to an evidence file
+- [ ] Every UI TC walked from its ENTRY (a click path, not a typed address); AFTER
+      checked incl. survives-a-reload; BACK/Cancel checked
 - [ ] `evd_check.py --expect-tcs <N>` green; REPORT.md follows the template
       (with the COMMIT: and VERIFIED-AT: lines), jargon-free body
 - [ ] QA images attached with read-back + TRACKER ATTACHMENTS section in the manifest

@@ -5,6 +5,7 @@ Commands:
   box  --img shot.png --rect X,Y,W,H [--rect ...] --label "TC_2: what this proves" --out out.png
        Draw a RED box around the region under test + an in-image caption, so a
        viewer understands what is being shown without reading anything else.
+       --label is REQUIRED: an unexplained red box is not evidence.
 
   diff --old oracle.png --new app.png --out design_vs_app.png [--label "…"] [--min 40]
        Place the two images side by side, AUTO-DETECT differing regions and box
@@ -131,7 +132,10 @@ def main():
     b = sub.add_parser("box")
     b.add_argument("--img", required=True)
     b.add_argument("--rect", action="append", required=True)
-    b.add_argument("--label", default="")
+    # a red rectangle with no caption explains nothing to the stranger the
+    # evidence is FOR — the caption is the point, not decoration
+    b.add_argument("--label", required=True,
+                   help="in-image caption: what this region proves, in project.language")
     b.add_argument("--out", required=True)
     d = sub.add_parser("diff")
     d.add_argument("--old", required=True)

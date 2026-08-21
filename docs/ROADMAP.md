@@ -315,6 +315,33 @@ need graph structure, and makes the implicit graph visible:
   candidate), LangGraph-style orchestration.
 E2E 109 → 119; doctor discovers 22 selftests.
 
+## Phase 15 — QA as a person, not a route ✅ (evidence review round)
+Five questions from the owner ("is the region boxed? could a stranger
+understand it? are the steps to reach the TC complete? is the thinking
+readable? does QA think like a real user?") found three real holes, all now
+machine-closed:
+- `*_boxed.png` was required only on FAIL/NEW-BUG, so a PASS could ship an
+  unannotated full-page screenshot and stay green. Now required on EVERY
+  executed UI TC — and `annotate.py box --label` is mandatory: a red rectangle
+  with no caption explains nothing to the stranger the evidence is for.
+- Nothing described HOW the tester reached the screen, so "exact URL" quietly
+  legitimised deep-linking. Every executed UI TC now carries a gate-checked
+  journey — `AS:` (account+role), `PRECONDITION:`, `ENTRY:`, `AFTER:`, `BACK:` —
+  and an `ENTRY:` that is only a URL is REFUSED: typing an address proves the
+  address, not the product (a missing menu item, a wrong permission and an
+  unreachable row all hide behind a deep link). A URL kept beside the click path
+  is welcome as a second check.
+- `AFTER:` and `BACK:` did not exist as concepts. They do now, and they name the
+  four moves a real person makes that a script skips: look for the confirmation,
+  glance at the list behind, refresh (a save that dies on reload is not a save),
+  press Back and Cancel and expect the right state.
+- The thinking, not just the form: `roles/qa.md` opens with "You are a person,
+  not a route"; qa.md's V2 designs the journey and V4 walks it from ENTRY; step
+  screenshots are named for what they show.
+evd_check selftest grows the journey battery: full walk green, each of the five
+fields demanded by name, 3 URL-only ENTRYs red, click-path+URL green,
+unannotated PASS red.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)
