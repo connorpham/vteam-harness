@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-label="Anatomy of one QA test case: the evidence folder on the left with manifest, per-step screenshots and a boxed verdict shot; on the right the journey fields the gate demands — AS which account and role, PRECONDITION, ENTRY the screen and control the user clicks, AFTER what changed including survives a reload, BACK where Back and Cancel land — plus a mock screenshot showing the red box and caption on the region that carried the verdict.">
+  <style>
+    .ink{fill:#1C1F22}.muted{fill:#5A6065}.panel{fill:#FFFFFF;stroke:#C9CBC4}
+    .soft{fill:#F4F4F1;stroke:#C9CBC4}.red{stroke:#C03B2B}.redf{fill:#C03B2B}
+    .redsoft{fill:#F7E9E6;stroke:#C03B2B}.chrome{fill:#EFEFEA;stroke:#C9CBC4}
+    .row{fill:#F7F7F4;stroke:#DDDED8}.ok{fill:#1E7F4F}
+    @media (prefers-color-scheme: dark){
+      .ink{fill:#E8E6E1}.muted{fill:#9BA1A7}.panel{fill:#1D2024;stroke:#3A3E43}
+      .soft{fill:#22252A;stroke:#3A3E43}.red{stroke:#E4604F}.redf{fill:#E4604F}
+      .redsoft{fill:#3A231F;stroke:#E4604F}.chrome{fill:#24272B;stroke:#3A3E43}
+      .row{fill:#191C20;stroke:#2E3237}.ok{fill:#4CB983}
+    }
+    text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  </style>
+
+  <text x="24" y="32" class="ink" font-size="17" font-weight="700">What "proof" means here: one test case, readable by a stranger in six months</text>
+  <text x="24" y="53" class="muted" font-size="12.5">Every field below is demanded by <tspan class="mono" font-size="11.5">evd_check</tspan> — asking politely did not get them written.</text>
+
+  <!-- left: the folder -->
+  <rect x="24" y="76" width="286" height="326" rx="8" class="soft" stroke-width="1.5"/>
+  <text x="40" y="100" class="ink mono" font-size="11.5" font-weight="700">evd/WAL-1/</text>
+  <text x="52" y="124" class="muted mono" font-size="10.5">REPORT.md</text>
+  <text x="150" y="124" class="muted" font-size="9.5">verdict + 2 anchors</text>
+  <text x="52" y="142" class="muted mono" font-size="10.5">manifest.md</text>
+  <text x="150" y="142" class="muted" font-size="9.5">the requirement, plainly</text>
+  <text x="52" y="160" class="muted mono" font-size="10.5">debate.md</text>
+  <text x="150" y="160" class="muted" font-size="9.5">verifier + challenger</text>
+  <text x="52" y="182" class="ink mono" font-size="10.5" font-weight="650">TC_1/</text>
+  <text x="64" y="200" class="muted mono" font-size="10.5">manifest.md</text>
+  <text x="176" y="200" class="redf" font-size="9.5">← the journey →</text>
+  <text x="64" y="218" class="muted mono" font-size="10.5">01_orders_list.png</text>
+  <text x="64" y="236" class="muted mono" font-size="10.5">02_edit_form.png</text>
+  <text x="64" y="254" class="ink mono" font-size="10.5" font-weight="650">03_result_boxed.png</text>
+  <text x="64" y="270" class="redf" font-size="9.5">required on every UI case, caption and all</text>
+  <text x="64" y="292" class="muted mono" font-size="10.5">db_verify.md</text>
+  <text x="176" y="292" class="muted" font-size="9.5">write cases: the SELECT after</text>
+  <text x="40" y="322" class="muted" font-size="10.5">Files are named for what they SHOW —</text>
+  <text x="40" y="336" class="muted" font-size="10.5">the filenames are the first thing read.</text>
+  <rect x="40" y="352" width="254" height="36" rx="6" class="row" stroke-width="1"/>
+  <text x="52" y="368" class="ok mono" font-size="10">RESULT: PASS</text>
+  <text x="52" y="382" class="muted" font-size="9.5">…and it expires when the code moves</text>
+
+  <!-- middle: the journey fields -->
+  <rect x="326" y="76" width="300" height="326" rx="8" class="panel" stroke-width="1.5"/>
+  <text x="342" y="100" class="ink" font-size="13" font-weight="700">TC_1/manifest.md — the journey</text>
+  <text x="342" y="118" class="muted" font-size="10">a person using the product, not a route being hit</text>
+
+  <rect x="342" y="130" width="268" height="42" rx="5" class="row" stroke-width="1"/>
+  <text x="354" y="147" class="redf mono" font-size="10" font-weight="700">AS:</text>
+  <text x="392" y="147" class="ink" font-size="10.5">staff@demo (role STAFF)</text>
+  <text x="354" y="163" class="muted" font-size="9.5">half of all UI bugs are role-shaped</text>
+
+  <rect x="342" y="178" width="268" height="42" rx="5" class="row" stroke-width="1"/>
+  <text x="354" y="195" class="redf mono" font-size="10" font-weight="700">PRECONDITION:</text>
+  <text x="354" y="211" class="ink" font-size="10.5">order #4102 exists, state PENDING</text>
+
+  <rect x="342" y="226" width="268" height="56" rx="5" class="redsoft" stroke-width="1.5"/>
+  <text x="354" y="243" class="redf mono" font-size="10" font-weight="700">ENTRY:</text>
+  <text x="404" y="243" class="ink" font-size="10.5">signed in → Orders</text>
+  <text x="354" y="258" class="ink" font-size="10.5">list → row #4102 → Edit</text>
+  <text x="354" y="274" class="redf" font-size="9.5">a bare URL is REFUSED — see below</text>
+
+  <rect x="342" y="288" width="268" height="52" rx="5" class="row" stroke-width="1"/>
+  <text x="354" y="305" class="redf mono" font-size="10" font-weight="700">AFTER:</text>
+  <text x="400" y="305" class="ink" font-size="10.5">"Saved" toast · list</text>
+  <text x="354" y="320" class="ink" font-size="10.5">shows 3 · survives a reload</text>
+  <text x="354" y="334" class="muted" font-size="9.5">a save that dies on refresh is not a save</text>
+
+  <rect x="342" y="346" width="268" height="42" rx="5" class="row" stroke-width="1"/>
+  <text x="354" y="363" class="redf mono" font-size="10" font-weight="700">BACK:</text>
+  <text x="396" y="363" class="ink" font-size="10.5">returns to Orders,</text>
+  <text x="354" y="379" class="ink" font-size="10.5">filter preserved · Cancel changes nothing</text>
+
+  <!-- right: the boxed screenshot -->
+  <text x="642" y="96" class="ink" font-size="13" font-weight="700">03_result_boxed.png</text>
+  <rect x="642" y="108" width="294" height="180" rx="6" class="panel" stroke-width="1.5"/>
+  <rect x="642" y="108" width="294" height="22" rx="6" class="chrome" stroke-width="1"/>
+  <circle cx="656" cy="119" r="3.5" class="muted"/><circle cx="668" cy="119" r="3.5" class="muted"/><circle cx="680" cy="119" r="3.5" class="muted"/>
+  <text x="696" y="123" class="muted mono" font-size="8.5">Orders · #4102 · Edit</text>
+  <rect x="656" y="142" width="122" height="9" rx="2" class="row" stroke-width="0.8"/>
+  <rect x="656" y="158" width="160" height="9" rx="2" class="row" stroke-width="0.8"/>
+  <rect x="656" y="174" width="96" height="9" rx="2" class="row" stroke-width="0.8"/>
+  <!-- the boxed region -->
+  <rect x="652" y="196" width="200" height="34" class="red" fill="none" stroke-width="2.5"/>
+  <text x="664" y="212" class="ink mono" font-size="10.5" font-weight="700">Total  450,000</text>
+  <text x="664" y="225" class="muted" font-size="9">recalculated after qty 2 → 3</text>
+  <rect x="652" y="236" width="248" height="26" rx="4" class="redsoft" stroke-width="1.2"/>
+  <text x="660" y="253" class="redf" font-size="9.5">TC_1: total recalculates per spec §3.2</text>
+  <text x="642" y="280" class="muted" font-size="9.5">the caption is what a stranger reads instead of asking you</text>
+
+  <!-- the refusal -->
+  <rect x="642" y="300" width="294" height="102" rx="8" class="redsoft" stroke-width="1.5"/>
+  <text x="658" y="322" class="redf" font-size="12" font-weight="700">Why a bare URL is refused</text>
+  <text x="658" y="342" class="ink mono" font-size="9.5">ENTRY: /orders/4102/edit</text>
+  <text x="820" y="342" class="redf mono" font-size="9.5">→ exit 1</text>
+  <text x="658" y="361" class="muted" font-size="10">Typing an address proves the address.</text>
+  <text x="658" y="375" class="muted" font-size="10">A menu item missing for that role, a wrong</text>
+  <text x="658" y="389" class="muted" font-size="10">permission, an unreachable row — all hide there.</text>
+</svg>
