@@ -22,7 +22,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 ```bash
 npx vteam-harness audit    # 1. grade this repo 0-100. No install, no writes, no network.
 npx vteam-harness init     # 2. install the team + the gates
-npx vteam-harness doctor   # 3. prove the install: every selftest (19 today) + provider preflight
+npx vteam-harness doctor   # 3. prove the install: every selftest (21 today) + provider preflight
 ```
 
 Then open your agent tool and run `/team` to start a workday, or `/dev PROJ-12` for one ticket.
@@ -77,7 +77,7 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 
 | Law | What it means in practice |
 |---|---|
-| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (19 today). An always-green check gets fixed or deleted. |
+| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (21 today). An always-green check gets fixed or deleted. |
 | **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable lands in a committed file or the tracker, and every outward write is **read back** to confirm it landed. |
 | **A verdict is valid only for the code it examined** | Each QA verdict pins two anchors: `COMMIT:` for the code and `VERIFIED-AT:` for the clock. When the code moves, the verdict expires and the ticket returns to the queue. A verdict that can't be anchored is red — *"cannot verify"* and *"verified clean"* are different answers. |
 | **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip, with a labelled, reversible paper trail. Real money, legal, credentials and data deletion are never auto-decided. |
@@ -126,6 +126,18 @@ Each one ships a `--selftest` that feeds it a violating input and proves it goes
 Plus the **pre-push fence** (`.githooks/pre-push`): no direct pushes to the protected branch, no product code on a branch outside your configured grammar, no push without its review dossier — and a **secret scan with no escape hatch that fails closed**: if the diff base is unavailable it scans the full outgoing content rather than passing.
 
 Three more gates ship with the `nextjs-prisma` profile: design-token drift, UI fidelity measured against the design's own node data, and browser evidence capture.
+
+### Cross-model review
+
+You run vteam on Claude, but the code review doesn't have to be. A review card is just a file, so any tool that can write a conforming one can hold a reviewer seat — and two agents on the same model share their blind spots. Point a card id at an external CLI (`review.external.r2: {command: "codex exec", model: "gpt-5-codex"}`) and run `node .vteam/scripts/external_review.mjs <TICKET> R2`: vteam pipes the brief — `review-standard.md` verbatim, the card contract with the gate's real numbers, and the diff — to the tool on stdin, then validates what it prints against `review_check`'s own bar before writing `## R2 — external (gpt-5-codex)` into the dossier. An invalid card is never written: no card means the push fence blocks, exactly as for a missing Claude card. The CLI is yours to install and authenticate — vteam refuses loudly when the binary isn't on PATH rather than silently reviewing with one fewer pair of eyes.
+
+### The code map (CPG-lite)
+
+`python3 .vteam/scripts/code_map.py build` walks your `git.code_paths` + `paths.specs` and writes a sorted `.vteam/map.json`: files, symbols, import edges, doc anchors. Then `code_map.py query PROJ-42 wallet topup` ranks the files that actually matter, expands one import hop, and prints a capped table of **paths and line ranges — never file content** — ending in "read THESE, not the tree". `/dev` and `/docs` start there instead of walking the directory tree, which is where most of an agent's context budget quietly goes. It is honest about what it is: Python is really parsed (`ast`), JS/TS symbols come from conservative regexes, markdown contributes headings and ticket keys as doc→code edges. No data-flow, no call graph, not a Joern CPG — a real one needs per-language compiler frontends, and vteam ships zero dependencies. A stale map warns loudly and still answers; `--strict` turns that into exit 1 for CI.
+
+### Running it 24/7 on a subscription
+
+The "24/7 scheduled sessions" above is not one immortal process — it is short shifts on a clock: open the repo, read the board, run `/team`, print the desk report, exit. The ledger, the In Progress claim with its TTL, and the decision queue are what make a shift resumable from cold, so a spent usage window or a closed laptop costs you a break, not an incident. `docs/team/ops-247.md` (rendered at install) is the copy-paste appendix: a launchd plist plus `caffeinate` for macOS, a systemd user timer plus `systemd-inhibit` for Linux, a cron line plus a lock anywhere — so two shifts can never collide on one repo. It is honest about the limit: a subscription meters usage in rolling windows, so you get *unattended continuity, not unlimited throughput* — and about what never relaxes at 03:00: every gate, the push fence, and the exemptions. Questions still wait for you; the morning ritual is still one desk report.
 
 ### The board
 
@@ -200,7 +212,7 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 |---|---|
 | `npx vteam-harness audit [--json]` | grade any repo's agent accountability 0–100. No install needed, never writes, no network. |
 | `npx vteam-harness init [--yes]` | install into the current repo. Every flag value is validated before the first byte is written; invalid input exits 1 having written nothing. Flags: `--name --key --language --profile --tracker --design --autonomy --tools`. |
-| `npx vteam-harness doctor [--json]` | prove the install: prerequisites, config parse, manifest integrity, hook wiring, routing freshness, every selftest (discovered dynamically — 19 today), live provider pings. |
+| `npx vteam-harness doctor [--json]` | prove the install: prerequisites, config parse, manifest integrity, hook wiring, routing freshness, every selftest (discovered dynamically — 21 today), live provider pings. |
 | `npx vteam-harness update` | refresh framework files. `.vteam/manifest.json` makes *"never touches your files"* checkable: only files whose hash matches what the framework last wrote get overwritten; anything you edited is kept and the new version is parked as `*.new`. |
 | `npx vteam-harness board [--port N]` | the read-only local dashboard. |
 | `npx vteam-harness doctor --migrate [--apply]` | rewrite legacy pre-vteam markers in existing ledgers and evidence. Dry-run by default. |

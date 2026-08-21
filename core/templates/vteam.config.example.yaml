@@ -42,7 +42,9 @@ git:
   merge_strategy: merge  # merge | squash | rebase — squash/rebase discard branch shas,
                          # so QA verdicts anchor by VERIFIED-AT (stale_verdict falls back to it)
   hooks: managed         # managed: vteam owns .githooks/pre-push · external: repo has real branch protection
-  code_paths: [src/]     # "product code" for the review fence + stale-verdict scans
+  code_paths: [src/]     # "product code" for the review fence + stale-verdict scans,
+                         # and the scan roots of the code map (code_map.py, with
+                         # paths.specs) — the map needs this key, it adds none of its own
 
 tracker:
   provider: markdown     # jira | github | markdown (offline backlog, zero services); linear: roadmap
@@ -61,6 +63,8 @@ team:
                          # still agent-prose (see DESIGN §7).
                          # (read by agents in prose — no gate enforces it yet; see ROADMAP)
   capacity_per_day: 0.8  # person-days of throughput per calendar working day
+  hours_per_day: 8       # a workday = 8 hours; plan costs accept "1.5d" or "12h"
+                         # (machine-consumed: schedule_check normalizes hours to days)
 
 autonomy:
   level: assisted
@@ -79,6 +83,18 @@ review:
   reviewers: 2           # machine-enforced: review_check requires cards R1..RN (+1 high-stakes)
   high_stakes_paths: []          # e.g. ["prisma/schema.prisma", "src/lib/"]
   high_stakes_terms: []          # project vocabulary that means money/irreversibility
+  # external:                    # OPTIONAL — cross-model reviewers, by card id.
+  #   r2:                        # R2 comes from another tool instead of a Claude agent
+  #     command: "codex exec"    # gets the BRIEF on stdin, must print the CARD on stdout
+  #                              # (no shell: a string is split on spaces; use a list
+  #                              #  ["codex", "exec", "--flag=a b"] for quoted args)
+  #     model: "gpt-5-codex"     # RECORDED on the card — never guessed
+  #     timeout_s: 300           # optional, default 300
+  # The external CLI must be installed and authenticated by YOU. vteam pipes the
+  # brief (review-standard.md + the card contract + the diff) on stdin and
+  # VALIDATES the card before it counts: an invalid card is never written, so a
+  # missing binary or a junk card leaves the push fence shut — never one reviewer
+  # short in silence. `node .vteam/scripts/external_review.mjs <TICKET> R2`.
 
 models:
   routing: default       # default → <paths.team>/model-routing.data.yaml; any other value

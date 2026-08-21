@@ -4,7 +4,7 @@ import { pkgRoot, repoRoot, render } from "./util.mjs";
 import { loadConfig, cfgGet } from "./config.mjs";
 import { ManifestGuard, walkFiles } from "./manifest.mjs";
 import { TOOLS, renderTool, adapterMarker } from "./adapters.mjs";
-import { CI_WORKFLOW, GITIGNORE_RULES, pkgVersion } from "./init.mjs";
+import { CI_WORKFLOW, GITIGNORE_RULES, GITATTR_RULES, pkgVersion } from "./init.mjs";
 
 /** Refresh framework-owned files from the package. NEVER touches user ledgers
  * (docs/pm, docs/qa, docs/specs, docs/backlog, evd/) or vteam.config.yaml —
@@ -72,6 +72,16 @@ export async function update(_flags) {
   guard.sync(".githooks/pre-push",
     fs.readFileSync(path.join(pkgRoot, "core", "templates", "hooks", "pre-push"), "utf8"), 0o755);
   guard.sync(".github/workflows/vteam-gate.yml", CI_WORKFLOW);
+
+  // ---- .gitattributes rules: additive only (union merge for append-only files) ---
+  const ga = path.join(root, ".gitattributes");
+  const gaText = fs.existsSync(ga) ? fs.readFileSync(ga, "utf8") : "";
+  const gaHave = new Set(gaText.split("\n").map((l) => l.trim()));
+  const gaMissing = GITATTR_RULES.filter((r) => !gaHave.has(r));
+  if (gaMissing.length) {
+    fs.appendFileSync(ga, (gaText && !gaText.endsWith("\n") ? "\n" : "") + gaMissing.join("\n") + "\n");
+    console.log(`✓ .gitattributes union-merge rules refreshed (${gaMissing.length} added)`);
+  }
 
   // ---- .gitignore rules: additive only — user lines are never touched ------------
   const gi = path.join(root, ".gitignore");

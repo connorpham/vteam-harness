@@ -101,6 +101,19 @@ decided requirement deltas live in the change ledger. A NEW spec contradiction
 discovered mid-work → add a CH-nn row with status `proposed` (PM/BA arbitrate
 later); don't just narrate it in the task-sheet.
 
+**Context via the code map — BEFORE reading the directory tree:**
+`python3 .vteam/scripts/code_map.py query <TICKET> <2-4 domain terms>` (e.g.
+`query PROJ-42 wallet topup balance`). It prints PATHS + line ranges only — read
+those files plus `docs.task_context` below, and let the returned paths fill the
+task-sheet's **Code map** bullet. It says `MAP IS STALE` or `NO CODE MAP` → run
+`python3 .vteam/scripts/code_map.py build` first (one command, seconds) and
+re-query. The map is **advisory and lexical** (python is really parsed; js/ts
+symbols come from regexes, and there is no data-flow) — a file you know matters
+but the map missed gets read anyway **and named in the task-sheet** as
+`code map MISSED: <path> — <why it matters>`, so the next session (and the map's
+scan roots, `git.code_paths`) can be corrected. Reading the whole tree "to be
+safe" is the behavior this step exists to replace.
+
 **Task context (only when config `docs.task_context` exists):** read the files it
 maps for THIS ticket — `always:` first, then the `by_label:` lists matching the
 ticket's labels and its issue type. This is the project background the owner
@@ -281,6 +294,31 @@ Any REQUEST-CHANGES → fix, re-run the T4 gate, then re-submit to the SAME conc
 (a targeted re-review, not a fresh full pass). Only when ALL required cards say
 APPROVE does the pipeline proceed to T5. Unresolvable disagreement → the user.
 
+**Cross-model reviewers — `review.external.<card>`.** A card is a FILE, so any
+tool that can write a conforming one can hold that seat — and two agents on the
+same model share their blind spots. When `review.external.r2` is configured (any
+card id), that card comes from the external CLI instead of a spawned agent:
+
+```
+node .vteam/scripts/external_review.mjs <TICKET> R2
+```
+
+The runner pipes the brief (`{paths.team}/review-standard.md` verbatim + the card
+contract + the diff) to the tool on stdin, validates what it prints against
+review_check's own bar, and only then writes `## R2 — external (<model>)` into
+the dossier — stamped `MODEL:` / `TOOL: external`, replacing that card and no
+other. Exit 0 = APPROVE filed, 2 = REQUEST-CHANGES filed (round still open),
+1 = nothing written and stdout says what was missing.
+
+Then **STILL run `review_check.py`** — the gate does not care who wrote the card.
+Everything else is unchanged: the reviewer COUNT is still `review.reviewers`,
+high-stakes still adds R{N+1}, any REQUEST-CHANGES still reopens the round, and
+the remaining cards are still fresh Claude agents spawned in one message. An
+external card that fails validation is NOT written — no card, so the push fence
+blocks exactly as it does for a missing Claude card. The external CLI is
+installed and authenticated by YOU; a missing binary is a RED run, never a
+silent skip to one fewer reviewer.
+
 **Answering a reviewer — before typing any sentence containing "fixed":**
 1. `git add -A` then `git status --porcelain` filtered for unstaged changes —
    must be **0 lines**; reviewers read `git diff --cached`, a fix outside staging
@@ -379,3 +417,4 @@ APPROVE does the pipeline proceed to T5. Unresolvable disagreement → the user.
 - [ ] Status transition: In Review after comment + merge (full autonomy); Done is /qa's
 - [ ] Every phase narrated with a ▶ line; final summary passes the plain-language bar
 - [ ] KB read at T1; lesson appended at T6 (or "no new lesson" stated)
+- [ ] T1: code map queried BEFORE the tree read; any map miss named in the task-sheet

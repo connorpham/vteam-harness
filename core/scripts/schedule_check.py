@@ -40,7 +40,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from ctx import Ctx, parse_config  # noqa: E402
 
 
-def parse_plan(text: str) -> list[dict]:
+def parse_cost(raw: str, hours_per_day: float) -> float:
+    """A plan cost → person-days. Three spellings, one loud death:
+    `1.5` / `1.5d` = days; `12h` = hours ÷ team.hours_per_day (a workday is
+    hours_per_day hours — 8 by default — so estimates written in hours and
+    estimates written in days land on the same scale)."""
+    m = re.match(r"^([\d.]+)([dh]?)$", raw.strip(), re.I)
+    if not m:
+        raise SystemExit(f"schedule_check: cost {raw!r} is not <n>, <n>d or <n>h")
+    n, unit = float(m.group(1)), m.group(2).lower()
+    return n / hours_per_day if unit == "h" else n
+
+
+def parse_plan(text: str, hours_per_day: float = 8.0) -> list[dict]:
     data = parse_config(text)
     sprints = []
     for name, s in data.items():
@@ -49,10 +61,11 @@ def parse_plan(text: str) -> list[dict]:
             continue
         items = []
         for row in s.get("items", []) or []:
-            im = re.match(r"^(\S+)\s+([\d.]+)$", str(row).strip())
+            im = re.match(r"^(\S+)\s+(\S+)$", str(row).strip())
             if not im:
-                raise SystemExit(f"schedule_check: plan item {row!r} is not \"KEY days\"")
-            items.append((im.group(1).upper(), float(im.group(2))))
+                raise SystemExit(f"schedule_check: plan item {row!r} is not \"KEY <days|hours>\" "
+                                 f"(e.g. \"PROJ-12 1.5d\" or \"PROJ-12 12h\")")
+            items.append((im.group(1).upper(), parse_cost(im.group(2), hours_per_day)))
         sprints.append({
             "n": int(m.group(1)),
             "start": dt.date.fromisoformat(str(s["start"])),
@@ -140,7 +153,10 @@ def main() -> int:
         print(f"❌ schedule_check: {plan_file} missing — without a structured plan "
               f"nothing can be measured, and 'on time' may NOT be written by hand")
         return 1
-    sprints = parse_plan(plan_file.read_text(encoding="utf-8"))
+    hours_per_day = float(c.cfg("team.hours_per_day", 8))
+    if hours_per_day <= 0:
+        raise SystemExit(f"schedule_check: team.hours_per_day must be > 0 (got {hours_per_day})")
+    sprints = parse_plan(plan_file.read_text(encoding="utf-8"), hours_per_day)
     import tracker as trk
     t = trk.load(c)
     statuses: dict[str, str] = {}
@@ -193,7 +209,20 @@ def _selftest():
         raise AssertionError("malformed item should exit")
     except SystemExit:
         pass
-    print("schedule_check selftest: OK (on-schedule green + 3 reds + parser guard)")
+    # hour units: a workday is team.hours_per_day hours (default 8)
+    hp = ("sprint-1:\n  start: 2026-01-05\n  end: 2026-01-16\n  items:\n"
+          "    - \"PROJ-4 8h\"\n    - \"PROJ-5 4h\"\n    - \"PROJ-6 1.5d\"\n")
+    items = parse_plan(hp, hours_per_day=8.0)[0]["items"]
+    assert items == [("PROJ-4", 1.0), ("PROJ-5", 0.5), ("PROJ-6", 1.5)], items
+    assert parse_plan(hp, hours_per_day=4.0)[0]["items"][0] == ("PROJ-4", 2.0), \
+        "hours_per_day must rescale hour costs"
+    try:
+        parse_cost("2w", 8.0)
+        raise AssertionError("unknown unit should exit")
+    except SystemExit:
+        pass
+    print("schedule_check selftest: OK (on-schedule green + 3 reds + parser guard "
+          "+ hour units at 8h/day, rescaled at 4h/day, unknown unit red)")
 
 
 if __name__ == "__main__":
