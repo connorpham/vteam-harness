@@ -15,8 +15,14 @@ Checks, for {paths.evidence}/<TICKET>/:
      ≥1 .png step screenshot that OPENS, is readable and is not a blank
      single-color frame (Pillow, ≥400×300, non-empty, <97% one color — same
      rule as evd_ui_check: the lane issuing the verdict must not accept a
-     blank the DEV lane rejects); a *_boxed.png is required on FAIL/NEW-BUG
-     TCs. A TC declaring
+     blank the DEV lane rejects); a *_boxed.png is required on EVERY executed
+     UI TC (a PASS proved by an unannotated full-page shot leaves the reader
+     guessing which pixels carried the verdict), and every executed UI TC
+     carries the JOURNEY a stranger would ask about — `AS:` (account+role),
+     `PRECONDITION:`, `ENTRY:` (the screen the user starts on and the control
+     they click — a bare URL is refused: it proves the address, not the
+     product), `AFTER:` (what changed), `BACK:` (how they leave and what
+     they return to). A TC declaring
      `TYPE: NON-UI` may skip images but MUST have db_verify.md OR cmd_verify.md
      (pure libraries/CLIs have no database — real command+output transcripts are
      their honest evidence; field-trial finding #20). A write TC
@@ -190,9 +196,40 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
             errs.append(f"{tc.name}: declares TYPE: NON-UI, so db_verify.md (data checks) "
                         f"or cmd_verify.md (command+output transcripts) is "
                         f"MANDATORY (the SELECTs actually run + real results)")
-        if any(w in res for w in FAIL_WORDS) and not any("_boxed" in p.name for p in pngs):
-            errs.append(f"{tc.name}: RESULT={res} but no *_boxed.png marking the "
-                        f"divergence (annotate.py)")
+        # A box is required on EVERY executed UI TC, not only on failures: a PASS
+        # proved by a full-page screenshot leaves the reader guessing WHICH pixels
+        # carried the verdict. (Before: only FAIL/NEW-BUG demanded one, so a green
+        # run could ship unannotated evidence.)
+        if not blocked and not non_ui and pngs and not any("_boxed" in p.name for p in pngs):
+            errs.append(f"{tc.name}: RESULT={res} but no *_boxed.png — box the region "
+                        f"that carries the verdict, with a caption: annotate.py box "
+                        f"--label \"what this proves\" (an unboxed screenshot makes the "
+                        f"reader guess which pixels mattered)")
+        # The JOURNEY: a UI test is a person using the product, not a route being
+        # hit. Each field answers a question a stranger would ask, and the gate
+        # asks them because prose asking politely did not get them written.
+        if not blocked and not non_ui:
+            for field, why in (
+                ("AS:", "which account and role was signed in — a verdict without an actor is untraceable"),
+                ("PRECONDITION:", "what had to be true/exist BEFORE (data, state, prior screen)"),
+                ("ENTRY:", "where the user started and what they CLICKED to arrive — not just a URL"),
+                ("AFTER:", "what changed once the action landed (message, list, persisted value)"),
+                ("BACK:", "how the user leaves, and what state they come back to"),
+            ):
+                if field not in mtext:
+                    errs.append(f"{tc.name}/manifest.md: no `{field}` line — {why}")
+            # A deep link is a legitimate SECOND path, never the only one: if ENTRY
+            # is nothing but a URL, the test never proved a user can reach the screen.
+            m_entry = re.search(r"^ENTRY:\s*(.+)$", read(tc / "manifest.md"), re.M | re.I)
+            if m_entry:
+                entry = m_entry.group(1).strip()
+                url_only = re.fullmatch(r"[<(\[\"']*(https?://\S+|/[\w./:-]*)[>)\]\"']*", entry)
+                if url_only:
+                    errs.append(f"{tc.name}/manifest.md: ENTRY is only a URL "
+                                f"({entry[:48]}) — name the screen the user starts on and the "
+                                f"control they click to get here. Reaching a screen by typing "
+                                f"its address proves the address, not the product; keep the "
+                                f"deep link as a second check if you want it.")
         if write_pat.search(mtext) and not (tc / "db_verify.md").is_file():
             errs.append(f"{tc.name}: a WRITE TC (per its manifest) without "
                         f"db_verify.md — writing without a read-back SELECT is not verification")
@@ -294,6 +331,64 @@ def _selftest():
         (tc / "db_verify.md").write_text("SELECT 1; -> 1")
         errs, _ = check_tree(evd, 3, [])
         assert errs, "expect-tcs 3 vs 1 should red"
+
+        # ── the UI journey contract (a person using the product) ─────────────
+        ui = evd / "TC_2"
+        ui.mkdir()
+        JOURNEY = ("RESULT: PASS\n"
+                   "AS: staff@demo (role STAFF)\n"
+                   "PRECONDITION: order #4102 exists in state PENDING\n"
+                   "ENTRY: signed in → Orders list → clicked row #4102 → Edit\n"
+                   "STEPS: 1 change qty 2→3 · 2 press Save\n"
+                   "EXPECTED (spec §3.2): total recalculates to 450,000\n"
+                   "ACTUAL: total shows 450,000, success message appears\n"
+                   "AFTER: green 'Saved' toast · list row shows 3 · value survives a reload\n"
+                   "BACK: Back returns to the Orders list, filter preserved\n")
+        (ui / "manifest.md").write_text(JOURNEY)
+        big = _png(500, 400, lambda x, y: bytes((x % 251, y % 239, (x * y) % 253)))
+        (ui / "01_orders_list.png").write_bytes(big)
+        (ui / "02_result_boxed.png").write_bytes(big)
+        (evd / "REPORT.md").write_text(report.replace("TC_1: db_verify.md",
+                                                      "TC_1: db_verify.md\nTC_2: 02_result_boxed.png"))
+        errs, _ = check_tree(evd, 2, [])
+        assert not errs, f"a full journey with a boxed shot must pass: {errs}"
+
+        # m: every journey field is demanded by name
+        for field in ("AS:", "PRECONDITION:", "ENTRY:", "AFTER:", "BACK:"):
+            (ui / "manifest.md").write_text(
+                "".join(l + "\n" for l in JOURNEY.splitlines() if not l.startswith(field)))
+            errs, _ = check_tree(evd, 2, [])
+            assert any(field in e and "manifest.md" in e for e in errs), \
+                f"a TC missing {field} must red: {errs}"
+        (ui / "manifest.md").write_text(JOURNEY)
+
+        # m: ENTRY that is only a URL — proves the address, not the product
+        for bare in ("/orders/4102/edit", "https://app.demo/orders/4102/edit", '"/orders/4102/edit"'):
+            (ui / "manifest.md").write_text(
+                JOURNEY.replace("ENTRY: signed in → Orders list → clicked row #4102 → Edit",
+                                f"ENTRY: {bare}"))
+            errs, _ = check_tree(evd, 2, [])
+            assert any("ENTRY is only a URL" in e for e in errs), \
+                f"a deep-link-only ENTRY must red ({bare}): {errs}"
+        # …and a URL kept BESIDE the click path is fine (a second path is welcome)
+        (ui / "manifest.md").write_text(
+            JOURNEY.replace("ENTRY: signed in → Orders list → clicked row #4102 → Edit",
+                            "ENTRY: signed in → Orders list → clicked row #4102 → Edit "
+                            "(also reachable at /orders/4102/edit)"))
+        errs, _ = check_tree(evd, 2, [])
+        assert not any("ENTRY" in e for e in errs), f"click path + URL must pass: {errs}"
+        (ui / "manifest.md").write_text(JOURNEY)
+
+        # m: a PASS with screenshots but NO box (the old hole — green before)
+        (ui / "02_result_boxed.png").rename(ui / "02_result.png")
+        errs, _ = check_tree(evd, 2, [])
+        assert any("_boxed.png" in e for e in errs), \
+            f"an unannotated PASS must red now: {errs}"
+        (ui / "02_result.png").rename(ui / "02_result_boxed.png")
+        errs, _ = check_tree(evd, 2, [])
+        assert not errs, f"restored fixture must pass: {errs}"
+        # NON-UI TCs are exempt from the journey (no screen to walk)
+        assert "TYPE: NON-UI" in read(tc / "manifest.md").upper()
         (evd / "REPORT.md").write_text(report.replace("COMMIT: abc1234\n", ""))
         errs, _ = check_tree(evd, 1, [])
         assert any("COMMIT" in e for e in errs), "missing COMMIT pin should red"
@@ -326,7 +421,9 @@ def _selftest():
             varied.write_bytes(_png(500, 400,
                                     lambda x, y: bytes((x % 256, y % 256, (x * y) % 256))))
             assert png_problems(varied) == [], png_problems(varied)
-    print("evd_check selftest: OK (fixture green + 7 mutations red)")
+    print("evd_check selftest: OK (fixture green + 7 mutations red + the UI journey: "
+          "full walk green, each of AS/PRECONDITION/ENTRY/AFTER/BACK demanded by "
+          "name, 3 URL-only ENTRYs red, click-path+URL green, unannotated PASS red)")
 
 
 if __name__ == "__main__":

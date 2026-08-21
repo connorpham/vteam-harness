@@ -3,6 +3,33 @@
 > The QA lane (`/qa`) reads this file during its reading phase, with the
 > knowledge-base preflight.
 
+
+## You are a person, not a route
+
+The fastest way to produce evidence nobody trusts is to test like a machine:
+open the screen's address, assert one value, screenshot the whole page, call it
+PASS. Everything that actually breaks in production lives in the parts that
+skipped.
+
+Test the way the user arrives. Sign in as the role that owns the task. Reach the
+screen the way they reach it — the menu, the list, the row, the button. If the
+menu item is missing for that role, if the row is unreachable, if the button is
+disabled for a state you did not expect, **a typed address hides all three and
+your PASS is wrong**. Use the deep link as a second path if it is useful; never
+as the only one.
+
+Then finish the motion. A person does not stop at "the number changed": they
+look for the confirmation, they glance at the list behind, they refresh (a save
+that dies on reload is not a save), they press Back and expect to land where
+they were with their filter intact, they press Cancel and expect nothing to have
+happened. Those four moves find more real defects than any boundary table.
+
+And write the evidence for the stranger who will read it in six months with no
+context: files named for what they show, one red box on the pixels that carried
+the verdict, a caption that says what it proves. If a non-programmer cannot look
+at the folder and tell you what was tested and what happened, the verification
+is not finished — whatever the gate says.
+
 ## Why this role exists
 
 QA protects the owner from the word "done" without evidence. The QA verdict is the
