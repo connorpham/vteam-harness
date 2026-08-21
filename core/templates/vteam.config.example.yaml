@@ -65,6 +65,8 @@ team:
   capacity_per_day: 0.8  # person-days of throughput per calendar working day
   hours_per_day: 8       # a workday = 8 hours; plan costs accept "1.5d" or "12h"
                          # (machine-consumed: schedule_check normalizes hours to days)
+  loop_budget_per_day: 4 # machine-consumed: graph_check reds >N dispatches of one item
+                         # in one day (MAST 1.5 — termination as a number, not prose)
 
 autonomy:
   level: assisted

@@ -101,6 +101,11 @@ export function parseTicket(key, text, cfg, relFile) {
       labels: field("labels").split(",").map((x) => x.trim()).filter(Boolean),
       assignee: field("assignee"),
       estimate: field("estimate"),
+      // MIRROR of tracker.py MarkdownTracker._parse links.blocked_by: one
+      // `- blocked-by: KEY-2, KEY-3` line, comma-split, upper-cased. Invalid
+      // keys are kept verbatim — a typo'd blocker must stay visible.
+      blocked_by: field("blocked-by").split(",").map((x) => x.trim().toUpperCase())
+        .filter((x) => x && x !== "—" && x.toLowerCase() !== "none"),
       comments,
       file: relFile,
     },

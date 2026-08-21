@@ -7,6 +7,8 @@ steps:
     run: "bash .vteam/scripts/docs_shrink_check.sh"
   ledger:
     run: "python3 .vteam/scripts/log_check.py"
+  graph:
+    run: "python3 .vteam/scripts/graph_check.py"
   verbatim:
     run: "python3 .vteam/scripts/verbatim_gate.py"
   lint:

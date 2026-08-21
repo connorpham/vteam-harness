@@ -128,6 +128,11 @@ Write `{paths.evidence}/<TICKET>/dev/tasksheet.md` BEFORE touching code (it
 carries Impact + assumptions + self-review results; it commits with the code so
 the next session can resume the work):
 - **Requirement** in one paragraph, plus acceptance criteria as the ticket states them.
+- **`CODE-SCOPE:`** one line, the paths this ticket may touch (e.g.
+  `CODE-SCOPE: src/auth/ src/lib/session.ts`) — graph_check reds any commit
+  naming this ticket that strays outside them (MAST 2.3: self-expansion).
+  Scope grew mid-ticket? Widen the line DELIBERATELY in the same commit and
+  say why in the task-sheet — or split the ticket.
 - **Spec check**: the governing spec sections — quote them. Spec silent on a
   detail → list it under "assumptions to confirm" and ask.
 - **Design check (UI tickets)**: the design oracle, in priority order — ① design
@@ -418,3 +423,4 @@ silent skip to one fewer reviewer.
 - [ ] Every phase narrated with a ▶ line; final summary passes the plain-language bar
 - [ ] KB read at T1; lesson appended at T6 (or "no new lesson" stated)
 - [ ] T1: code map queried BEFORE the tree read; any map miss named in the task-sheet
+- [ ] T1: tasksheet declares `CODE-SCOPE:` (arms the derailment gate)
