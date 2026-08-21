@@ -1,10 +1,19 @@
 # vteam
 
+[![npm](https://img.shields.io/npm/v/vteam-harness?color=%23C03B2B&label=npm)](https://www.npmjs.com/package/vteam-harness)
+[![ci](https://github.com/connorpham/vteam-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/connorpham/vteam-harness/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/vteam-harness)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/vteam-harness)](LICENSE)
+
 **Proof-of-done for AI agents.** Your agent can't say *done* anymore — it has to prove it.
 
 vteam installs a virtual software team into your repository — a PM, a BA, an architect, a developer and a QA — together with **14 machine gates that exit non-zero** when work is claimed but not proven. It runs on Claude Code, Cursor, Windsurf, Codex and Copilot, and it was extracted from a harness that ran a real project autonomously: 37+ merged PRs, 113+ confirmed review findings, 24/7 scheduled sessions, one human owner spending ~15 minutes a day. Every rule exists because something specific broke without it.
 
-- [Install and first run](#install-and-first-run)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/lifecycle.svg" alt="One ticket's path through vteam: /ba, then dor_check exits 1 on a vague ticket; /dev, then /verify plus the push fence refuse code with no committed review dossier; /qa, then evd_check demands a verdict pinned to both a commit and a timestamp; Done. When code changes after the verdict, stale_verdict_check expires it and the ticket comes back to /dev." width="100%">
+</p>
+
+- [Install and first run](#install-and-first-run) · [what it actually looks like](#what-it-actually-looks-like)
 - [Requirements](#requirements)
 - [The problem it solves](#the-problem-it-solves)
 - [The five laws](#the-five-laws)
@@ -36,6 +45,66 @@ Claude Code users can install through the plugin instead of the terminal:
 /plugin install vteam@vteam-harness
 /vteam:setup
 ```
+
+### What it actually looks like
+
+Three transcripts, captured from a real run — not mockups.
+
+**1. Measure the gap before installing anything.** `audit` reads your repo and scores six dimensions; every ❌ names the artifact a machine would need to see.
+
+```console
+$ npx vteam-harness audit
+  0/100 · grade F    (A ≥85 · B ≥70 · C ≥55 · D ≥35 · F <35)
+
+GATES          0/20
+   ❌ no CI pipeline — nothing can go red off this machine
+   ❌ no test entrypoint (package.json test / pytest / Makefile / tests/)
+   → a machine would need to see: a CI pipeline that runs the tests on every push
+HOOKS          0/15
+   ❌ no active git hooks — a push leaves this machine completely unchecked
+   ❌ no secret scan in hooks or CI — a leaked token sails through
+
+$ npx vteam-harness init && npx vteam-harness audit
+  85/100 · grade A
+```
+
+**2. A vague ticket does not reach the developer.** The DoR gate answers with the four things that are missing, not with a shrug.
+
+```console
+$ python3 .vteam/scripts/dor_check.py WAL-1
+❌ dor_check: WAL-1 is NOT ready — return to the BA lane (raci §2)
+   - no Given/When/Then acceptance criteria
+   - no spec citation (`spec §x.y` or a docs/specs/ path)
+   - no out-of-scope section — the dev will self-expand
+   - no original estimate — an unestimated ticket is not created yet (BA debt)
+```
+
+**3. A verdict is valid only for the code it examined.** QA passed this ticket, then one commit landed on top — and the pass expired by itself.
+
+```console
+$ python3 .vteam/scripts/stale_verdict_check.py
+✅ no stale verdicts — examined 1 evidenced tickets
+
+# …one commit later, on the same ticket:
+$ python3 .vteam/scripts/stale_verdict_check.py
+⚠️  1 tickets were judged, then the CODE CHANGED
+
+  WAL-1  (REPORT pins d576135)
+      ↳ e823e9d 2026-08-21 15:29  WAL-1 tweak after the verdict
+
+A verdict is valid only for the code it examined.
+```
+
+And the push fence, for completeness: code with no committed review dossier does not leave the machine.
+
+```console
+$ git push origin feat/WAL-1-topup-limits
+❌ review_check: evd/WAL-1/dev/review.md NOT in commit d5761359a478 — the review
+   dossier commits with the code; a file on one machine is a fabricated report
+error: failed to push some refs to 'origin'
+```
+
+---
 
 **Working in a mature repo with no documentation?** Run `/docs` first. It reads your codebase, asks you one batched round of questions, and writes the spec shards, decision records and known-issues the other lanes assume already exist — marking every sentence `DRAFT-FROM-CODE` or `OWNER-CONFIRMED`, so nothing it inferred can be mistaken for something you confirmed.
 
