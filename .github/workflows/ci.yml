@@ -1,14 +1,19 @@
 # CI for the framework itself: the e2e suite installs vteam into fresh repos
 # and asserts init → doctor GREEN, manifest-guarded update, clean failures.
+# Node matrix covers the floor we declare (engines >=20) AND the current LTS —
+# "engines: >=20" was an untested promise until 22 ran here.
 name: ci
 on: [push, pull_request]
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with: { node-version: "${{ matrix.node }}" }
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - run: pip install pillow   # evd_ui_check's pixel analysis — its selftest refuses to pretend without it

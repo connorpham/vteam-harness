@@ -59,9 +59,13 @@ team:
   size: 1                # 1 is the documented sweet spot. >1 is MACHINE-ENFORCED where it
                          # matters most: log_check reds any ledger without the Actor column
                          # (who = VTEAM_ACTOR env, else `git config user.name`); perf_report
-                         # and the board then report per person. WIP limit + claim TTL are
-                         # still agent-prose (see DESIGN §7).
+                         # and the board then report per person. WIP limit is still
+                         # agent-prose (see DESIGN §7).
                          # (read by agents in prose — no gate enforces it yet; see ROADMAP)
+  claim_ttl_hours: 2     # an In Progress claim older than this with no branch/worklog is
+                         # ORPHANED. The ONE home of this number (raci.md §2 defers here);
+                         # machine-read by `vteam resume`, prose-honored by the PM recovery
+                         # lane and dev T0.4
   capacity_per_day: 0.8  # person-days of throughput per calendar working day
   hours_per_day: 8       # a workday = 8 hours; plan costs accept "1.5d" or "12h"
                          # (machine-consumed: schedule_check normalizes hours to days)

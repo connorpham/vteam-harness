@@ -341,3 +341,67 @@ if (anyFail) {
   process.exit(1);
 }
 console.log(`\nconformance: OK — ${rows.length} fixtures, ctx.py == ctx.mjs (== ctx.sh on its scalar subset), error fixtures red in both.`);
+
+// ── ledger-grammar fence: lib/ledger.py ⇄ board.mjs parseLedger ─────────────
+// lib/ledger.py is declared "the ONE home" of the row grammar (audit H4), but
+// board.mjs keeps a JS mirror that usage.mjs and the dashboard read through.
+// ctx and graph both have parity fences; until this one existed, the ledger
+// mirror was the only parser pair with nothing stopping silent drift. Every
+// fixture row runs through BOTH parsers; kind / tok(k) / actor / malformed
+// must agree exactly.
+const { parseLedger } = await import("../src/cli/board.mjs");
+const V2_HEAD = "| Date | Lane | Actor | Item | Result | Link |\n|---|---|---|---|---|---|\n";
+const LEGACY_HEAD = "| Date | Lane | Item | Result | Link |\n|---|---|---|---|---|\n";
+const LEDGER_FIXTURES = [
+  { name: "v2 done+tier+tok", head: V2_HEAD, row: "| 2026-01-05 | DEV | An | T-1 | done (workhorse) · tok ≈ 90k | PR #1 |" },
+  { name: "tok≈ missing spaces (malformed accounting)", head: V2_HEAD, row: "| 2026-01-05 | DEV | An | T-2 | done · tok≈90k | PR #2 |" },
+  { name: "unsuffixed tok ≈ 90 (=0.09k)", head: V2_HEAD, row: "| 2026-01-05 | DEV | An | T-3 | done · tok ≈ 90 | PR #3 |" },
+  { name: "donezo is not done (word boundary)", head: V2_HEAD, row: "| 2026-01-05 | DEV | An | T-4 | donezo · tok ≈ 9k | PR #4 |" },
+  { name: "blocked with reason", head: V2_HEAD, row: "| 2026-01-06 | BA | Binh | auth | blocked: Q2 open | Q2 |" },
+  { name: "bare 'blocked:' has no reason (other)", head: V2_HEAD, row: "| 2026-01-06 | BA | Binh | auth | blocked: | Q2 |" },
+  { name: "failed with reason", head: V2_HEAD, row: "| 2026-01-07 | DEV | An | T-5 | failed: gate red | T-5 |" },
+  { name: "empty actor cell survives the parser (gate's call)", head: V2_HEAD, row: "| 2026-01-07 | DEV |  | T-6 | done | T-6 |" },
+  { name: "4 columns is malformed", head: V2_HEAD, row: "| 2026-01-07 | DEV | broken row |" },
+  { name: "legacy 5-col row (actor null)", head: LEGACY_HEAD, row: "| 2026-01-05 | QA | T-1 | done · tok ≈ 30k | T-1 |" },
+];
+const pyBatch = spawnSync("python3", ["-c", `
+import json, sys
+sys.path.insert(0, ${JSON.stringify(LIB)})
+import ledger
+out = []
+for line in json.loads(sys.stdin.read()):
+    r = ledger.parse_row(line)
+    out.append(None if r is None else r)
+print(json.dumps(out))
+`], { input: JSON.stringify(LEDGER_FIXTURES.map((f) => f.row)), encoding: "utf8" });
+if (pyBatch.status !== 0) {
+  console.error(`ledger fence: python harness died:\n${pyBatch.stderr}`);
+  process.exit(1);
+}
+const pyRows = JSON.parse(pyBatch.stdout);
+const tokK = (t) => (t == null ? null : /[kK]$/.test(t) ? parseFloat(t) : parseFloat(t) / 1000);
+let ledgerFail = 0;
+LEDGER_FIXTURES.forEach((f, i) => {
+  const js = parseLedger(f.head + f.row + "\n")[0] ?? null;
+  const py = pyRows[i];
+  const diffs = [];
+  const mal = { js: !!js?.malformed, py: !!py?.malformed };
+  if (mal.js !== mal.py) diffs.push(`malformed js=${mal.js} py=${mal.py}`);
+  if (!mal.js && !mal.py && js && py) {
+    if (js.result_kind !== py.kind) diffs.push(`kind js=${js.result_kind} py=${py.kind}`);
+    const jk = tokK(js.tok);
+    if ((jk === null) !== (py.tok_k === null) || (jk !== null && Math.abs(jk - py.tok_k) > 1e-9))
+      diffs.push(`tok_k js=${jk} py=${py.tok_k}`);
+    if ((js.actor ?? null) !== (py.actor ?? null)) diffs.push(`actor js=${J(js.actor)} py=${J(py.actor)}`);
+    if (js.item !== py.item || js.result !== py.result) diffs.push("item/result cell split differs");
+  }
+  if (diffs.length) {
+    ledgerFail++;
+    console.error(`  ❌ ledger fence: ${f.name} — ${diffs.join("; ")}`);
+  }
+});
+if (ledgerFail) {
+  console.error(`\nconformance: LEDGER GRAMMAR DIVERGES (${ledgerFail} fixture(s)) — lib/ledger.py is the home; fix board.mjs parseLedger to match.`);
+  process.exit(1);
+}
+console.log(`conformance: OK — ledger grammar, ${LEDGER_FIXTURES.length} rows, lib/ledger.py == board.mjs parseLedger (kind/tok/actor/malformed).`);

@@ -68,6 +68,10 @@ const repo = freshRepo("t1");
 {
   const r = vteam(repo, ...INIT_FLAGS);
   check("init exits 0", r.status === 0, r.stdout + r.stderr);
+  // the fence blocks the very install commit — init must warn BEFORE the first
+  // refused push, not let the error message be the tutorial (2026-08-24 review)
+  check("init warns that the fence is live from the install commit on",
+    /ALLOW_PUSH_MAIN=1/.test(r.stdout) && /PR/.test(r.stdout), r.stdout.slice(-500));
   for (const f of ["vteam.config.yaml", ".vteam/scripts/gate.py", ".vteam/manifest.json",
     ".vteam/scripts/lib/ctx.py", ".vteam/scripts/lib/ctx.mjs", ".vteam/scripts/lib/ctx.sh",
     ".claude/skills/team/SKILL.md", ".githooks/pre-push",
@@ -677,6 +681,22 @@ console.log("19. resume — derived crash recovery (artifact ladder)");
   // determinism: a reader run twice answers the same
   check("resume is a pure reader (two runs, identical output)",
     vteam(repo19, "resume", "DEMO-9").stdout === r.stdout);
+}
+
+// ── the README's "N checks" claim is machine-verified ──────────────────────
+// Found stale (said 119, suite ran 139) in the 2026-08-24 review: a count
+// nobody re-runs is a count that drifts. This is deliberately the LAST check —
+// the README must state the suite's full total, this line included.
+{
+  const readme = fs.readFileSync(path.join(PKG, "README.md"), "utf8");
+  const m = readme.match(/\*\*(\d+) checks\*\*/);
+  n++;
+  if (m && Number(m[1]) === n) {
+    console.log(`  ✅ README's "${m[1]} checks" claim matches the suite (${n})`);
+  } else {
+    failed++;
+    console.log(`  ❌ README claims "${m ? m[1] : "(no **N checks** found)"}" but the suite ran ${n} — fix README.md's number`);
+  }
 }
 
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);
