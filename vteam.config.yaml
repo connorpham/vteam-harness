@@ -1,0 +1,89 @@
+# vteam configuration — the contract between this repo and the framework.
+# Schema house of record: the vteam package's docs/DESIGN.md §2.
+version: 1
+
+project:
+  name: 'vteam'
+  key: VT
+  language: en
+  adopted: 2026-08-24
+
+paths:
+  specs: docs/specs
+  pm: docs/pm
+  qa: docs/qa
+  adr: docs/adr
+  team: docs/team
+  design: docs/design
+  evidence: evd
+  backlog: docs/backlog
+
+specs:
+  # the ORIGINAL spec documents BA shards from (verbatim_gate compares shards
+  # in paths.specs against these — leave empty until you have source docs;
+  # never point it at paths.specs itself: self-comparison is self-grading)
+  sources: []
+
+docs:
+  task_context:            # extra background /dev reads at T1, keyed by ticket label/type
+    always: []             # read for EVERY ticket, e.g. [docs/architecture.md]
+    by_label: {}           # label/type (lowercase) -> file list; a mapped-but-missing
+                           # file is reported LOUDLY in the task sheet, never guessed
+
+stack:
+  profile: generic
+  package_manager: npm
+
+git:
+  protected_branch: main
+  branch_pattern: "^(feat|fix)/{key}-[0-9]+-"
+  merge_strategy: merge
+  # merge | squash | rebase — how PRs land on the protected branch. squash and
+  # rebase DISCARD branch shas, so QA verdicts anchor by VERIFIED-AT (qa workflow)
+  # and stale_verdict_check falls back to it; set this to match your repo.
+  hooks: managed
+  # Derived from THIS repo's layout at init time (field-trial finding #17: a
+  # hardcoded [src/, prisma/] default silently lost the review fence on repos
+  # whose code lives in lib/, app/ or root files). Review it — the review fence
+  # and stale-verdict gate only watch what is listed here. An empty list means
+  # derivation found nothing: doctor warns, and the pre-push fence FAILS CLOSED
+  # (every path is treated as product code) until you fill it in.
+  code_paths: [src/, core/, bin/]
+
+tracker:
+  provider: markdown
+  done_statuses: [Done, Closed, Resolved]
+  review_status: In Review
+
+design:
+  provider: none
+
+team:
+  size: 1
+  capacity_per_day: 0.8
+  # a workday is this many hours — plan costs written as "12h" divide by it
+  # (schedule_check normalizes h and d onto one person-day scale)
+  hours_per_day: 8
+  # termination as DATA (MAST 1.5): graph_check reds an item dispatched more
+  # than this many times in one day — thrash, not persistence
+  loop_budget_per_day: 4
+
+autonomy:
+  level: assisted
+  # agent may merge its own green PR — only honored at level: full; flip to
+  # false to keep every merge in human hands even at full autonomy
+  self_merge: false
+  exemptions:
+    - real-money
+    - legal
+    - purchasing
+    - credentials
+    - data-deletion
+
+review:
+  reviewers: 2
+  high_stakes_paths: []
+  high_stakes_terms: []
+
+models:
+  routing: default
