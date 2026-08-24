@@ -49,7 +49,7 @@ const day = (iso) => (iso || "").slice(0, 10);
 
 function newSession(source, id) {
   return { source, id, start: null, end: null, branch: null, models: {},
-    msgs: 0, input: 0, cache_read: 0, cache_write: 0, output: 0 };
+    days: {}, msgs: 0, input: 0, cache_read: 0, cache_write: 0, output: 0 };
 }
 
 function bump(s, model, u, ts) {
@@ -63,6 +63,17 @@ function bump(s, model, u, ts) {
     if (!s.start || ts < s.start) s.start = ts;
     if (!s.end || ts > s.end) s.end = ts;
   }
+  // daily accounting bins by the MESSAGE's day, not the session's start day —
+  // a session left open across midnight otherwise makes every later day look
+  // idle, and the ledger cross-check false-flags real work (found live when
+  // vteam's own dogfood day sat inside a week-old session)
+  const dk = `${day(ts) || day(s.start) || "unknown"}|${model}`;
+  const d = s.days[dk] || (s.days[dk] = { msgs: 0, input: 0, cache_read: 0, cache_write: 0, output: 0 });
+  d.msgs++;
+  d.input += u.input || 0;
+  d.cache_read += u.cache_read || 0;
+  d.cache_write += u.cache_write || 0;
+  d.output += u.output || 0;
 }
 
 /** One session file → one session object, or null (other project / no usage).
@@ -158,25 +169,29 @@ const dominantModel = (s) =>
   Object.entries(s.models).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] || "(unknown)";
 
 /** sessions → sorted daily rows (date × source × model) + per-model totals.
- * A session is binned on its START day and under its dominant model — good
- * enough for accounting, and it keeps every table one-row-per-session-source. */
+ * Daily rows come from each session's per-message-day bins (a multi-day
+ * session contributes to EVERY day it touched); the sessions column counts
+ * sessions ACTIVE on that day. Model totals stay per dominant model. */
 export function aggregate(sessions) {
   const daily = new Map();
   const models = new Map();
   for (const s of sessions) {
     const model = dominantModel(s);
-    const k = `${day(s.start)}|${s.source}|${model}`;
-    const row = daily.get(k) ||
-      { date: day(s.start), source: s.source, model, sessions: 0, msgs: 0,
-        input: 0, cache_read: 0, cache_write: 0, output: 0 };
     const mrow = models.get(model) ||
       { model, sessions: 0, msgs: 0, input: 0, cache_read: 0, cache_write: 0, output: 0 };
-    for (const t of [row, mrow]) {
-      t.sessions++; t.msgs += s.msgs; t.input += s.input;
-      t.cache_read += s.cache_read; t.cache_write += s.cache_write; t.output += s.output;
-    }
-    daily.set(k, row);
+    mrow.sessions++; mrow.msgs += s.msgs; mrow.input += s.input;
+    mrow.cache_read += s.cache_read; mrow.cache_write += s.cache_write; mrow.output += s.output;
     models.set(model, mrow);
+    for (const [dk, d] of Object.entries(s.days)) {
+      const [date, m] = dk.split("|");
+      const k = `${date}|${s.source}|${m}`;
+      const row = daily.get(k) ||
+        { date, source: s.source, model: m, sessions: 0, msgs: 0,
+          input: 0, cache_read: 0, cache_write: 0, output: 0 };
+      row.sessions++; row.msgs += d.msgs; row.input += d.input;
+      row.cache_read += d.cache_read; row.cache_write += d.cache_write; row.output += d.output;
+      daily.set(k, row);
+    }
   }
   const byKey = (a, b) => (a.date + a.source + a.model < b.date + b.source + b.model ? -1 : 1);
   return {
@@ -396,6 +411,20 @@ function selftest() {
 
   const agg = aggregate([...cs, ...xs]);
   check(agg.daily.length === 2 && agg.models.length === 2, "day×model rows", agg);
+
+  // a session spanning midnight must contribute to EVERY day it touched —
+  // binning it on the start day false-flags every later day as idle
+  fs.writeFileSync(path.join(projDir, "s2.jsonl"), [
+    asst("m3", "r3", "claude-fable-5", 500, "2026-08-13T23:50:00Z", "main"),
+    asst("m4", "r4", "claude-fable-5", 700, "2026-08-14T00:10:00Z", "main"),
+  ].join("\n"));
+  const spans = readClaudeSessions(claudeDir, root, "2026-08-01");
+  const spanAgg = aggregate(spans.filter((x) => x.id === "s2"));
+  check(spanAgg.daily.length === 2 &&
+    spanAgg.daily[0].date === "2026-08-13" && spanAgg.daily[0].output === 500 &&
+    spanAgg.daily[1].date === "2026-08-14" && spanAgg.daily[1].output === 700,
+    "midnight-spanning session bins per MESSAGE day", spanAgg.daily);
+  fs.rmSync(path.join(projDir, "s2.jsonl"));
 
   const rows = parseLedger([
     "| Date | Lane | Actor | Item | Result | Link |", "|---|---|---|---|---|---|",

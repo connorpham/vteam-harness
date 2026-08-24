@@ -1,0 +1,5 @@
+# vteam: append-only shared files — union merge keeps two humans' appends conflict-free
+docs/pm/log.md merge=union
+docs/pm/hatch-log.md merge=union
+docs/qa/knowledge-base.md merge=union
+docs/qa/known-issues.md merge=union
