@@ -347,6 +347,7 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 | `npx vteam-harness board [--port N]` | the read-only local dashboard. |
 | `npx vteam-harness graph [--json\|--dot]` | the work graph made visible: ready set, blocked set, dangling edges, cycles. Always exits 0 — the mirror; `graph_check.py` is the gate. |
 | `npx vteam-harness usage [--sync\|--json\|--since D]` | **measured** AI usage for this repo — who ran which model, when, at what token cost — read from Claude Code's and Codex's own session logs, not from what anyone wrote in a ledger. `--sync` publishes counts to `docs/pm/usage/<you>.md` (one file per person, conflict-free) so the lead sees the whole team. Counts only: models, tokens, session times — never chat content. |
+| `npx vteam-harness resume <KEY> [--json]` | where a crashed or paused ticket stopped, and the next move — **derived** from the committed artifacts (claim, branch, tasksheet, review dossier, QA verdict, ledger), never from a stored checkpoint. Nothing is written, so the answer cannot go stale or lie; run it twice, get the same answer. |
 | `npx vteam-harness doctor --migrate [--apply]` | rewrite legacy pre-vteam markers in existing ledgers and evidence. Dry-run by default. |
 
 ---

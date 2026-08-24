@@ -11,8 +11,9 @@ tracker (which column each ticket is in), git (branches/PRs), the dispatch ledge
 (`{paths.pm}/log.md`), the decision queue (`{paths.pm}/decisions.md`). A session that
 dies early (usage limit, crash, closed laptop) loses almost nothing; the next
 scheduled session reads the board and continues exactly where work stopped. A
-usage-limit pause is a break, not an incident — no special "resume" mechanism exists
-or is needed.
+usage-limit pause is a break, not an incident — resume needs no stored state, only
+the reading of it: `npx vteam-harness resume <KEY>` derives where a ticket stopped
+from those same artifacts and names the next dispatch (`ops-247.md` §1).
 
 **Duplicate-work guard:** every session opens by reading the ledger + tracker — work
 already In Review or already carrying a PR is never picked up again; two overlapping

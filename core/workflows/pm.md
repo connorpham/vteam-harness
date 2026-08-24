@@ -81,9 +81,13 @@ and keeps the beat:
 1c. **Recovery lane (a dead session must not orphan work):** scan for
    (i) In Progress tickets whose claim is past TTL with no remote branch/new
    worklog, (ii) local `feat|fix/*` branches with no upstream. Each is ONE piece
-   of unfinished work: take it over (prefer resuming the old branch) or return
-   the ticket to To Do + clear the claim; always write a `failed: previous
-   session died mid-work` ledger row — so loop guards count crashed sessions.
+   of unfinished work: run `npx vteam-harness resume <KEY>` first — it derives
+   the furthest PROVEN stage from the committed artifacts (tasksheet → resume
+   /dev; review dossier → dispatch /qa; verdict → close/return) so you re-enter
+   at the right lane instead of restarting. Then take it over (prefer resuming
+   the old branch) or return the ticket to To Do + clear the claim; always write
+   a `failed: previous session died mid-work` ledger row — so loop guards count
+   crashed sessions.
 1d. `python3 .vteam/scripts/schedule_check.py` — on/off-schedule numbers are
    MACHINE-computed (plan ↔ tracker ↔ today). Paste the output VERBATIM into the
    P4 desk report; OFF-SCHEDULE → the desk report's first line must be a plan
