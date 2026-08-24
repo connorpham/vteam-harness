@@ -618,56 +618,65 @@ console.log("18. measured usage history (vteam usage + perf_report merge)");
     /\*\*Binh\*\* has ledger rows but NO synced usage file/.test(pr.stdout), pr.stdout.slice(-1500));
 }
 
-// ── 19. checkpoint and resume — ticket crash recovery ─────────────────────
-// When /dev crashes mid-work, the ticket is partially done. Checkpoint saves
-// progress ({completed_lanes, next_lane, code_sha}). Resume reads it and tells
-// PM what lanes to skip, recovering without re-doing earlier work.
-console.log("19. checkpoint-resume — ticket recovery (fixture crash → resume)");
+// ── 19. resume — crash recovery DERIVED from committed artifacts ───────────
+// ops.md §1: all state is external; ops-247.md §1: a stored "resume" file
+// would be a second source of truth. So `vteam resume` READS the books —
+// claim, branch, tasksheet, review dossier, QA verdict, ledger — and derives
+// the furthest PROVEN stage. This section proves the derivation ladder end to
+// end on a real installed repo: each artifact added promotes the stage.
+console.log("19. resume — derived crash recovery (artifact ladder)");
 {
   const repo19 = freshRepo("t19");
   vteam(repo19, ...INIT_FLAGS);
-  const evdRel = "evd";  // matches vteam.config.yaml default: paths.evidence: evd
-  fs.mkdirSync(path.join(repo19, evdRel, "DEMO-1"), { recursive: true });
 
-  // Simulate lane progress: DEMO-1 completed [plan, dor, dev], ready for qa
-  const checkpoint = {
-    ticket: "DEMO-1",
-    completed_lanes: ["plan", "dor", "dev"],
-    next_lane: "qa",
-    code_sha: "abc12345",
-    saved_at: "2026-08-24T12:00:00Z",
-  };
-  fs.writeFileSync(path.join(repo19, evdRel, "DEMO-1", ".checkpoint"),
-    JSON.stringify(checkpoint, null, 2));
+  const st = vteam(repo19, "resume", "--selftest");
+  check("resume --selftest is green", st.status === 0 && /selftest: OK/.test(st.stdout),
+    st.stdout + st.stderr);
 
-  // vteam resume reads checkpoint and prints next lane
-  const res = vteam(repo19, "resume", "DEMO-1");
-  check("resume exits 0", res.status === 0, res.stderr);
-  check("resume names completed lanes", /plan.*dor.*dev/.test(res.stdout), res.stdout);
-  check("resume names next lane (qa)", /qa/.test(res.stdout), res.stdout);
-  check("resume shows code sha", /abc1234/.test(res.stdout), res.stdout);
+  const bad = vteam(repo19, "resume");
+  check("resume without a key exits 1 and says the grammar", bad.status === 1 &&
+    /<PROJ>-<n>|DEMO-1/.test(bad.stderr), bad.stderr);
 
-  // vteam checkpoint query reads the same
-  const q = vteam(repo19, "checkpoint", "query", "DEMO-1");
-  check("checkpoint query exits 0", q.status === 0, q.stderr);
-  check("checkpoint query repeats the message", /DEMO-1.*qa/.test(q.stdout), q.stdout);
+  // rung 0: never started
+  let r = vteam(repo19, "resume", "DEMO-9");
+  check("untouched ticket derives 'no trace' and exits 0 (a mirror never fails the build)",
+    r.status === 0 && /no trace/.test(r.stdout) && /never started/.test(r.stdout), r.stdout);
 
-  // vteam checkpoint save overwrites deterministically (idempotent)
-  const save1 = vteam(repo19, "checkpoint", "save", "DEMO-1", "dev");
-  const cp1 = fs.readFileSync(path.join(repo19, evdRel, "DEMO-1", ".checkpoint"), "utf8");
-  const save2 = vteam(repo19, "checkpoint", "save", "DEMO-1", "dev");
-  const cp2 = fs.readFileSync(path.join(repo19, evdRel, "DEMO-1", ".checkpoint"), "utf8");
-  check("checkpoint save is idempotent", cp1 === cp2, `save1:\n${cp1}\nsave2:\n${cp2}`);
+  // rung 1: expired claim, no work → orphaned, and the answer cites pm.md P0.1c
+  fs.writeFileSync(path.join(repo19, "docs", "backlog", "DEMO-9.md"),
+    "# DEMO-9 demo ticket\n\nclaimed 2026-01-01T00:00:00Z · branch feat/DEMO-9-x\n");
+  r = vteam(repo19, "resume", "DEMO-9");
+  check("expired claim derives orphaned + the recovery-lane move",
+    /PAST TTL/.test(r.stdout) && /orphaned/.test(r.stdout) && /P0\.1c/.test(r.stdout), r.stdout);
 
-  // resume fails loudly when checkpoint missing
-  const nocp = vteam(repo19, "resume", "DEMO-2");
-  check("resume exits 1 when checkpoint missing", nocp.status === 1, nocp.stderr);
-  check("resume error message is specific", /no checkpoint/.test(nocp.stderr), nocp.stderr);
+  // rung 2: tasksheet exists → resume /dev, don't restart
+  fs.mkdirSync(path.join(repo19, "evd", "DEMO-9", "dev"), { recursive: true });
+  fs.writeFileSync(path.join(repo19, "evd", "DEMO-9", "dev", "tasksheet.md"), "# tasksheet\n");
+  r = vteam(repo19, "resume", "DEMO-9");
+  check("tasksheet promotes the stage: re-dispatch /dev resuming committed work",
+    /tasksheet written/.test(r.stdout) && /resumes/.test(r.stdout), r.stdout);
 
-  // vteam checkpoint save writes a file; query reads it back
-  vteam(repo19, "checkpoint", "save", "DEMO-1", "qa");
-  const qfinal = vteam(repo19, "checkpoint", "query", "DEMO-1");
-  check("after save, query reflects new lane", /qa/.test(qfinal.stdout), qfinal.stdout);
+  // rung 3: review dossier → hand to QA
+  fs.writeFileSync(path.join(repo19, "evd", "DEMO-9", "dev", "review.md"), "# cards\n");
+  r = vteam(repo19, "resume", "DEMO-9");
+  check("review dossier promotes to: dispatch /qa",
+    /review dossier committed/.test(r.stdout) && /\/qa DEMO-9/.test(r.stdout), r.stdout);
+
+  // rung 4: QA verdict outranks everything — and the H1 word-boundary law holds
+  fs.writeFileSync(path.join(repo19, "evd", "DEMO-9", "REPORT.md"),
+    "# DEMO-9 — PASS\n\nCOMMIT: abc1234\n");
+  r = vteam(repo19, "resume", "DEMO-9");
+  check("PASS verdict → nothing to resume", /qa-verdict PASS/.test(r.stdout) &&
+    /nothing to resume/.test(r.stdout), r.stdout);
+
+  // --json is machine-readable and derivation matches the human view
+  const j = JSON.parse(vteam(repo19, "resume", "DEMO-9", "--json").stdout);
+  check("--json carries the same derivation", j.stage === "qa-verdict PASS" &&
+    j.tasksheet === true && j.review_dossier === true, JSON.stringify(j));
+
+  // determinism: a reader run twice answers the same
+  check("resume is a pure reader (two runs, identical output)",
+    vteam(repo19, "resume", "DEMO-9").stdout === r.stdout);
 }
 
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);

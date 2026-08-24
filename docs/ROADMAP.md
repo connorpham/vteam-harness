@@ -342,6 +342,32 @@ evd_check selftest grows the journey battery: full walk green, each of the five
 fields demanded by name, 3 URL-only ENTRYs red, click-path+URL green,
 unannotated PASS red.
 
+## Phase 16 — Durable execution as a READER ✅ (`vteam resume`)
+
+The 2026 graph-standard audit scored vteam weakest on durable execution
+(checkpoint/resume, the LangGraph 1.0 headline). The first attempt stored a
+`.checkpoint` file per ticket — and was reworked before release, because it
+violated the framework's own oldest law (`ops.md` §1 / `ops-247.md` §1: all
+state is external and single-owner; a stored checkpoint is a second source of
+truth nothing keeps honest — it can say "review done" while `dev/review.md`
+does not exist, and its lane list `plan/docs/dor/...` wasn't even the system's
+real vocabulary).
+
+What shipped instead: `npx vteam-harness resume <KEY>` — a pure reader, like
+`graph`. It derives the furthest PROVEN stage from artifacts that already have
+one owner each — the claim comment (+2h TTL), `feat|fix/<KEY>-*` branches,
+`evd/<KEY>/dev/tasksheet.md` (T1), `dev/review.md` (T4b), `REPORT.md` H1
+verdict (same word-boundary law as evd_check), and the ledger rows — then
+prints the one next dispatch (resume /dev · hand to /qa · orphaned → recovery
+lane · STOP, someone holds it). Wired into pm.md P0.1c and dev.md T0.4;
+doctrine sentences in ops.md §1 / ops-247.md §1 amended per the supersession
+law rather than left contradictory. Selftest proves all 9 derivation rungs and
+the precedence order; e2e section 19 walks the ladder on a real install.
+
+Deliberately NOT built: checkpoint files, a resume daemon, automatic
+re-dispatch. The reader tells a human (or /pm) where to re-enter; dispatch
+stays with the PM lane.
+
 ## Non-goals for v1
 - Multi-human teams beyond best-effort `team.size > 1` (DESIGN §7)
 - Mobile/desktop evidence capture (web via Playwright only; interface left open)

@@ -57,7 +57,9 @@ version may differ from training data).
    overrides). Ticket assigned to someone else → STOP and ask.
 4. **Status must be workable — In Progress is a CLAIM, not an invitation.**
    To Do / Open = OK. **In Progress → another session's until proven otherwise**:
-   read the latest claim comment + `git branch -a --list '*<TICKET>*'`. A claim
+   read the latest claim comment + `git branch -a --list '*<TICKET>*'`
+   (`npx vteam-harness resume <TICKET>` reads all these signals in one shot and
+   names the furthest proven stage). A claim
    younger than the claim TTL, or a branch someone is pushing → STOP, pick other
    work. A claim past TTL with no remote branch and no fresh worklog → ORPHANED
    (previous session died): take over, write one `failed: previous session died
