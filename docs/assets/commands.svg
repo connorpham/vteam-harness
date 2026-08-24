@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640" role="img" aria-label="Every vteam command end to end. Day zero: audit grades the repo with no install, init writes the config, gates, skills and fence, doctor proves the install with 22 selftests and a live preflight. Every day: the agent tool runs the workday, six gates can refuse with exit 1, and everything lands in files — ledger, evidence, tickets. Two mirrors read those files and never fail the build: board, the local dashboard, and graph, the ready and blocked sets. When a session dies, resume derives the furthest proven stage from the committed artifacts. usage measures who ran which model at what token cost from the agent CLI's own logs. update refreshes framework files by manifest hash, parking your edited copies as .new files.">
+  <style>
+    .ink{fill:#1C1F22}.muted{fill:#5A6065}.card{fill:#FFFFFF;stroke:#C9CBC4}
+    .line{stroke:#9BA1A7}.soft{fill:#F4F4F1;stroke:#C9CBC4}
+    .gate{fill:#F7E9E6;stroke:#C03B2B}.gatex{fill:#C03B2B}
+    .ok{fill:#E7F2EB;stroke:#1E7F4F}.okx{fill:#1E7F4F}
+    .files{fill:#F5EDDA;stroke:#9A6A00}.filesx{fill:#7A5400}
+    @media (prefers-color-scheme: dark){
+      .ink{fill:#E8E6E1}.muted{fill:#9BA1A7}.card{fill:#1D2024;stroke:#3A3E43}
+      .line{stroke:#6B7278}.soft{fill:#22252A;stroke:#3A3E43}
+      .gate{fill:#3A231F;stroke:#E4604F}.gatex{fill:#E4604F}
+      .ok{fill:#1D2F25;stroke:#4CB983}.okx{fill:#4CB983}
+      .files{fill:#33301E;stroke:#D9A94B}.filesx{fill:#E0BE6A}
+    }
+    text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  </style>
+  <defs>
+    <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9BA1A7"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="32" class="ink" font-size="17" font-weight="700">Every command, end to end — what it reads, what it writes, when it can say no</text>
+  <text x="24" y="53" class="muted" font-size="12.5">Gates exit 1. Mirrors always exit 0 — they read the same files and never fail the build. Nothing here calls a network.</text>
+
+  <!-- DAY 0 -->
+  <text x="24" y="86" class="okx" font-size="11.5" font-weight="700" letter-spacing="1">DAY 0 — MEASURE, INSTALL, PROVE</text>
+  <rect x="24" y="96" width="266" height="78" rx="8" class="card" stroke-width="1.5"/>
+  <text x="40" y="118" class="ink mono" font-size="13" font-weight="700">audit</text>
+  <text x="40" y="135" class="muted" font-size="10.5">any repo, no install, never writes —</text>
+  <text x="40" y="149" class="muted" font-size="10.5">6 dimensions → 0–100 + the exact</text>
+  <text x="40" y="163" class="muted" font-size="10.5">artifact each ❌ needs. This repo: 62→91</text>
+
+  <line x1="290" y1="135" x2="332" y2="135" class="line" stroke-width="1.5" marker-end="url(#c)"/>
+  <rect x="336" y="96" width="286" height="78" rx="8" class="card" stroke-width="1.5"/>
+  <text x="352" y="118" class="ink mono" font-size="13" font-weight="700">init</text>
+  <text x="352" y="135" class="muted" font-size="10.5">writes vteam.config.yaml · .vteam/ gates ·</text>
+  <text x="352" y="149" class="muted" font-size="10.5">workflows · push fence · CI. Input validated</text>
+  <text x="352" y="163" class="muted" font-size="10.5">BEFORE the first byte; invalid → exit 1, 0 writes</text>
+
+  <line x1="622" y1="135" x2="664" y2="135" class="line" stroke-width="1.5" marker-end="url(#c)"/>
+  <rect x="668" y="96" width="268" height="78" rx="8" class="ok" stroke-width="1.5"/>
+  <text x="684" y="118" class="okx mono" font-size="13" font-weight="700">doctor</text>
+  <text x="684" y="135" class="muted" font-size="10.5">proves the install: manifest hashes,</text>
+  <text x="684" y="149" class="muted" font-size="10.5">22 discovered selftests (each proves it</text>
+  <text x="684" y="163" class="muted" font-size="10.5">can go RED), live tracker/git/CLI pings</text>
+
+  <!-- EVERY DAY -->
+  <text x="24" y="212" class="okx" font-size="11.5" font-weight="700" letter-spacing="1">EVERY DAY — THE LOOP</text>
+  <rect x="24" y="222" width="222" height="90" rx="8" class="card" stroke-width="1.5"/>
+  <text x="40" y="246" class="ink" font-size="12" font-weight="650">your agent tool</text>
+  <text x="40" y="263" class="muted mono" font-size="10.5">/team · /pm · /dev · /qa</text>
+  <text x="40" y="280" class="muted" font-size="10.5">the workday: dispatch, code,</text>
+  <text x="40" y="294" class="muted" font-size="10.5">review, verify — files, not chat</text>
+
+  <line x1="246" y1="267" x2="292" y2="267" class="line" stroke-width="1.5" marker-end="url(#c)"/>
+  <rect x="296" y="222" width="252" height="90" rx="8" class="gate" stroke-width="1.5"/>
+  <text x="312" y="246" class="gatex" font-size="12" font-weight="700">14 gates — exit 1</text>
+  <text x="312" y="263" class="muted mono" font-size="10">dor · verify+fence · review</text>
+  <text x="312" y="279" class="muted mono" font-size="10">evd · graph · log · stale_verdict…</text>
+  <text x="312" y="296" class="muted" font-size="10.5">work that fails a gate does not move</text>
+
+  <line x1="548" y1="267" x2="594" y2="267" class="line" stroke-width="1.5" marker-end="url(#c)"/>
+  <rect x="598" y="222" width="338" height="90" rx="8" class="files" stroke-width="1.5"/>
+  <text x="614" y="246" class="filesx" font-size="12" font-weight="700">everything lands in FILES</text>
+  <text x="614" y="263" class="muted mono" font-size="10">docs/pm/log.md · docs/pm/decisions.md</text>
+  <text x="614" y="279" class="muted mono" font-size="10">docs/backlog/&lt;KEY&gt;.md · evd/&lt;KEY&gt;/ · git</text>
+  <text x="614" y="296" class="muted" font-size="10.5">committed, diffable, alive after every session</text>
+
+  <!-- mirrors reading the files -->
+  <path d="M700,312 L700,352" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#c)"/>
+  <path d="M840,312 L840,352" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#c)"/>
+  <rect x="598" y="356" width="180" height="64" rx="8" class="soft" stroke-width="1.5"/>
+  <text x="614" y="378" class="ink mono" font-size="12" font-weight="650">board</text>
+  <text x="614" y="394" class="muted" font-size="10">dashboard on 127.0.0.1:4177</text>
+  <text x="614" y="408" class="muted" font-size="10">read-only by construction</text>
+  <rect x="794" y="356" width="142" height="64" rx="8" class="soft" stroke-width="1.5"/>
+  <text x="810" y="378" class="ink mono" font-size="12" font-weight="650">graph</text>
+  <text x="810" y="394" class="muted" font-size="10">READY · BLOCKED ·</text>
+  <text x="810" y="408" class="muted" font-size="10">findings · --json --dot</text>
+  <text x="598" y="440" class="muted" font-size="10">mirrors: always exit 0 — the gate twin (graph_check) is what fails</text>
+
+  <!-- BOTTOM ROW -->
+  <text x="24" y="486" class="okx" font-size="11.5" font-weight="700" letter-spacing="1">WHEN A SESSION DIES</text>
+  <rect x="24" y="496" width="286" height="106" rx="8" class="card" stroke-width="1.5"/>
+  <text x="40" y="518" class="ink mono" font-size="13" font-weight="700">resume &lt;KEY&gt;</text>
+  <text x="40" y="535" class="muted" font-size="10.5">DERIVES the furthest proven stage from</text>
+  <text x="40" y="549" class="muted" font-size="10.5">claim · branch · tasksheet · review dossier ·</text>
+  <text x="40" y="563" class="muted" font-size="10.5">QA verdict · ledger → the one next dispatch.</text>
+  <text x="40" y="580" class="muted" font-size="10.5">Stores nothing — nothing can go stale or lie</text>
+
+  <text x="336" y="486" class="okx" font-size="11.5" font-weight="700" letter-spacing="1">WHO SPENT WHAT, MEASURED</text>
+  <rect x="336" y="496" width="300" height="106" rx="8" class="card" stroke-width="1.5"/>
+  <text x="352" y="518" class="ink mono" font-size="13" font-weight="700">usage [--sync]</text>
+  <text x="352" y="535" class="muted" font-size="10.5">reads the agent CLIs' OWN session logs:</text>
+  <text x="352" y="549" class="muted" font-size="10.5">who ran which model, when, at what token</text>
+  <text x="352" y="563" class="muted" font-size="10.5">cost — measured, next to the claimed tok ≈.</text>
+  <text x="352" y="580" class="muted" font-size="10.5">--sync = one file per person, conflict-free</text>
+
+  <text x="662" y="486" class="okx" font-size="11.5" font-weight="700" letter-spacing="1">STAYING CURRENT</text>
+  <rect x="662" y="496" width="274" height="106" rx="8" class="card" stroke-width="1.5"/>
+  <text x="678" y="518" class="ink mono" font-size="13" font-weight="700">update</text>
+  <text x="678" y="535" class="muted" font-size="10.5">refreshes framework files by MANIFEST</text>
+  <text x="678" y="549" class="muted" font-size="10.5">hash: only files vteam last wrote are</text>
+  <text x="678" y="563" class="muted" font-size="10.5">overwritten; anything you edited is kept,</text>
+  <text x="678" y="580" class="muted" font-size="10.5">the new version parked as *.new</text>
+
+  <text x="24" y="630" class="muted" font-size="11">Every claim in this picture has a transcript below it in the README — captured from real runs, not written by hand.</text>
+</svg>

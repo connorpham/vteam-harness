@@ -95,6 +95,7 @@ export function readClaudeSessions(claudeDir, root, sinceIso) {
       let o;
       try { o = JSON.parse(line); } catch { continue; } // torn writes happen; skip, never crash
       if (o.type !== "assistant" || !o.message?.usage) continue;
+      if (o.message.model === "<synthetic>") continue; // interruption notices, not model calls
       const key = `${o.message.id || o.uuid}:${o.requestId || ""}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -385,10 +386,11 @@ function selftest() {
     asst("m1", "r1", "claude-fable-5", 1000, "2026-08-10T09:00:00Z", "feat/x"),
     asst("m1", "r1", "claude-fable-5", 1000, "2026-08-10T09:00:01Z", "feat/x"), // dup content block
     asst("m2", "r2", "claude-fable-5", 2000, "2026-08-10T10:30:00Z", "feat/x"),
+    asst("m9", "r9", "<synthetic>", 0, "2026-08-10T10:31:00Z", "feat/x"), // not a model call
     "{torn json", "",
   ].join("\n"));
   const cs = readClaudeSessions(claudeDir, root, "2026-08-01");
-  check(cs.length === 1 && cs[0].msgs === 2, "dup message.id must count ONCE", cs);
+  check(cs.length === 1 && cs[0].msgs === 2, "dup counted once AND <synthetic> skipped", cs);
   check(cs[0].output === 3000 && cs[0].branch === "feat/x", "sum + branch", cs);
   check(readClaudeSessions(claudeDir, root, "2026-08-11").length === 0, "since filter");
 

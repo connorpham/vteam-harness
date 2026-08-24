@@ -338,17 +338,188 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 
 ## Command reference
 
+Eight commands, one journey. Gates exit 1; the two mirrors (`board`, `graph`) always exit 0; nothing calls a network except the preflight pings you configured. Every transcript below is captured from a real run — most of them from **this repository**, which installs vteam into itself and keeps its own ledger and evidence (`evd/VT-1/`).
+
+<picture>
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 22 selftests. Daily: the agent tool runs the workday, 14 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
+</picture>
+
 | Command | What it does |
 |---|---|
-| `npx vteam-harness audit [--json]` | grade any repo's agent accountability 0–100. No install needed, never writes, no network. |
-| `npx vteam-harness init [--yes]` | install into the current repo. Every flag value is validated before the first byte is written; invalid input exits 1 having written nothing. Flags: `--name --key --language --profile --tracker --design --autonomy --tools`. |
-| `npx vteam-harness doctor [--json]` | prove the install: prerequisites, config parse, manifest integrity, hook wiring, routing freshness, every selftest (discovered dynamically — 22 today), live provider pings. |
-| `npx vteam-harness update` | refresh framework files. `.vteam/manifest.json` makes *"never touches your files"* checkable: only files whose hash matches what the framework last wrote get overwritten; anything you edited is kept and the new version is parked as `*.new`. |
-| `npx vteam-harness board [--port N]` | the read-only local dashboard. |
-| `npx vteam-harness graph [--json\|--dot]` | the work graph made visible: ready set, blocked set, dangling edges, cycles. Always exits 0 — the mirror; `graph_check.py` is the gate. |
-| `npx vteam-harness usage [--sync\|--json\|--since D]` | **measured** AI usage for this repo — who ran which model, when, at what token cost — read from Claude Code's and Codex's own session logs, not from what anyone wrote in a ledger. `--sync` publishes counts to `docs/pm/usage/<you>.md` (one file per person, conflict-free) so the lead sees the whole team. Counts only: models, tokens, session times — never chat content. |
-| `npx vteam-harness resume <KEY> [--json]` | where a crashed or paused ticket stopped, and the next move — **derived** from the committed artifacts (claim, branch, tasksheet, review dossier, QA verdict, ledger), never from a stored checkpoint. Nothing is written, so the answer cannot go stale or lie; run it twice, get the same answer. |
-| `npx vteam-harness doctor --migrate [--apply]` | rewrite legacy pre-vteam markers in existing ledgers and evidence. Dry-run by default. |
+| [`audit [--json]`](#audit--measure-before-you-believe) | grade any repo's agent accountability 0–100. No install needed, never writes, no network. |
+| [`init [--yes]`](#init--install-validated-before-the-first-byte) | install into the current repo. Every flag value is validated before the first byte is written; invalid input exits 1 having written nothing. |
+| [`doctor [--json]`](#doctor--prove-the-install) | prove the install: prerequisites, config parse, manifest integrity, hook wiring, every selftest (discovered dynamically — 22 today), live provider pings. |
+| [`update`](#update--refresh-without-touching-your-files) | refresh framework files by manifest hash — your edited copies are kept, the new version parked as `*.new`. |
+| [`board [--port N]`](#board--the-read-only-dashboard) | the read-only local dashboard on 127.0.0.1. |
+| [`graph [--json\|--dot]`](#graph--the-work-graph-made-visible) | ready set, blocked set, dangling edges, cycles. Always exits 0 — the mirror; `graph_check.py` is the gate. |
+| [`usage [--sync\|--json\|--since D]`](#usage--measured-not-self-reported) | **measured** AI usage — who ran which model, when, at what token cost — from the agent CLIs' own session logs. |
+| [`resume <KEY> [--json]`](#resume--where-a-dead-session-stopped) | where a crashed or paused ticket stopped and the next move — **derived** from committed artifacts, never stored. |
+| `doctor --migrate [--apply]` | rewrite legacy pre-vteam markers in existing ledgers and evidence. Dry-run by default. |
+
+### `audit` — measure before you believe
+
+Reads the repo (CI config, hooks, evidence trees, ledgers, anchored verdicts, selftests), writes **nothing**, scores six dimensions 0–100 and names the exact artifact each ❌ needs. The [transcript above](#what-it-actually-looks-like) shows 0→85 on a bare repo; this repository's own score went 62/C → **91/A** the day it adopted itself (PR #38 carries the before/after).
+
+```console
+$ npx vteam-harness audit --json | jq '.score, .grade'
+91
+"A"
+```
+
+### `init` — install, validated before the first byte
+
+Reads your repo to derive `code_paths` (never invents them — an empty derivation is a loud warning, and the fence then **fails closed**), writes the config, the `.vteam/` gates with their manifest, the rendered workflows for your agent tools, the push fence and the CI gate. Re-running never clobbers your ledgers, and a repo with its own hooks keeps them — this repo's own fence survived its self-install untouched.
+
+```console
+$ npx vteam-harness init --yes --name Shop --key SHOP --profile node --tracker markdown
+✓ code_paths derived from this repo: [src/] — review in vteam.config.yaml (the review fence watches ONLY these)
+✓ git config core.hooksPath .githooks
+✓ claude-code: 11 workflow files
+
+vteam installed. Next steps:
+  1. Review vteam.config.yaml (high-stakes paths/terms, code_paths, capacity).
+  2. Tickets live in docs/backlog/*.md (markdown tracker — zero services).
+  3. Run: npx vteam-harness doctor
+  Then start a workday with /team in your agent tool.
+
+  Heads-up: the pre-push fence is active from THIS commit on — even the commit
+  that adds vteam reaches the protected branch through a PR, or one deliberate
+  ALLOW_PUSH_MAIN=1 git push for this install commit only.
+```
+
+### `doctor` — prove the install
+
+Reads everything init wrote and **runs the proof**: python present, config parses in all three parser languages, every manifest hash intact (files someone edited are *named*, not counted), hooks wired, then all 22 discovered selftests — each one feeds its gate a violating fixture and demands RED — then pings the tracker, git remote and hosting CLI for real. From this repository:
+
+```console
+$ npx vteam-harness doctor
+✅ python3 available (Python 3.9.6)
+✅ config parses (version 1)
+✅ .vteam runtime complete
+✅ manifest verified (55 framework-owned files intact)
+✅ core.hooksPath = .githooks
+✅ code_paths alive (src/, core/, bin/)
+✅ model-routing snapshot fresh (2026-08-17)
+✅ gate selftests green (22 discovered checks prove they can red)
+  … (14 more green lines)
+✅ gate selftests green (22 discovered checks prove they can red)
+── preflight ──
+✅ Tracker: backlog dir docs/backlog (1 tickets)
+✅ Design: no design source configured
+✅ Git: remote origin https://github.com/connorpham/vteam-harness.git
+✅ Hooks: core.hooksPath = .githooks
+✅ GitHub CLI: signed in (PRs possible)
+⚠️  Database       no .vteam/db-check.sh declared — DB leg unchecked (declare one if the app needs a DB)
+✅ Gate: driver installed (generic profile)
+──────────────────────────────────────────
+PREFLIGHT: GREEN — the ticket→design→code→git chain runs end-to-end
+```
+
+### `update` — refresh, without touching your files
+
+Reads `.vteam/manifest.json` (the hashes of what the framework last wrote), overwrites **only** files that still match, parks the new version of anything you edited as `*.new` next to your copy. Ledgers and config are never candidates.
+
+```console
+$ npx vteam-harness update
+✓ .vteam runtime refreshed
+✓ doctrine refreshed in docs/team
+✓ claude-code workflows re-rendered
+update done — ledgers and config untouched.
+```
+
+### `board` — the read-only dashboard
+
+Reads the same files everything else writes (tickets, ledger, evidence verdicts, decision queue) and serves one page on `127.0.0.1` — read-only **by construction**: GET `/` and GET `/api/state` are the only endpoints, so there is no write to secure.
+
+```console
+$ npx vteam-harness board
+vteam board — read-only dashboard for /path/to/your-repo
+  http://127.0.0.1:4177   (Ctrl-C stops it; --port <n> to move it)
+```
+
+### `graph` — the work graph, made visible
+
+Reads `docs/backlog/*.md` (`blocked-by` edges), the plan, the ledger and the evidence verdicts; prints what can start now, what waits on what, and every incoherence — dangling edges, cycles, a Done ticket with no PASS. Always exits 0: it is the mirror, `graph_check.py` is the gate that fails. `--json` is byte-stable per commit (diffable), `--dot` renders with Graphviz. From this repository:
+
+```console
+$ npx vteam-harness graph
+vteam graph — the implicit work graph, made visible · /Users/connorpham/Documents/vteam
+
+  1 ticket · 0 edges · 0 ready · 0 blocked · 1 done    (commit b269435)
+
+── READY — what a machine says can start now (0) ──
+   read from: docs/backlog/<KEY>.md + docs/pm/plan.yaml + docs/pm/log.md + evd/<KEY>/REPORT.md
+   nothing is startable: every open ticket is waiting on another (see BLOCKED and FINDINGS)
+
+── BLOCKED — waiting on another ticket (0) ──
+   read from: docs/backlog/<KEY>.md (`- blocked-by:` lines)
+   nothing is blocked
+
+── FINDINGS (0) ──
+   ✅ no dangling blockers, no cycles, every Done ticket carries a PASS verdict
+
+── SOURCES ──
+   plan: docs/pm/plan.yaml has no sprint-N blocks yet
+
+graph REPORTS, it never fails the build (always exit 0) — it is a mirror of the files above.
+The gates that DO fail are dor_check.py (blocked-by not Done), schedule_check.py (plan) and evd_check.py (verdicts).
+```
+
+### `usage` — measured, not self-reported
+
+The ledger's `tok ≈` is written by the agent that did the work. `usage` reads the **agent CLIs' own session logs** on this machine (Claude Code, Codex) for this project only: who ran which model, when, on which branch, at what token cost — counts only, never chat content. The cross-check flags what no self-report can dodge: a *done* ledger day with no recorded session, and a heavy AI day with no ledger row. This repository's real history:
+
+```console
+$ npx vteam-harness usage --since 2026-08-17
+Measured AI usage — Connor Pham · this project · since 2026-08-17
+(from local session logs: counts only — models, tokens, times. Never chat content.)
+
+By model:
+  claude-fable-5               3 sessions · in      4k · cache  279.7M · out    789k
+  claude-haiku-4-5-20251001    1 sessions · in      10 · cache     24k · out     102
+
+Daily (date × source × model):
+  2026-08-17  claude claude-fable-5              1s   17msg · in      32 · out     47k
+  2026-08-18  claude claude-fable-5              1s  187msg · in      3k · out    227k
+  2026-08-18  claude claude-opus-5               1s   59msg · in     118 · out     74k
+  2026-08-19  claude claude-fable-5              1s   81msg · in     162 · out     90k
+  2026-08-21  claude claude-fable-5              3s   99msg · in     198 · out    126k
+  2026-08-21  claude claude-haiku-4-5-20251001   1s    1msg · in      10 · out     102
+  2026-08-21  claude claude-opus-5               1s   97msg · in     194 · out    103k
+  2026-08-24  claude claude-fable-5              1s   78msg · in     156 · out     96k
+  2026-08-24  claude claude-haiku-4-5-20251001   1s   33msg · in     268 · out     21k
+  2026-08-24  claude claude-sonnet-5             1s    5msg · in      10 · out      6k
+
+Sessions (last 4 of 4):
+  2026-08-21 04:44  claude claude-haiku-4-5-20251001     0m ·    1msg · out    102 · feat/scale-round
+  2026-08-21 04:43  claude claude-fable-5                0m ·    1msg · out    171 · feat/scale-round
+  …
+Ledger cross-check: claimed tok ≈ 1390k · measured in+out 804k
+  ✅ every done day has a session, every heavy day has a ledger row
+```
+
+`--sync` writes the counts to `docs/pm/usage/<you>.md` — **one file per person**, so a team never merge-conflicts; commit it and `perf_report` puts every member's *claimed* number next to their *measured* one.
+
+### `resume` — where a dead session stopped
+
+Reads the artifacts that already have one owner each — the claim comment (against `team.claim_ttl_hours`), `feat|fix/<KEY>-*` branches, the tasksheet, the review dossier, the QA verdict, the ledger — and derives the furthest **proven** stage plus the one next dispatch. It stores nothing, so it cannot go stale or lie; run it twice, get the same answer. Against this repository's real ticket:
+
+```console
+$ npx vteam-harness resume VT-1
+VT-1 — derived from committed artifacts (nothing stored, nothing to go stale)
+
+  claim        ✅ 2026-08-24T04:20:00Z · chore/self-install  (PAST TTL)
+  branch       — none matching *VT-1*
+  tasksheet    —  evd/VT-1/dev/tasksheet.md
+  review       —  evd/VT-1/dev/review.md
+  qa verdict   ✅ PASS
+  ledger       1 row(s), last: 2026-08-24 QA done
+
+  STAGE  qa-verdict PASS
+  NEXT   nothing to resume — QA passed. If the ticket is not Done yet, /qa V7.3b closes it.
+```
+
+A ticket that died mid-`/dev` instead answers `STAGE tasksheet written (/dev T1 done)` and tells the PM to re-dispatch `/dev`, which resumes the leftover branch instead of restarting — the recovery lane (`pm.md` P0.1c) runs this first.
 
 ---
 
