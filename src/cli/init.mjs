@@ -358,7 +358,11 @@ vteam installed. Next steps:
        tracker === "github" ? "Add GITHUB_TOKEN to .env (gitignored); repo auto-detected from origin or set GITHUB_REPO=owner/repo." :
        "Tickets live in docs/backlog/*.md (markdown tracker — zero services)."}
   ${design === "figma" ? "3. Add FIGMA_ACCESS_TOKEN / FIGMA_FILE_KEY to .env (gitignored).\n  4." : "3."} Run: npx vteam-harness doctor
-  Then start a workday with /team in your agent tool.`);
+  Then start a workday with /team in your agent tool.
+
+  Heads-up: the pre-push fence is active from THIS commit on — even the commit
+  that adds vteam reaches the protected branch through a PR, or one deliberate
+  ALLOW_PUSH_MAIN=1 git push for this install commit only.`);
 }
 
 export function pkgVersion() {

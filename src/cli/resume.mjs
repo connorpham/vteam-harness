@@ -28,7 +28,7 @@ import { loadConfig, cfgGet } from "./config.mjs";
 import { parseLedger, parseReport } from "./board.mjs";
 
 const KEY_RE = /^[A-Za-z][A-Za-z0-9]*-\d+$/; // one grammar with tracker.py
-const CLAIM_TTL_H = 2; // raci.md §2 — the one home of this number is prose; mirror it
+// claim TTL: the ONE home is config `team.claim_ttl_hours` (raci.md §2 defers there)
 const CLAIM_PAT = /claimed\s+(\d{4}-\d{2}-\d{2}[T ][\d:.+Z-]+)\s*·\s*(?:branch\s+)?(\S+)/gi;
 
 const readText = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return null; } };
@@ -39,6 +39,7 @@ export function collectSignals(root, cfg, key) {
   const pmRel = String(cfgGet(cfg, "paths.pm", "docs/pm"));
   const blRel = String(cfgGet(cfg, "paths.backlog", "docs/backlog"));
   const provider = String(cfgGet(cfg, "tracker.provider", "markdown"));
+  const ttl_h = Number(cfgGet(cfg, "team.claim_ttl_hours", 2)) || 2;
   const evd = path.join(root, evdRel, key);
 
   // 1. the claim — readable locally only on the markdown tracker
@@ -51,8 +52,8 @@ export function collectSignals(root, cfg, key) {
       for (const m of t.matchAll(CLAIM_PAT)) last = { at: m[1].trim(), branch: m[2] };
       if (last) {
         const age_h = (Date.now() - new Date(last.at).getTime()) / 3.6e6;
-        claim = { ...claim, found: true, ...last,
-          expired: Number.isFinite(age_h) ? age_h > CLAIM_TTL_H : null };
+        claim = { ...claim, found: true, ...last, ttl_h,
+          expired: Number.isFinite(age_h) ? age_h > ttl_h : null };
       }
     }
   }
@@ -113,7 +114,7 @@ export function derive(s) {
   if (s.claim.found)
     return { stage: s.claim.expired === false ? "claimed, within TTL" : "claim past TTL, no trace of work",
       next: s.claim.expired === false
-        ? `STOP — someone claimed this ${CLAIM_TTL_H}h TTL ago or less (${s.claim.at}). Pick other work (dev.md T0.4).`
+        ? `STOP — someone claimed this within the ${s.claim.ttl_h}h TTL (${s.claim.at}). Pick other work (dev.md T0.4).`
         : `orphaned — return it to To Do or take it over, and write the \`failed: previous session died mid-work\` ledger row (pm.md P0.1c).` };
   return { stage: "no trace", next:
     `${s.key} never started — nothing to resume; dispatch it normally (/pm picks it when unblocked).` };
@@ -194,6 +195,10 @@ function selftest() {
   s = collectSignals(root, cfg, "DEMO-1");
   check(s.claim.expired === true && /orphaned/.test(derive(s).next),
     "old claim must derive orphaned", derive(s));
+  // the TTL is a CONFIG KNOB (team.claim_ttl_hours), not a constant — prove it
+  const wide = collectSignals(root, { ...cfg, team: { claim_ttl_hours: 999999 } }, "DEMO-1");
+  check(wide.claim.expired === false && /STOP/.test(derive(wide).next),
+    "a wide team.claim_ttl_hours must keep the same old claim ALIVE", wide.claim);
 
   // each artifact promotes the stage — precedence proven in order
   spawnSync("git", ["-C", root, "branch", "feat/DEMO-1-x"], {}); // may fail (no commit) — fake via ref
