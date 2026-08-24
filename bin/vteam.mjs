@@ -12,8 +12,13 @@ Usage:
   npx vteam-harness graph     the work graph made visible: what can start now, what is blocked, what is broken
   npx vteam-harness usage     MEASURED AI usage for this repo: who ran which model, when, at what token
                               cost — read from the agent CLIs' own session logs, not from self-reports
+  npx vteam-harness resume    resume a ticket paused or crashed mid-lane — read checkpoint, print next lane
+  npx vteam-harness checkpoint save <T> <LANE>  mark ticket T as completed LANE (manual progress save)
+                                  query <T>    read current checkpoint for ticket T
 
 audit flags:  --json  machine-readable {score, grade, dimensions} on stdout
+
+resume flags: --json  output checkpoint as JSON instead of human-readable message
 
 usage flags:  --since <YYYY-MM-DD>  window start (default: last 90 days)
               --json                machine-readable {models, daily, sessions, cross_check}
@@ -69,6 +74,12 @@ try {
   } else if (cmd === "usage") {
     const { usage } = await import("../src/cli/usage.mjs");
     await usage(flags);
+  } else if (cmd === "resume") {
+    const { resume } = await import("../src/cli/resume.mjs");
+    await resume({ ...flags, ticket: positional[1] });
+  } else if (cmd === "checkpoint") {
+    const { checkpoint } = await import("../src/cli/checkpoint.mjs");
+    await checkpoint({ ...flags, _: positional.slice(1) });
   } else {
     console.log(HELP);
     process.exit(cmd ? 1 : 0);
