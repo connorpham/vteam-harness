@@ -1,9 +1,12 @@
 # CI for the framework itself: the e2e suite installs vteam into fresh repos
 # and asserts init → doctor GREEN, manifest-guarded update, clean failures.
-# Node matrix covers the floor we declare (engines >=20) AND the current LTS —
-# "engines: >=20" was an untested promise until 22 ran here.
+# Node matrix covers the floor we declare (engines >=20) AND the current LTS.
+# Least privilege + actions pinned by full SHA (tag in the comment) — tags
+# are mutable; Dependabot keeps the pins fresh.
 name: ci
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -11,10 +14,10 @@ jobs:
       matrix:
         node: [20, 22]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: "${{ matrix.node }}" }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: { python-version: "3.11" }
       - run: pip install pillow   # evd_ui_check's pixel analysis — its selftest refuses to pretend without it
       - run: npm test

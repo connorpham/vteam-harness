@@ -1,5 +1,5 @@
 {
-  "version": "0.13.0",
+  "version": "0.13.1",
   "files": {
     ".claude/skills/ba/SKILL.md": "ed10f92a30352a73c532cc37b8db9cae7d6ae02e5e89129346d93f36583ff743",
     ".claude/skills/dev/SKILL.md": "1a5f5264d65221798bc2cdf4de0c36e1f7761e32e6c3978d51fdcdb71a56645a",
@@ -10,7 +10,7 @@
     ".claude/skills/qa/SKILL.md": "14707184334e091e5a579865b7292660309f69459d7b0b88c7c0d4f97e867a14",
     ".claude/skills/team/SKILL.md": "96ee39662d014bcc60aa65d24b2bc766009418d5d4f8582314e46ee61d00decf",
     ".claude/skills/verify/SKILL.md": "56b6ea99d041fd6c3602465c3408fdaede8775c7d716025edd3702ac0e2b29a0",
-    ".github/workflows/vteam-gate.yml": "bfa0ca242cc5e3237c05f5eaea3f3f1ae25c3006f16920a3ba0d0f4f1e23fe6a",
+    ".github/workflows/vteam-gate.yml": "8179203fe6ffdf0781fb75a90a6f19838d05ec70e3b135ba6a69c4ee54e1a2a4",
     ".vteam/locales/en.yml": "9379bc2e321d70afa3a90d96418525ab48f6fafd7788ec0f9736d76af8f3f1c8",
     ".vteam/locales/vi.yml": "a8171cc8effe19fc3afe625da03d49ed0e9455fe63bc7a1ecd9481e232306fda",
     ".vteam/profiles/generic/gates.yaml": "3783e71c2e95560680022ae499bdc66e1f480283fe60474652acb972dab82f4d",

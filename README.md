@@ -4,6 +4,8 @@
 [![ci](https://github.com/connorpham/vteam-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/connorpham/vteam-harness/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/vteam-harness)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/vteam-harness)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/connorpham/vteam-harness/badge)](https://scorecard.dev/viewer/?uri=github.com/connorpham/vteam-harness)
+[![codeql](https://github.com/connorpham/vteam-harness/actions/workflows/codeql.yml/badge.svg)](https://github.com/connorpham/vteam-harness/actions/workflows/codeql.yml)
 
 **Proof-of-done for AI agents.** Your agent can't say *done* anymore — it has to prove it.
 
@@ -576,6 +578,10 @@ plugins/     the Claude Code plugin
 bin/, src/   the installer CLI (audit · init · doctor · update · board · graph · doctor --migrate)
 tests/       the end-to-end suite behind every claim above
 ```
+
+## Security
+
+The same law as everything else here: a security claim without a machine check is a hope. **Zero runtime dependencies** (`npm ls --all` — empty tree), no network calls beyond the preflight pings you configure, a dashboard that is read-only *by construction*, a secret scan that **fails closed**, and releases published from CI with **npm provenance** (Sigstore) so the tarball is cryptographically tied to its commit. OpenSSF Scorecard re-grades the repo weekly (badge above), CodeQL scans every push. Reporting a vulnerability: [SECURITY.md](SECURITY.md). The full posture, control by control, each with the command that verifies it: [docs/security/](docs/security/README.md).
 
 ## License
 

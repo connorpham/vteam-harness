@@ -1,0 +1,36 @@
+# Publish to npm with PROVENANCE (Sigstore) — the npm page then carries the
+# "Provenance" badge cryptographically linking the tarball to this exact
+# commit and workflow. Local `npm publish` cannot produce this; only CI with
+# OIDC can.
+#
+# One-time owner setup on npmjs.com (no token, no secret to leak):
+#   package vteam-harness → Settings → Publishing access → Trusted Publisher:
+#   GitHub Actions · repository connorpham/vteam-harness · workflow release.yml
+#
+# Then a release = publish: draft a GitHub release on the version's tag
+# (e.g. v0.14.0) and this workflow ships it. package.json's prepublishOnly
+# guard still runs INSIDE this job — dirty tree / version taken / red tests
+# refuse the publish here exactly as they do locally.
+name: release
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # the OIDC token npm exchanges for provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 } # the prepublish guard compares HEAD to origin/main
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24 # npm >= 11.5 — required for OIDC trusted publishing
+          registry-url: https://registry.npmjs.org
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: "3.11" }
+      - run: pip install pillow # prepublishOnly runs the full suite; the pixel gate refuses to pretend
+      - run: npm publish --provenance --access public
