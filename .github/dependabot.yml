@@ -1,0 +1,8 @@
+# The package itself has zero dependencies (doctrine) — the only supply chain
+# left is the CI actions, pinned by SHA. Dependabot keeps those pins fresh.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
