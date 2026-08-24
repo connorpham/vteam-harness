@@ -618,5 +618,57 @@ console.log("18. measured usage history (vteam usage + perf_report merge)");
     /\*\*Binh\*\* has ledger rows but NO synced usage file/.test(pr.stdout), pr.stdout.slice(-1500));
 }
 
+// ── 19. checkpoint and resume — ticket crash recovery ─────────────────────
+// When /dev crashes mid-work, the ticket is partially done. Checkpoint saves
+// progress ({completed_lanes, next_lane, code_sha}). Resume reads it and tells
+// PM what lanes to skip, recovering without re-doing earlier work.
+console.log("19. checkpoint-resume — ticket recovery (fixture crash → resume)");
+{
+  const repo19 = freshRepo("t19");
+  vteam(repo19, ...INIT_FLAGS);
+  const evdRel = "evd";  // matches vteam.config.yaml default: paths.evidence: evd
+  fs.mkdirSync(path.join(repo19, evdRel, "DEMO-1"), { recursive: true });
+
+  // Simulate lane progress: DEMO-1 completed [plan, dor, dev], ready for qa
+  const checkpoint = {
+    ticket: "DEMO-1",
+    completed_lanes: ["plan", "dor", "dev"],
+    next_lane: "qa",
+    code_sha: "abc12345",
+    saved_at: "2026-08-24T12:00:00Z",
+  };
+  fs.writeFileSync(path.join(repo19, evdRel, "DEMO-1", ".checkpoint"),
+    JSON.stringify(checkpoint, null, 2));
+
+  // vteam resume reads checkpoint and prints next lane
+  const res = vteam(repo19, "resume", "DEMO-1");
+  check("resume exits 0", res.status === 0, res.stderr);
+  check("resume names completed lanes", /plan.*dor.*dev/.test(res.stdout), res.stdout);
+  check("resume names next lane (qa)", /qa/.test(res.stdout), res.stdout);
+  check("resume shows code sha", /abc1234/.test(res.stdout), res.stdout);
+
+  // vteam checkpoint query reads the same
+  const q = vteam(repo19, "checkpoint", "query", "DEMO-1");
+  check("checkpoint query exits 0", q.status === 0, q.stderr);
+  check("checkpoint query repeats the message", /DEMO-1.*qa/.test(q.stdout), q.stdout);
+
+  // vteam checkpoint save overwrites deterministically (idempotent)
+  const save1 = vteam(repo19, "checkpoint", "save", "DEMO-1", "dev");
+  const cp1 = fs.readFileSync(path.join(repo19, evdRel, "DEMO-1", ".checkpoint"), "utf8");
+  const save2 = vteam(repo19, "checkpoint", "save", "DEMO-1", "dev");
+  const cp2 = fs.readFileSync(path.join(repo19, evdRel, "DEMO-1", ".checkpoint"), "utf8");
+  check("checkpoint save is idempotent", cp1 === cp2, `save1:\n${cp1}\nsave2:\n${cp2}`);
+
+  // resume fails loudly when checkpoint missing
+  const nocp = vteam(repo19, "resume", "DEMO-2");
+  check("resume exits 1 when checkpoint missing", nocp.status === 1, nocp.stderr);
+  check("resume error message is specific", /no checkpoint/.test(nocp.stderr), nocp.stderr);
+
+  // vteam checkpoint save writes a file; query reads it back
+  vteam(repo19, "checkpoint", "save", "DEMO-1", "qa");
+  const qfinal = vteam(repo19, "checkpoint", "query", "DEMO-1");
+  check("after save, query reflects new lane", /qa/.test(qfinal.stdout), qfinal.stdout);
+}
+
 console.log(`\n${failed === 0 ? "E2E: GREEN" : "E2E: RED"} — ${n - failed}/${n} checks passed`);
 process.exit(failed === 0 ? 0 : 1);
