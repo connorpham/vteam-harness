@@ -20,7 +20,8 @@ inside the same /dev pipeline, the same evidence rules, the same gates.
 | `backend-specialist` | API contracts, data modeling, transactions, concurrency, query performance | Endpoints, schema/migrations, background jobs, caching, backend bugs/slowness |
 | `frontend-mobile-specialist` | Component architecture, state, rendering perf, design fidelity, accessibility, mobile | Screens from a design source, UI bugs, layout/interaction, web vitals |
 | `devops-cloud-specialist` | CI/CD, containers/K8s, IaC, observability, deploy safety | Pipeline failures, Dockerfiles, deploy config, secrets handling, "works locally not in CI" |
-| `ai-data-specialist` | LLM integration, agents/RAG, evals, data pipelines | Model API features, prompt/tool design, retrieval quality, data transformations |
+| `ai-data-specialist` | LLM integration, agents/RAG, evals, AI feature data prep | Model API features, prompt/tool design, retrieval quality, eval/embedding data prep |
+| `data-engineer-specialist` | Warehouse/lakehouse modeling, ELT (dbt/orchestrators), streaming, data quality contracts, analytical cost/perf | Data pipelines, warehouse schemas, ingestion/backfills, slow or expensive analytical queries, data quality incidents |
 | `security-specialist` | Threat modeling, authn/authz, injection classes, crypto usage, supply chain (defensive scope) | Security review of a diff/PR, auth flows, untrusted-input handling, hardening tickets, dependency audits |
 | `qa-automation-specialist` | Test strategy, E2E frameworks, flaky-test forensics, test data, CI test infra | Writing/restructuring automated tests, flaky-test hunts, slow suites, test harness work (dev-lane; /qa stays verify-only) |
 
