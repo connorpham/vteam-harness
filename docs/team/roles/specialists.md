@@ -21,6 +21,7 @@ inside the same /dev pipeline, the same evidence rules, the same gates.
 | `frontend-mobile-specialist` | Component architecture, state, rendering perf, design fidelity, accessibility, mobile | Screens from a design source, UI bugs, layout/interaction, web vitals |
 | `devops-cloud-specialist` | CI/CD, containers/K8s, IaC, observability, deploy safety | Pipeline failures, Dockerfiles, deploy config, secrets handling, "works locally not in CI" |
 | `ai-data-specialist` | LLM integration, agents/RAG, evals, data pipelines | Model API features, prompt/tool design, retrieval quality, data transformations |
+| `security-specialist` | Threat modeling, authn/authz, injection classes, crypto usage, supply chain (defensive scope) | Security review of a diff/PR, auth flows, untrusted-input handling, hardening tickets, dependency audits |
 
 ## Dispatch rules
 
