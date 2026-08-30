@@ -207,7 +207,11 @@ spec); otherwise proceed.
 - **UI change → PROPER EVIDENCE, machine-guarded:**
   1. Start the dev server, capture with `node .vteam/profiles/nextjs-prisma/scripts/ui-evidence.mjs` —
      it signs in through the app's REAL auth flow (the profile's auth strategy),
-     no forged cookies, so the images show what a real user sees. Images go to
+     no forged cookies, so the images show what a real user sees. The run is
+     **HEADED by default** — the browser visibly opens and walks each screen at
+     a human-followable pace, so the owner can WATCH the app being used like a
+     real user (the same standard the QA lane holds). Pass `--headless` only on
+     machines with no display (CI sets it automatically). Images go to
      `{paths.evidence}/<TICKET>/dev/` — the root layer belongs to QA; two lanes,
      two directories, so their gates never red each other. One image per
      criterion, named `NN_<description>.png`.
