@@ -22,6 +22,7 @@ inside the same /dev pipeline, the same evidence rules, the same gates.
 | `devops-cloud-specialist` | CI/CD, containers/K8s, IaC, observability, deploy safety | Pipeline failures, Dockerfiles, deploy config, secrets handling, "works locally not in CI" |
 | `ai-data-specialist` | LLM integration, agents/RAG, evals, data pipelines | Model API features, prompt/tool design, retrieval quality, data transformations |
 | `security-specialist` | Threat modeling, authn/authz, injection classes, crypto usage, supply chain (defensive scope) | Security review of a diff/PR, auth flows, untrusted-input handling, hardening tickets, dependency audits |
+| `qa-automation-specialist` | Test strategy, E2E frameworks, flaky-test forensics, test data, CI test infra | Writing/restructuring automated tests, flaky-test hunts, slow suites, test harness work (dev-lane; /qa stays verify-only) |
 
 ## Dispatch rules
 
