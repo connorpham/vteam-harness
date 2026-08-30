@@ -19,15 +19,23 @@
 // Auth strategy: ./auth.mjs (swap via EVD_AUTH_MODULE).
 //
 // Uses the machine's installed Chrome (channel: "chrome").
+//
+// HEADED by default: the browser visibly opens and walks each shot with a
+// human-followable pace (slowMo) — the owner watches the app being used like a
+// real user, the same standard the QA lane already holds ("a run the user
+// could watch"). Headless is the EXCEPTION, not the default: pass --headless
+// or set CI, for machines with no display.
 
 import { chromium } from "playwright";
 import { readFileSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { loadAuth } from "./auth.mjs";
 
-const [ticket, shotsFile] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const HEADLESS = args.includes("--headless") || !!process.env.CI;
+const [ticket, shotsFile] = args.filter((a) => a !== "--headless");
 if (!ticket || !shotsFile) {
-  console.error("usage: node ui-evidence.mjs <TICKET> <shots.json>");
+  console.error("usage: node ui-evidence.mjs <TICKET> <shots.json> [--headless]");
   process.exit(1);
 }
 
@@ -44,7 +52,13 @@ const shots = JSON.parse(readFileSync(shotsFile, "utf8"));
 mkdirSync(OUT, { recursive: true });
 
 const signIn = await loadAuth();
-const browser = await chromium.launch({ channel: "chrome" });
+// headed runs pace every action so a human can follow what the "user" does
+const browser = await chromium.launch({
+  channel: "chrome",
+  headless: HEADLESS,
+  slowMo: HEADLESS ? 0 : 300,
+});
+if (!HEADLESS) console.log("HEADED run — watch the browser: it signs in and walks each screen like a real user (use --headless on machines with no display)");
 let failed = 0;
 for (const { user: u, path, file, label, viewport, anon, click, fill } of shots) {
   const context = await browser.newContext({ viewport: viewport ?? { width: 1280, height: 800 } });

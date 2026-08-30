@@ -1,8 +1,8 @@
 {
-  "version": "0.13.1",
+  "version": "0.14.0",
   "files": {
     ".claude/skills/ba/SKILL.md": "ed10f92a30352a73c532cc37b8db9cae7d6ae02e5e89129346d93f36583ff743",
-    ".claude/skills/dev/SKILL.md": "1a5f5264d65221798bc2cdf4de0c36e1f7761e32e6c3978d51fdcdb71a56645a",
+    ".claude/skills/dev/SKILL.md": "5bd39fca0d2f7af9945b43b31eb75d2073e0dad819f8b7498fa98808ad3ef0cf",
     ".claude/skills/docs/SKILL.md": "2f3c91f285069ee44ab89beac2957df60da79931c66f7e326ec1007432bdd5c0",
     ".claude/skills/guidelines/SKILL.md": "139f8d610f5cfbad85e1729d871f9d4be6038cec6a55f422cdc8fb254b871cec",
     ".claude/skills/plan/SKILL.md": "f12c8e53cdf51fac665c4a15c64cd7137ca904fd910184be798a42fb77d41233",
@@ -55,6 +55,7 @@
     "docs/team/roles/devops.md": "103916d7e212da918c247734df4806658f5000f1e9b7d4f88dfe0bfab7da59e3",
     "docs/team/roles/pm.md": "4771b25dac7ba17defa27c6d42b2d708d701e64f9fe6dd33a56179d2bedaace5",
     "docs/team/roles/qa.md": "25bfd8b1ac7e7efd457e1d5b065b38af5673899b45a6c69ee75d42c6ac4e55e7",
-    "docs/team/roles/sa.md": "5e8bf600f0f436bc742775b50dee27e4562839d710ffff3950747d8e1857df5f"
+    "docs/team/roles/sa.md": "5e8bf600f0f436bc742775b50dee27e4562839d710ffff3950747d8e1857df5f",
+    "docs/team/roles/specialists.md": "5e084d1704545bb16908ee589d07a6c0b3f0483cb1df37e2dd0b64024d156aff"
   }
 }
