@@ -74,7 +74,8 @@ const repo = freshRepo("t1");
     /ALLOW_PUSH_MAIN=1/.test(r.stdout) && /PR/.test(r.stdout), r.stdout.slice(-500));
   for (const f of ["vteam.config.yaml", ".vteam/scripts/gate.py", ".vteam/manifest.json",
     ".vteam/scripts/lib/ctx.py", ".vteam/scripts/lib/ctx.mjs", ".vteam/scripts/lib/ctx.sh",
-    ".claude/skills/team/SKILL.md", ".githooks/pre-push",
+    ".claude/skills/team/SKILL.md", ".claude/agents/backend-specialist.md",
+    ".githooks/pre-push",
     ".github/workflows/vteam-gate.yml", "docs/pm/log.md", "docs/backlog/.gitkeep"]) {
     check(`created ${f}`, fs.existsSync(path.join(repo, f)));
   }

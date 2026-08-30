@@ -25,7 +25,11 @@ export function render(wf, ctx) {
   };
 }
 
-/** Post-step: install the SessionStart hook. Two writes, both non-destructive:
+/** Post-step: install the specialist subagents and the SessionStart hook.
+ * Subagents (core/agents/*.md → .claude/agents/) follow the same
+ * non-destructive rule as the hook: written when absent, a user-edited copy
+ * is kept — loudly, never silently.
+ * Then the SessionStart hook. Two writes, both non-destructive:
  * the hook script (a user-edited copy is kept — loudly, never silently), and a
  * SessionStart entry merged into .claude/settings.json — parsed and added only
  * when absent; when the entry is already there the file is not rewritten, so
@@ -36,6 +40,25 @@ export function pointers(root) {
   const changed = [];
   const settingsRel = ".claude/settings.json";
   const skip = (msg) => { console.log(`⚠ claude-code: ${msg}`); return changed; };
+
+  // 0) the specialist subagents, from the packaged core/agents/
+  const agentsSrc = path.join(pkgRoot, "core", "agents");
+  if (fs.existsSync(agentsSrc)) {
+    for (const f of fs.readdirSync(agentsSrc).filter((n) => n.endsWith(".md")).sort()) {
+      const rel = `.claude/agents/${f}`;
+      const wantAgent = fs.readFileSync(path.join(agentsSrc, f), "utf8");
+      const abs = path.join(root, ".claude", "agents", f);
+      const haveAgent = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
+      if (haveAgent === null) {
+        fs.mkdirSync(path.dirname(abs), { recursive: true });
+        fs.writeFileSync(abs, wantAgent);
+        changed.push(rel);
+      } else if (haveAgent !== wantAgent) {
+        console.log(`⚠ claude-code: ${rel} differs from the packaged version — kept YOURS ` +
+          "(delete it and re-run vteam update for a fresh copy)");
+      }
+    }
+  }
 
   // 1) the hook script, from the packaged template
   const want = fs.readFileSync(
