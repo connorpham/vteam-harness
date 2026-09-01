@@ -16,3 +16,6 @@ evd/**
 .vteam/**/__pycache__/
 # vteam: machine-local code-map index (rebuild anytime: code_map.py build)
 .vteam/map.json
+
+# vteam: QA journey scripts are re-runnable evidence — text, so they commit
+!evd/**/*.mjs

@@ -43,7 +43,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 ```bash
 npx vteam-harness audit    # 1. grade this repo 0-100. No install, no writes, no network.
 npx vteam-harness init     # 2. install the team + the gates
-npx vteam-harness doctor   # 3. prove the install: every selftest (22 today) + provider preflight
+npx vteam-harness doctor   # 3. prove the install: every selftest (25 today) + provider preflight
 ```
 
 Then open your agent tool and run `/team` to start a workday, or `/dev PROJ-12` for one ticket.
@@ -158,7 +158,7 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 
 | Law | What it means in practice |
 |---|---|
-| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (22 today). An always-green check gets fixed or deleted. |
+| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (25 today). An always-green check gets fixed or deleted. |
 | **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable lands in a committed file or the tracker, and every outward write is **read back** to confirm it landed. |
 | **A verdict is valid only for the code it examined** | Each QA verdict pins two anchors: `COMMIT:` for the code and `VERIFIED-AT:` for the clock. When the code moves, the verdict expires and the ticket returns to the queue. A verdict that can't be anchored is red — *"cannot verify"* and *"verified clean"* are different answers. |
 | **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip, with a labelled, reversible paper trail. Real money, legal, credentials and data deletion are never auto-decided. |
@@ -331,6 +331,7 @@ Knobs worth setting deliberately:
 - **`autonomy.self_merge`** — whether an agent may merge its own green PR. Only honoured at `level: full`, and you can keep it `false` there.
 - **`review.high_stakes_terms`** — the words that mean money or irreversibility *in your product*. A diff mentioning them gets an extra reviewer at a higher tier.
 - **`docs.task_context`** — which background documents `/dev` must read for which kind of ticket. A file listed here but missing is reported loudly, never guessed around.
+- **`app:` (start / url / health / open_files / headed)** — the runnable app the dev/QA lanes drive. With it set, env bring-up is a quotable proof (`app_check.sh` → `APP: UP`), QA journeys open a **real Chrome window** through `browser.mjs` (scripts kept as re-runnable evidence), and `/dev` opens the files it edits in your editor (`open_files.sh`, Cursor/VS Code auto-detected). Empty on repos with no web app; `headed: never` keeps unattended shifts windowless without dropping a single screenshot.
 - **`team.size`** — set it to your real headcount. Above 1, the ledger's `Actor` column becomes mandatory (a gate, not a convention) and reporting splits per person.
 - **`team.hours_per_day` / `team.loop_budget_per_day`** — a workday in hours (so estimates can be written `12h`), and the per-item daily dispatch ceiling above which `graph_check` calls thrash what it is.
 
@@ -350,7 +351,7 @@ Eight commands, one journey. Gates exit 1; the two mirrors (`board`, `graph`) al
 |---|---|
 | [`audit [--json]`](#audit--measure-before-you-believe) | grade any repo's agent accountability 0–100. No install needed, never writes, no network. |
 | [`init [--yes]`](#init--install-validated-before-the-first-byte) | install into the current repo. Every flag value is validated before the first byte is written; invalid input exits 1 having written nothing. |
-| [`doctor [--json]`](#doctor--prove-the-install) | prove the install: prerequisites, config parse, manifest integrity, hook wiring, every selftest (discovered dynamically — 22 today), live provider pings. |
+| [`doctor [--json]`](#doctor--prove-the-install) | prove the install: prerequisites, config parse, manifest integrity, hook wiring, every selftest (discovered dynamically — 25 today), live provider pings. |
 | [`update`](#update--refresh-without-touching-your-files) | refresh framework files by manifest hash — your edited copies are kept, the new version parked as `*.new`. |
 | [`board [--port N]`](#board--the-read-only-dashboard) | the read-only local dashboard on 127.0.0.1. |
 | [`graph [--json\|--dot]`](#graph--the-work-graph-made-visible) | ready set, blocked set, dangling edges, cycles. Always exits 0 — the mirror; `graph_check.py` is the gate. |
@@ -558,7 +559,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **142 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **155 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 

@@ -34,6 +34,15 @@ stack:
   profile: generic
   package_manager: npm
 
+app:
+  # this repo is a CLI/framework — no runnable web app: app_check.sh prints
+  # SKIP and the lanes' Environment block renders the "not configured" branch
+  start: ""
+  url: ""
+  health: ""
+  open_files: auto
+  headed: auto
+
 git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"

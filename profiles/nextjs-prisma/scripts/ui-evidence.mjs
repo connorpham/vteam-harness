@@ -15,8 +15,8 @@
 //           after input + blur
 //   viewport (optional {width,height}) — match the design frame box; default 1280×800
 // Password comes from EVD_PASSWORD (no default ships — a framework must not
-// carry seed passwords). Base URL: EVD_BASE_URL (default http://localhost:3000).
-// Auth strategy: ./auth.mjs (swap via EVD_AUTH_MODULE).
+// carry seed passwords). Base URL: EVD_BASE_URL → config app.url →
+// http://localhost:3000. Auth strategy: ./auth.mjs (swap via EVD_AUTH_MODULE).
 //
 // Uses the machine's installed Chrome (channel: "chrome").
 //
@@ -32,7 +32,7 @@ import { execSync } from "node:child_process";
 import { loadAuth } from "./auth.mjs";
 
 const args = process.argv.slice(2);
-const HEADLESS = args.includes("--headless") || !!process.env.CI;
+let HEADLESS = args.includes("--headless") || !!process.env.CI; // + app.headed: never, read below
 const [ticket, shotsFile] = args.filter((a) => a !== "--headless");
 if (!ticket || !shotsFile) {
   console.error("usage: node ui-evidence.mjs <TICKET> <shots.json> [--headless]");
@@ -40,16 +40,23 @@ if (!ticket || !shotsFile) {
 }
 
 const ROOT = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
-const BASE = process.env.EVD_BASE_URL ?? "http://localhost:3000";
-const PASSWORD = process.env.EVD_PASSWORD;
-const EVD = (() => {
+const cfg = (key) => { // one optional config value; absent key → ""
   try {
-    return execSync("python3 .vteam/scripts/lib/ctx.py paths.evidence", { cwd: ROOT, encoding: "utf8" }).trim();
-  } catch { return "evd"; }
-})();
+    return execSync(`python3 .vteam/scripts/lib/ctx.py ${key}`,
+      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch { return ""; }
+};
+// base URL: env override → the repo's own app.url (vteam.config.yaml) → default
+const BASE = process.env.EVD_BASE_URL ?? (cfg("app.url") || "http://localhost:3000");
+const PASSWORD = process.env.EVD_PASSWORD;
+const EVD = cfg("paths.evidence") || "evd";
 const OUT = `${ROOT}/${EVD}/${ticket}/dev`; // DEV lane writes under dev/ — the root layer belongs to QA
 const shots = JSON.parse(readFileSync(shotsFile, "utf8"));
 mkdirSync(OUT, { recursive: true });
+
+// config app.headed: never = an unattended shift — same as --headless (the
+// visibility drops, never the screenshots)
+if (cfg("app.headed") === "never") HEADLESS = true;
 
 const signIn = await loadAuth();
 // headed runs pace every action so a human can follow what the "user" does

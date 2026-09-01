@@ -50,6 +50,38 @@ function routingBlock(tool, root) {
   return r.stdout.trimEnd() + "\n" + usage + "\n";
 }
 
+/** The Environment block for the lanes that run the product (dev/qa/verify):
+ * the app's resolved coordinates + the ONE headed mechanism, so "HEADED" in a
+ * rendered workflow names commands instead of a vibe. Built from cfg.app in JS
+ * — deliberately NOT a render() template group: an unset `app:` section must
+ * produce the "not configured" branch, never a literal `{app.url}` in text. */
+const ENV_WORKFLOWS = new Set(["dev", "qa", "verify"]);
+function envBlock(cfg) {
+  const app = (cfg && typeof cfg.app === "object" && !Array.isArray(cfg.app)) ? cfg.app : {};
+  const start = String(app.start ?? "").trim();
+  const url = String(app.url ?? "").trim();
+  if (!start && !url) {
+    return "> **Environment:** `app:` is not configured in vteam.config.yaml — env bring-up is\n" +
+      "> manual this session, and `app_check.sh` prints `APP: SKIP`. Set `app.start` +\n" +
+      "> `app.url` (+ optional `app.health`, `app.open_files`, `app.headed` — schema:\n" +
+      "> DESIGN.md §2) to enable the watchable session: headed Chrome via\n" +
+      "> `.vteam/scripts/browser.mjs`, health probe via `.vteam/scripts/app_check.sh`,\n" +
+      "> editor opening via `.vteam/scripts/open_files.sh`.\n\n";
+  }
+  return `> **Environment** (from \`app:\` in vteam.config.yaml — start: \`${start || "<unset>"}\` · url: ${url || "<unset>"}):\n` +
+    "> - **Bring-up:** run `app.start` in a BACKGROUND terminal (a gate never starts servers\n" +
+    ">   — it probes), then `bash .vteam/scripts/app_check.sh --wait 60` and QUOTE its\n" +
+    ">   `APP: UP` line as the bring-up proof (`--url <base>` overrides `app.url` for one run).\n" +
+    "> - **HEADED = a real Chrome window the owner can watch:** drive journeys through\n" +
+    ">   `launch`/`shot` from `.vteam/scripts/browser.mjs` (Playwright, the OS Chrome,\n" +
+    ">   `headless: false`). Preflight it: `node .vteam/scripts/browser.mjs check` — missing\n" +
+    ">   Playwright is a loud BLOCKED with the install command, never a silent headless run.\n" +
+    ">   `app.headed: never` (unattended shifts) drops only the visibility, NEVER a screenshot.\n" +
+    "> - **Work visibly:** open the files being edited in the owner's editor —\n" +
+    ">   `bash .vteam/scripts/open_files.sh <file[:line]> …` (config `app.open_files`:\n" +
+    ">   auto|code|cursor|none; a missing editor CLI skips with one line, never blocks).\n\n";
+}
+
 function workflows() {
   const dir = path.join(pkgRoot, "core", "workflows");
   return fs.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => {
@@ -73,8 +105,11 @@ export async function renderTool(tool, root, cfg,
       name,
       description: render(raw.meta.description || "", cfg),
       args: render(raw.meta.args || "", cfg), // frontmatter args carry {project.key} too
-      // guidelines is method-only — no agents spawned, no routing block needed
-      body: (name === "guidelines" ? "" : routing) + render(raw.body, cfg),
+      // guidelines is method-only — no agents spawned, no routing block needed;
+      // dev/qa/verify additionally get the Environment block (the lanes that
+      // must bring the app up and run it headed)
+      body: (name === "guidelines" ? "" : routing) +
+        (ENV_WORKFLOWS.has(name) ? envBlock(cfg) : "") + render(raw.body, cfg),
     };
     const out = adapter.render(wf, ctx);
     write(out.path, out.text);

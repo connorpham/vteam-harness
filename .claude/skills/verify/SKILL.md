@@ -1,7 +1,7 @@
 ---
 name: verify
 description: "Create and run the verification gate for this repo — the profile's ordered step manifest (ledgers → lockfile → lint → types → unit → build → reality checks → integration → e2e), with exact closing lines recorded. Also the standard for WRITING tests — expected values cite the spec or the schema, every behavior gets a boundary pair, no tests that mirror the implementation. Invoked standalone and as the /dev verify step, and before declaring ANY code change done."
-argument-hint: "[all|unit|e2e|gate] [--filter <pattern>] [--headed]"
+argument-hint: "[all|unit|e2e|gate] [--filter <pattern>]"
 ---
 
 > **Model routing for this tool** (from `model-routing.data.yaml`, snapshot 2026-08-17):
@@ -9,6 +9,13 @@ argument-hint: "[all|unit|e2e|gate] [--filter <pattern>] [--headed]"
 > Roles → tiers: ba-challenger: standard · ba-draft: standard · dev-r1: workhorse · dev-r2: standard (high-stakes: workhorse) · dev-r3: workhorse · explore: utility · qa-challenger: standard · sa-background: workhorse · sa-challenger: workhorse · sa-writer: workhorse
 > Resolve at runtime: `python3 .vteam/scripts/model_route.py <role> --tool claude-code [--high-stakes]` — high-stakes diffs (review.high_stakes_*) bump dev-r2 to the workhorse tier.
 > Spawning a subagent: pass the resolved name as the Agent tool's `model` parameter.
+
+> **Environment:** `app:` is not configured in vteam.config.yaml — env bring-up is
+> manual this session, and `app_check.sh` prints `APP: SKIP`. Set `app.start` +
+> `app.url` (+ optional `app.health`, `app.open_files`, `app.headed` — schema:
+> DESIGN.md §2) to enable the watchable session: headed Chrome via
+> `.vteam/scripts/browser.mjs`, health probe via `.vteam/scripts/app_check.sh`,
+> editor opening via `.vteam/scripts/open_files.sh`.
 
 
 # /verify — the verification gate
