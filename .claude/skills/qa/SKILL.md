@@ -1,7 +1,7 @@
 ---
 name: qa
 description: "VERIFY-ONLY QA pipeline for a ticket a dev claims done (the spec is the oracle). Reads the ticket + spec + schema to derive expected behavior → designs 2–5 test cases (exact repro, boundary, whole-screen sanity, read-only DB verify for writes) → self-provisions missing data through the REAL UI flow (write-gated) → runs them HEADED in the browser → collects evidence (named screenshots, annotated images with in-image captions) → cross-checks every ticket claim against an evidence file → machine gate (evd_check.py) → challenger sign-off → plain-language REPORT.md anyone can read → tracker comment posted once both machine gates are green, ticket transition per the full-auto policy. NO code change, NO fix — verification only."
-argument-hint: "<TICKET: VT-nnn | tracker URL> [assignee=<name>] [base=<app URL>]"
+argument-hint: "<TICKET: VT-nnn | tracker URL> [assignee=<name>] [base=<app URL — overrides config app.url for this run>]"
 ---
 
 > **Model routing for this tool** (from `model-routing.data.yaml`, snapshot 2026-08-17):
@@ -9,6 +9,13 @@ argument-hint: "<TICKET: VT-nnn | tracker URL> [assignee=<name>] [base=<app URL>
 > Roles → tiers: ba-challenger: standard · ba-draft: standard · dev-r1: workhorse · dev-r2: standard (high-stakes: workhorse) · dev-r3: workhorse · explore: utility · qa-challenger: standard · sa-background: workhorse · sa-challenger: workhorse · sa-writer: workhorse
 > Resolve at runtime: `python3 .vteam/scripts/model_route.py <role> --tool claude-code [--high-stakes]` — high-stakes diffs (review.high_stakes_*) bump dev-r2 to the workhorse tier.
 > Spawning a subagent: pass the resolved name as the Agent tool's `model` parameter.
+
+> **Environment:** `app:` is not configured in vteam.config.yaml — env bring-up is
+> manual this session, and `app_check.sh` prints `APP: SKIP`. Set `app.start` +
+> `app.url` (+ optional `app.health`, `app.open_files`, `app.headed` — schema:
+> DESIGN.md §2) to enable the watchable session: headed Chrome via
+> `.vteam/scripts/browser.mjs`, health probe via `.vteam/scripts/app_check.sh`,
+> editor opening via `.vteam/scripts/open_files.sh`.
 
 
 # /qa — verify a delivered ticket against the spec (QA lane, no code)
@@ -109,7 +116,7 @@ appendix; it commits with the V7.4 dossier so the link outlives the session):
   data; ② else look the frame up by screen code in the design index. A UI TC
   compares the real screen against it (`annotate.py diff` → `design_vs_app.png`),
   judged at block/color/text level. The dev submitted a committed `fidelity.md`
-  → READ it: re-run `node .vteam/profiles/nextjs-prisma/scripts/ui_fidelity.mjs <TICKET>` to confirm the
+  → READ it: re-run `node .vteam/profiles/generic/scripts/ui_fidelity.mjs <TICKET>` to confirm the
   numbers still hold on the build being verified, and audit the INTENTIONAL
   deviation lines — does the declared reason stand (real a11y/spec, or an
   excuse)? QA still designs its own boundaries — never take TCs from the dev's
@@ -158,10 +165,22 @@ Plan in the verify-sheet — usually 2–5 TCs:
 
 ## V2b — ENV BRING-UP
 
-- DB up → migrations clean → dev server up → health check returns 200/3xx.
+- DB up → migrations clean → dev server up: run the configured `app.start` in a
+  BACKGROUND terminal (the Environment block above carries the resolved values;
+  gates never start servers — they probe).
+- **Health proof, machine-quotable:** `bash .vteam/scripts/app_check.sh --wait 60`
+  (a `base=` argument on this run → pass it as `--url <base>`). PASTE the
+  `APP: UP …` line into the verify-sheet — that line IS the bring-up proof.
+  `APP: DOWN` → BLOCKED with the printed unblock path. `APP: SKIP` → the repo
+  has no `app:` config: ask the owner for the URL (and propose the `app:`
+  section — schema DESIGN.md §2) before any TC runs.
 - Resolve test accounts per role (seed data or existing rows, read-only). No
   usable account → V3 (create via the app's real sign-up flow, write-gated).
-- Browser: HEADED — a run the user could watch.
+- Browser: HEADED — a run the user could watch, and the mechanism is named:
+  a REAL Chrome window via `.vteam/scripts/browser.mjs`. Preflight it NOW:
+  `node .vteam/scripts/browser.mjs check` — missing Playwright is BLOCKED with
+  the printed install command, never a silent headless run. (`app.headed:
+  never` — unattended shifts — drops only the visibility, never a screenshot.)
 
 ## V3 — PROVISION DATA VIA THE REAL UI FLOW (only if V2 found gaps)
 
@@ -223,6 +242,16 @@ the verdict. **Required on every executed UI TC, not just failures**: an
 unannotated full-page shot makes the reader guess which pixels mattered, and the
 caption is what a stranger reads instead of asking you.
 
+**The headed mechanism — one journey script per TC, kept as evidence:** write
+`evd/<TICKET>/TC_<n>/journey.mjs` importing `launch`/`shot` from
+`.vteam/scripts/browser.mjs`, walking EXACTLY the V2 journey (ENTRY as clicks,
+STEPS in order, AFTER including the reload, BACK), calling
+`shot(page, dir, n, "<what_it_shows>")` at every meaningful step — the helper
+enforces the `NN_<what>.png` naming by construction. `node TC_<n>/journey.mjs`
+opens a real Chrome window the owner can watch. The script STAYS in the TC
+folder: it is evidence, and the next QA session re-runs the same journey
+against a new build instead of re-improvising it.
+
 ```bash
 python3 .vteam/scripts/annotate.py box \
   --img evd/<TICKET>/TC_<n>/03_result.png --rect X,Y,W,H \
@@ -237,6 +266,8 @@ evd/<TICKET>/
 ├── debate.md              # V6 cards (verifier + challenger)
 ├── data_prep/             # V3 runs, if any
 └── TC_<n>/
+    ├── journey.mjs        # the headed run itself (browser.mjs launch/shot) —
+    │                     #   re-runnable evidence, committed with the dossier
     ├── manifest.md        # the journey, in plain language — gate-checked:
     │                     #   RESULT: PASS|FAIL|BLOCKED
     │                     #   AS: staff@demo (role STAFF)
@@ -375,8 +406,10 @@ verify-sheet · spec §/schema citations · debate.md · remaining evidence file
 - [ ] V0: assignee matches; status verifiable; announced (incl. WHICH code:
       protected branch or PR branch)
 - [ ] Expected derived from spec/schema with citations (never from ticket prose or code)
-- [ ] Every TC ran HEADED this session against the running app; blocked TCs carry
-      reason + unblock path
+- [ ] Every TC ran HEADED this session against the running app — bring-up proven
+      by app_check's `APP: UP` line quoted in the verify-sheet, journeys driven
+      through `browser.mjs` journey scripts kept in their TC folders; blocked
+      TCs carry reason + unblock path
 - [ ] Boundary TC + whole-screen sanity TC ran (not only the happy path)
 - [ ] Writes verified via read-only DB checks; all test data UI-created, per the
       write gate (ask when present / minutes-first when absent), ZZTEST-marked,

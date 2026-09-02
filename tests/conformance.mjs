@@ -167,6 +167,10 @@ const FIXTURES = [
       "docs.task_context.always": [],
       "docs.task_context.by_label": {},
       "stack.profile": "generic",
+      "app.start": "",
+      "app.url": "",
+      "app.open_files": "auto",
+      "app.headed": "auto",
       "git.branch_pattern": "^(feat|fix)/{key}-[0-9]+-",
       "git.code_paths": ["src/"],
       "tracker.done_statuses": ["Done", "Closed", "Resolved"],
@@ -183,6 +187,11 @@ const FIXTURES = [
       "paths.evidence": "evd",
       "tracker.review_status": "In Review",
       "stack.profile": "generic",
+      // the shell subset MUST keep reading these: app_check.sh/open_files.sh
+      // resolve them through vteam_cfg, so the section must stay block-style
+      "app.url": "",
+      "app.open_files": "auto",
+      "app.headed": "auto",
     },
   },
   {

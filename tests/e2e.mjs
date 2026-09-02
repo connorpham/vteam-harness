@@ -341,6 +341,46 @@ console.log("14. SessionStart doctrine re-injection");
     /gate|evidence|done/i.test(hk.stdout), hk.stdout + hk.stderr);
 }
 
+// ── 14c. app: env — scripts installed, Environment block rendered per config ─
+console.log("14c. app: env — scripts installed, Environment block rendered");
+{
+  // the env toolchain ships with core/scripts on every install
+  for (const f of ["app_check.sh", "browser.mjs", "open_files.sh"]) {
+    check(`installed .vteam/scripts/${f}`, fs.existsSync(path.join(repo, ".vteam", "scripts", f)));
+  }
+  // t1 has an EMPTY app: section → the lanes render the "not configured" branch
+  const qa1 = fs.readFileSync(path.join(repo, ".claude", "skills", "qa", "SKILL.md"), "utf8");
+  check("empty app: renders the 'not configured' Environment branch",
+    /\*\*Environment:\*\*/.test(qa1) && /not configured/.test(qa1), qa1.slice(0, 600));
+  // a configured app: → update re-renders with resolved values + the mechanism
+  const dir = freshRepo("t14c");
+  vteam(dir, "init", "--yes", "--name", "Demo", "--key", "DEMO", "--language", "en",
+    "--profile", "generic", "--tracker", "markdown", "--design", "none",
+    "--autonomy", "assisted", "--tools", "claude-code,cursor");
+  const cfgF = path.join(dir, "vteam.config.yaml");
+  fs.writeFileSync(cfgF, fs.readFileSync(cfgF, "utf8")
+    .replace('  start: ""', "  start: npm run dev")
+    .replace('  url: ""', "  url: http://localhost:3456"));
+  const up = vteam(dir, "update");
+  check("update after configuring app: exits 0", up.status === 0, up.stdout + up.stderr);
+  const qa2 = fs.readFileSync(path.join(dir, ".claude", "skills", "qa", "SKILL.md"), "utf8");
+  check("qa skill carries the resolved app values + the headed mechanism",
+    /start: `npm run dev`/.test(qa2) && /http:\/\/localhost:3456/.test(qa2) &&
+    /app_check\.sh --wait 60/.test(qa2) && /browser\.mjs/.test(qa2), qa2.slice(0, 900));
+  const dev2 = fs.readFileSync(path.join(dir, ".claude", "skills", "dev", "SKILL.md"), "utf8");
+  check("dev skill tells the lane to open edited files in the owner's editor",
+    /open_files\.sh/.test(dev2) && /\*\*Environment\*\*/.test(dev2), dev2.slice(0, 900));
+  const gl = fs.readFileSync(path.join(dir, ".claude", "skills", "guidelines", "SKILL.md"), "utf8");
+  check("guidelines (method-only) gets NO Environment block", !/\*\*Environment/.test(gl));
+  const qaCursor = fs.readFileSync(path.join(dir, ".cursor", "commands", "qa.md"), "utf8");
+  check("the mechanism is tool-neutral: cursor's qa render names browser.mjs too",
+    /browser\.mjs/.test(qaCursor) && /app_check\.sh/.test(qaCursor), qaCursor.slice(0, 600));
+  // and the dead flag stays dead: /verify no longer advertises --headed
+  const vf = fs.readFileSync(path.join(dir, ".claude", "skills", "verify", "SKILL.md"), "utf8");
+  check("verify's dead --headed flag is gone (headedness lives in app.headed)",
+    !/--headed/.test(vf), vf.split("\n").slice(0, 6).join("\n"));
+}
+
 // ── 15. board: read-only dashboard over the proof trail ─────────────────────
 console.log("15. board — read-only dashboard");
 {

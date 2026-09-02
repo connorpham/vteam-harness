@@ -167,6 +167,14 @@ spec); otherwise proceed.
 
 - `git fetch && git switch -c <type>/<TICKET>-<slug> origin/<protected>` (never
   commit on the protected branch).
+- **Work like a developer, visibly.** Before editing a file, put it on the
+  owner's screen: `bash .vteam/scripts/open_files.sh <file[:line]> …` (config
+  `app.open_files`; `none` or a missing editor CLI skips with one line — it
+  never blocks). Bring the app up per the Environment block (`app.start` in a
+  background terminal → `bash .vteam/scripts/app_check.sh --wait 60`) and keep
+  the screen you are changing in view while you build — watch it headed via
+  `.vteam/scripts/browser.mjs`; a dev who never saw the screen ships blind.
+  API/backend tickets skip the browser, not the editor.
 - **UI work — design from the design source, consistency from the design
   language, quality from the UI rules:**
   0. Read the design language FIRST ({paths.design}/design-language.md —
@@ -205,13 +213,20 @@ spec); otherwise proceed.
   in the task-sheet. New behavior needs a new test whose expected value cites
   spec/schema.
 - **UI change → PROPER EVIDENCE, machine-guarded:**
-  1. Start the dev server, capture with `node .vteam/profiles/nextjs-prisma/scripts/ui-evidence.mjs` —
-     it signs in through the app's REAL auth flow (the profile's auth strategy),
-     no forged cookies, so the images show what a real user sees. The run is
+  1. Bring the app up (Environment block: `app.start` in a background terminal,
+     then quote `bash .vteam/scripts/app_check.sh --wait 60`'s `APP: UP` line in
+     the task-sheet), and capture with the stack profile's evidence script —
+     `node .vteam/profiles/{stack.profile}/scripts/ui-evidence.mjs` — it signs
+     in through the app's REAL auth flow (the profile's auth strategy), no
+     forged cookies, so the images show what a real user sees. The run is
      **HEADED by default** — the browser visibly opens and walks each screen at
      a human-followable pace, so the owner can WATCH the app being used like a
      real user (the same standard the QA lane holds). Pass `--headless` only on
-     machines with no display (CI sets it automatically). Images go to
+     machines with no display (CI sets it automatically; config `app.headed:
+     never` does the same for unattended shifts). Base URL defaults from config
+     `app.url` (`EVD_BASE_URL` still overrides). A profile that ships no
+     evidence script → capture through `.vteam/scripts/browser.mjs` journeys
+     under the SAME rules (real sign-in, one image per criterion). Images go to
      `{paths.evidence}/<TICKET>/dev/` — the root layer belongs to QA; two lanes,
      two directories, so their gates never red each other. One image per
      criterion, named `NN_<description>.png`.
@@ -255,7 +270,7 @@ NOT DONE = NO REVIEWERS YET:
    - `fidelity.json` — key elements' selectors + expected values **taken from the
      design node data** (never from your own code — measuring code with code is
      self-grading).
-   - `node .vteam/profiles/nextjs-prisma/scripts/ui_fidelity.mjs <TICKET>` → generates `fidelity.md`.
+   - `node .vteam/profiles/{stack.profile}/scripts/ui_fidelity.mjs <TICKET>` → generates `fidelity.md`.
      WRONG deviations → fix code, re-measure. Justified deviations → declare an
      `intent` from the CLOSED list (`a11y:` / `spec:` / `responsive:` + reason) —
      the tool rejects intents outside the list.

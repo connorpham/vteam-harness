@@ -9,7 +9,9 @@ Checks, for {paths.evidence}/<TICKET>/:
      clock: squash/rebase merges discard branch shas, and the timestamp is
      then the only thing that dates the verdict — the two-anchor law) — no
      <placeholder> tokens; FAIL/NEW-BUG verdicts carry Severity + Origin lines.
-  2. A top-level manifest.md exists.
+  2. A top-level manifest.md exists, and verifysheet.md (the V1/V2 plan —
+     EXPECTED + TC journeys, written BEFORE any browser opened) exists and
+     names at least one TC.
   3. debate.md exists with ≥2 cards (verifier + challenger headings).
   4. Every TC_* folder has manifest.md with a RESULT: line, and — unless BLOCKED —
      ≥1 .png step screenshot that OPENS, is readable and is not a blank
@@ -147,6 +149,18 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
 
     if not (evd / "manifest.md").is_file():
         errs.append("MISSING manifest.md (requirement overview + TC list + per-TC verdicts)")
+    # the PLAN is part of the dossier: V1/V2 write the verify-sheet BEFORE any
+    # browser opens, and the workflow mandated it in prose for months while
+    # nothing checked it existed — a dossier without its plan is a run that was
+    # improvised, not designed
+    vsheet = read(evd / "verifysheet.md")
+    if not vsheet:
+        errs.append("MISSING verifysheet.md — QA designs the test plan (V1/V2: "
+                    "EXPECTED with spec citations + the TC journeys) BEFORE "
+                    "touching a browser, and the plan commits with the dossier")
+    elif "TC" not in vsheet.upper():
+        errs.append("verifysheet.md never mentions a TC — a plan that names no "
+                    "test case planned nothing (V2)")
     debate = read(evd / "debate.md")
     if not debate:
         errs.append("MISSING debate.md — no challenger signature (V6)")
@@ -315,6 +329,7 @@ def _selftest():
                   "## 1. What\nx\n## 2. How\nx\n## 3. Evidence\nTC_1: db_verify.md\n## 4. Conclusion\nok\n")
         (evd / "REPORT.md").write_text(report)
         (evd / "manifest.md").write_text("overview")
+        (evd / "verifysheet.md").write_text("plan: TC_1 covers the acceptance path (spec §1)\n")
         (evd / "debate.md").write_text("### verifier\nPASS\n### challenger\nagree\n")
         (tc / "manifest.md").write_text("TYPE: NON-UI\nRESULT: PASS\nDB_VERIFY\n")
         (tc / "db_verify.md").write_text("SELECT 1; -> 1")
@@ -331,6 +346,19 @@ def _selftest():
         (tc / "db_verify.md").write_text("SELECT 1; -> 1")
         errs, _ = check_tree(evd, 3, [])
         assert errs, "expect-tcs 3 vs 1 should red"
+
+        # m: the plan is part of the dossier — no verifysheet, and a TC-less one
+        (evd / "verifysheet.md").rename(evd / "verifysheet.md.bak")
+        errs, _ = check_tree(evd, 1, [])
+        assert any("verifysheet.md" in e for e in errs), \
+            f"a dossier without its plan must red: {errs}"
+        (evd / "verifysheet.md").write_text("we will test things carefully\n")
+        errs, _ = check_tree(evd, 1, [])
+        assert any("names no test case" in e for e in errs), \
+            f"a plan naming no TC must red: {errs}"
+        (evd / "verifysheet.md.bak").rename(evd / "verifysheet.md")
+        errs, _ = check_tree(evd, 1, [])
+        assert not errs, f"restored verifysheet must pass: {errs}"
 
         # ── the UI journey contract (a person using the product) ─────────────
         ui = evd / "TC_2"
@@ -421,9 +449,10 @@ def _selftest():
             varied.write_bytes(_png(500, 400,
                                     lambda x, y: bytes((x % 256, y % 256, (x * y) % 256))))
             assert png_problems(varied) == [], png_problems(varied)
-    print("evd_check selftest: OK (fixture green + 7 mutations red + the UI journey: "
-          "full walk green, each of AS/PRECONDITION/ENTRY/AFTER/BACK demanded by "
-          "name, 3 URL-only ENTRYs red, click-path+URL green, unannotated PASS red)")
+    print("evd_check selftest: OK (fixture green + 9 mutations red — incl. missing/"
+          "TC-less verifysheet — + the UI journey: full walk green, each of "
+          "AS/PRECONDITION/ENTRY/AFTER/BACK demanded by name, 3 URL-only ENTRYs "
+          "red, click-path+URL green, unannotated PASS red)")
 
 
 if __name__ == "__main__":

@@ -36,6 +36,19 @@ stack:
   profile: generic       # generic | node | python | nextjs-prisma  → profiles/<name>/gates.yaml
   package_manager: npm
 
+app:
+  # the running application the dev/qa lanes bring up and drive — leave empty
+  # on repos with no runnable app (CLIs, libraries): app_check.sh prints SKIP
+  start: ""              # dev-server command, e.g. "npm run dev" — the lanes run it in a
+                         # BACKGROUND terminal; gates only probe (app_check.sh), never start
+  url: ""                # where the app answers, e.g. http://localhost:3000
+                         # (/qa's base= argument overrides it for one run)
+  health: ""             # health endpoint: a path (/api/health) or a full URL; empty = probe url
+  open_files: auto       # auto | code | cursor | none — /dev opens edited files in the
+                         # owner's editor (open_files.sh; a missing CLI skips, never blocks)
+  headed: auto           # auto | never — never = unattended 24/7 shifts: the visible browser
+                         # window drops (browser.mjs/ui-evidence go headless), screenshots never do
+
 git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"

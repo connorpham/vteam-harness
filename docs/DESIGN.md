@@ -80,6 +80,17 @@ docs:
 stack:
   profile: nextjs-prisma     # selects profiles/<name>/gates.yaml
   package_manager: npm
+app:                         # the runnable application the dev/qa lanes drive;
+                             # empty section = no web app (app_check prints SKIP)
+  start: npm run dev         # dev-server command — lanes run it in a background
+                             # terminal; gates only PROBE it (app_check.sh)
+  url: http://localhost:3000 # where it answers; /qa's base= overrides per run,
+                             # ui-evidence/ui_fidelity default their base URL to it
+  health: /api/health        # a path or a full URL; empty = probe url itself
+  open_files: auto           # auto | code | cursor | none — /dev opens edited
+                             # files in the owner's editor (open_files.sh)
+  headed: auto               # auto | never — never = unattended shifts: the
+                             # visible Chrome window drops, screenshots never do
 git:
   protected_branch: main
   branch_pattern: "^(feat|fix)/{key}-[0-9]+-"

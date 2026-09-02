@@ -2,7 +2,7 @@
 name: verify
 command: /verify
 description: Create and run the verification gate for this repo — the profile's ordered step manifest (ledgers → lockfile → lint → types → unit → build → reality checks → integration → e2e), with exact closing lines recorded. Also the standard for WRITING tests — expected values cite the spec or the schema, every behavior gets a boundary pair, no tests that mirror the implementation. Invoked standalone and as the /dev verify step, and before declaring ANY code change done.
-args: "[all|unit|e2e|gate] [--filter <pattern>] [--headed]"
+args: "[all|unit|e2e|gate] [--filter <pattern>]"
 ---
 
 # /verify — the verification gate

@@ -37,13 +37,16 @@ if (!ticket) {
   process.exit(1);
 }
 const ROOT = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
-const BASE = process.env.EVD_BASE_URL ?? "http://localhost:3000";
-const PASSWORD = process.env.EVD_PASSWORD;
-const EVD = (() => {
+const cfg = (key) => { // one optional config value; absent key → ""
   try {
-    return execSync("python3 .vteam/scripts/lib/ctx.py paths.evidence", { cwd: ROOT, encoding: "utf8" }).trim();
-  } catch { return "evd"; }
-})();
+    return execSync(`python3 .vteam/scripts/lib/ctx.py ${key}`,
+      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch { return ""; }
+};
+// base URL: env override → the repo's own app.url (vteam.config.yaml) → default
+const BASE = process.env.EVD_BASE_URL ?? (cfg("app.url") || "http://localhost:3000");
+const PASSWORD = process.env.EVD_PASSWORD;
+const EVD = cfg("paths.evidence") || "evd";
 const DIR = `${ROOT}/${EVD}/${ticket}/dev`;
 const SPEC = specArg ?? `${DIR}/fidelity.json`;
 if (!existsSync(SPEC)) {

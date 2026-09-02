@@ -48,6 +48,8 @@ export const GITIGNORE_RULES = [
   "!evd/**/",
   "!evd/**/*.md",
   "!evd/**/*.json",
+  "# vteam: QA journey scripts are re-runnable evidence — text, so they commit",
+  "!evd/**/*.mjs",
   "# vteam: tokens live in .env — .env never commits",
   ".env",
   "# vteam: machine-local doctor snapshot for `vteam board`",
@@ -196,6 +198,20 @@ docs:
 stack:
   profile: ${profile}
   package_manager: ${pkgManager}
+
+app:
+  # the running application the dev/qa lanes bring up and drive — leave empty
+  # on repos with no runnable app (CLIs, libraries): app_check.sh prints SKIP.
+  # start: the dev-server command (lanes run it in a background terminal; gates
+  # only probe) · url: where it answers · health: path or full URL (empty =
+  # probe url) · open_files: auto|code|cursor|none (/dev opens edited files) ·
+  # headed: auto|never (never = unattended shifts — the visible browser drops,
+  # screenshots never do)
+  start: ""
+  url: ""
+  health: ""
+  open_files: auto
+  headed: auto
 
 git:
   protected_branch: main
