@@ -9,13 +9,15 @@
 // instead of a reminder.
 //
 // Runs from package.json's `prepublishOnly`, so `npm publish` cannot skip it.
-// Four refusals, each with the fix in the message:
+// Five refusals, each with the fix in the message:
 //   1. dirty working tree
 //   2. HEAD ≠ origin/main (behind = something is not merged yet; ahead = your
 //      commits are not on main)
 //   3. this version already exists on the registry (bump first — a clear failure
 //      BEFORE the 2FA dance, not after it)
-//   4. the test suite is not green
+//   4. the tarball would ship build artifacts (__pycache__/*.pyc — npm packs
+//      gitignored files under "files" directories; 0.15.1 shipped 3 this way)
+//   5. the test suite is not green
 // Offline: the two network checks warn loudly and step aside; the local ones stand.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -77,7 +79,25 @@ if (view.status === 0 && view.stdout.trim()) {
   ok(`${version} is free on the registry`);
 }
 
-// 4. the suite behind every README claim
+// 4. no build artifacts in the tarball — npm packs everything under a
+// directory named in "files", INCLUDING gitignored content (0.15.1 shipped
+// core/scripts/lib/__pycache__/*.pyc this way). The gates regenerate
+// bytecode locally, so the fix is deletion, never committing an ignore file.
+const pack = run("npm", ["pack", "--dry-run", "--json"]);
+const packed = pack.status === 0
+  ? JSON.parse(pack.stdout)[0].files.map((f) => f.path)
+  : [];
+const artifacts = packed.filter((p) => /__pycache__|\.pyc$/.test(p));
+if (pack.status !== 0) {
+  warn("npm pack --dry-run failed — skipping the tarball-artifact check");
+} else if (artifacts.length) {
+  bad(`tarball would ship ${artifacts.length} build artifact(s): ${artifacts.slice(0, 3).join(", ")}${artifacts.length > 3 ? ", …" : ""}`,
+    'delete them and re-run: find . -name __pycache__ -type d -prune -exec rm -rf {} +');
+} else {
+  ok(`tarball carries no __pycache__/*.pyc (${packed.length} files checked)`);
+}
+
+// 5. the suite behind every README claim
 const test = run("npm", ["test"], { stdio: "pipe" });
 if (test.status !== 0) {
   const tail = (String(test.stdout || "") + String(test.stderr || ""))
