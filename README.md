@@ -15,7 +15,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 
 |  | | |
 |---|---|---|
-| **Done is an exit code** | A gate exits non-zero. A push is refused. There is nothing to argue with. | [see the 14 gates ↓](#gates-14-checks-that-exit-non-zero) |
+| **Done is an exit code** | A gate exits non-zero. A push is refused. There is nothing to argue with. | [see the 15 gates ↓](#gates-15-checks-that-exit-non-zero) |
 | **A verdict dies when the code moves** | QA passed it, one commit landed on top — the pass expired by itself and the ticket came back. | [watch it happen ↓](#what-it-actually-looks-like) |
 | **Every gate proves it can fail** | Each one ships a `--selftest` that feeds it a violating input and checks it goes red. A gate that has never been red gets deleted. | [the law ↓](#the-five-laws) |
 | **QA tests like a person, not a route** | Reaching a screen by typing its address is *refused* — name the button a user clicks, or the test proved the URL and nothing else. | [what proof means ↓](#what-a-verdict-has-to-carry) |
@@ -29,7 +29,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 - [Requirements](#requirements)
 - [The problem it solves](#the-problem-it-solves)
 - [The five laws](#the-five-laws)
-- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [gates](#gates-14-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [evidence](#what-a-verdict-has-to-carry) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
+- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [competencies](#competencies-what-each-role-actually-knows) · [gates](#gates-15-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [evidence](#what-a-verdict-has-to-carry) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
 - [Configuration](#configuration)
 - [Command reference](#command-reference)
 - [What you get out of it](#what-you-get-out-of-it)
@@ -43,7 +43,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 ```bash
 npx vteam-harness audit    # 1. grade this repo 0-100. No install, no writes, no network.
 npx vteam-harness init     # 2. install the team + the gates
-npx vteam-harness doctor   # 3. prove the install: every selftest (22 today) + provider preflight
+npx vteam-harness doctor   # 3. prove the install: every selftest (23 today) + provider preflight
 ```
 
 Then open your agent tool and run `/team` to start a workday, or `/dev PROJ-12` for one ticket.
@@ -132,7 +132,7 @@ error: failed to push some refs to 'origin'
 |---|---|---|
 | **Node.js ≥ 20** | the installer CLI and the board | `npx` won't run |
 | **git** | repo root, hooks, the review fence, verdict anchoring | `init` refuses with one clear line |
-| **Python 3** | 11 of the 14 gates are Python | `doctor` diagnoses it and stops — it never crashes on it |
+| **Python 3** | 12 of the 15 gates are Python | `doctor` diagnoses it and stops — it never crashes on it |
 | **bash** | 3 gates, the pre-push fence, the session hook | on Windows use WSL or Git Bash |
 | **Pillow** (`pip install pillow`) | the two screenshot-evidence gates analyse pixels | those gates report *"CANNOT CHECK — Pillow missing"* and go red; they never quietly pass |
 
@@ -158,7 +158,7 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 
 | Law | What it means in practice |
 |---|---|
-| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (22 today). An always-green check gets fixed or deleted. |
+| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (23 today). An always-green check gets fixed or deleted. |
 | **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable lands in a committed file or the tracker, and every outward write is **read back** to confirm it landed. |
 | **A verdict is valid only for the code it examined** | Each QA verdict pins two anchors: `COMMIT:` for the code and `VERIFIED-AT:` for the clock. When the code moves, the verdict expires and the ticket returns to the queue. A verdict that can't be anchored is red — *"cannot verify"* and *"verified clean"* are different answers. |
 | **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip, with a labelled, reversible paper trail. Real money, legal, credentials and data deletion are never auto-decided. |
@@ -206,7 +206,17 @@ Each lane is one command in your agent tool. What matters is not the persona —
 
 **`guidelines` — the method, not a role.** Behavioural defaults that prevent classic LLM coding mistakes: think before writing, surgical diffs, red-first tests.
 
-### Gates (14 checks that exit non-zero)
+### Competencies (what each role actually knows)
+
+A lane says **when** things happen. A gate says whether they **happened**. Neither says how a senior engineer does the work in between — and a team of supervisors with no craftspeople ships exactly what you would expect. Competencies are the missing layer: one file per skill a role is expected to carry, written the way the best-regarded engineering references are written, not the way agent "personas" usually are.
+
+Each competency is short (under 1 100 words) and has the same six parts, because each part does a job the others cannot: **Identity** (who you are when this is loaded) · **When this applies** (symptoms, not topics) · **Decide** — a table of *situation → choice → why*, the part most agent collections skip in favour of listing options · **Rules**, each as *TL;DR + Otherwise* (the consequence, which is the only part anyone remembers) · a **Rationalizations** table and **Red flags** (the sentences an agent says right before skipping the rule) · one worked **Example** · a **Reviewer lens**.
+
+That last part is what keeps competencies honest under the five laws. Craft cannot go red — but a **Reviewer lens** is a list of things to try to break, and `/dev` pastes the lens of every loaded competency into the R1/R2 briefs. The craft is checked by the review, the review is checked by `review_check`, and a card that skips a lens item without saying why is returned. `competency_check.py` guards the shape: a competency with no Reviewer lens, a description that narrates a procedure instead of naming the problem (agents follow the summary and skip the file), a routing token with a typo, or a stale index goes red.
+
+**DEV ships with ten** — `dev-identity` (loaded on every ticket), `domain-modeling`, `codebase-design`, `data-modeling`, `api-design`, `error-handling`, `debugging`, `testing-craft`, `security-basics`, and a stack file per profile starting with `nextjs-prisma`. `/dev` loads them from a one-page `INDEX.md` by ticket label, touched path, stack profile or term — a data ticket that loaded nothing about data modeling is a planning error the reviewers are told to look for. They are rendered twice: into `docs/team/competencies/` as doctrine you can edit (kept as yours on `update`), and as skills for your agent tool so the model can also find them by description. Sources are cited in every file — Node.js Best Practices, the JavaScript testing guide, OWASP Cheat Sheets, Postgres and Prisma references, and the debugging/design disciplines from the most-used skill collections. QA and BA competencies follow the same shape and are next.
+
+### Gates (15 checks that exit non-zero)
 
 The count rule, stated once: a *gate* is a script that exits non-zero on your work. Helper libraries and the resolver/report tools are not counted, and the pre-push fence is listed separately below.
 
@@ -223,6 +233,7 @@ Each one ships a `--selftest` that feeds it a violating input and proves it goes
 | `stale_verdict_check.py` | a "done" ticket whose code changed after the verdict, and any verdict that cannot be anchored to a commit or timestamp |
 | `log_check.py` | a dispatch ledger row that breaks the schema, or a ledger edited anywhere but the end |
 | `verbatim_gate.py` | a spec shard that has drifted from the source document it was copied from |
+| `competency_check.py` | a role's craft file that a reviewer cannot check — no **Reviewer lens**, a description that narrates the procedure instead of naming the problem, a routing token with a typo, a body past the word budget, or an `INDEX.md` that no longer matches the files the lane routes from |
 | `comment_check.py` | a ticket report missing any of its seven required sections |
 | `schedule_check.py` | *"we're on schedule"* as an opinion — the plan is a structured file and this computes the answer |
 | `lockfile_check.sh` | a second package manager's lockfile sneaking into the repo — one repo, one package manager |
@@ -343,14 +354,14 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 Eight commands, one journey. Gates exit 1; the two mirrors (`board`, `graph`) always exit 0; nothing calls a network except the preflight pings you configured. Every transcript below is captured from a real run — most of them from **this repository**, which installs vteam into itself and keeps its own ledger and evidence (`evd/VT-1/`).
 
 <picture>
-  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 22 selftests. Daily: the agent tool runs the workday, 14 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 23 selftests. Daily: the agent tool runs the workday, 15 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
 </picture>
 
 | Command | What it does |
 |---|---|
 | [`audit [--json]`](#audit--measure-before-you-believe) | grade any repo's agent accountability 0–100. No install needed, never writes, no network. |
 | [`init [--yes]`](#init--install-validated-before-the-first-byte) | install into the current repo. Every flag value is validated before the first byte is written; invalid input exits 1 having written nothing. |
-| [`doctor [--json]`](#doctor--prove-the-install) | prove the install: prerequisites, config parse, manifest integrity, hook wiring, every selftest (discovered dynamically — 22 today), live provider pings. |
+| [`doctor [--json]`](#doctor--prove-the-install) | prove the install: prerequisites, config parse, manifest integrity, hook wiring, every selftest (discovered dynamically — 23 today), live provider pings. |
 | [`update`](#update--refresh-without-touching-your-files) | refresh framework files by manifest hash — your edited copies are kept, the new version parked as `*.new`. |
 | [`board [--port N]`](#board--the-read-only-dashboard) | the read-only local dashboard on 127.0.0.1. |
 | [`graph [--json\|--dot]`](#graph--the-work-graph-made-visible) | ready set, blocked set, dangling edges, cycles. Always exits 0 — the mirror; `graph_check.py` is the gate. |
@@ -545,7 +556,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 - **It suits a repo willing to adopt the practice.** vteam creates the ledgers, specs and evidence layout it needs (and `/docs` bootstraps documentation from your code), but it does expect that from now on decisions land in files and evidence gets committed. If your team won't commit evidence, this is the wrong tool.
 - **`init` writes its layout using defaults it does not yet infer from your repo.** Review the generated `vteam.config.yaml` before your first run — especially `protected_branch`, `branch_pattern` and `merge_strategy`. Detect-then-propose is the next thing being built.
-- **Repo-level Claude Code skills with the same names are currently overwritten** by `init` (`team`, `pm`, `ba`, `dev`, `qa`, `verify`, `docs`, `guidelines`). If you have your own skill by one of those names, back it up first. This is a known bug, not a design choice, and it is being fixed.
+- **Repo-level Claude Code skills with the same names are currently overwritten** by `init` (`team`, `pm`, `ba`, `dev`, `qa`, `verify`, `docs`, `guidelines`, and every competency name such as `dev-identity`). If you have your own skill by one of those names, back it up first. This is a known bug, not a design choice, and it is being fixed.
 - **There is no `uninstall` command yet.** Removing vteam today means deleting `vteam.config.yaml`, `.vteam/`, the rendered tool directories, `.githooks/pre-push`, and resetting `core.hooksPath`.
 - **The CI snippet it writes is GitHub Actions.** On other platforms call `bash .vteam/scripts/gate.sh` from your own pipeline — the gates themselves are platform-agnostic.
 - **One human owner plus agents is the most-tested shape.** `team.size > 1` now has real machinery — the mandatory Actor column, per-person reporting, conflict-free ledger merges, and a claim TTL that is a config knob (`team.claim_ttl_hours`) read by `vteam resume` — but the WIP limit is still doctrine prose the agents follow, not a gate; treat >1 as young.
@@ -558,7 +569,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **141 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **142 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 

@@ -7,6 +7,8 @@ steps:
     run: "python3 .vteam/scripts/log_check.py"
   verbatim:
     run: "python3 .vteam/scripts/verbatim_gate.py"
+  competencies:
+    run: "python3 .vteam/scripts/competency_check.py"
   vet:
     run: "go vet ./..."
     requires: "go.mod"
