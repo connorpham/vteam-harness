@@ -21,3 +21,4 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-24 | DEV | Connor Pham | PR #39 README command reference end-to-end + commands.svg + usage synthetic filter | done (frontier) · tok ≈ 60k | PR #39 |
 | 2026-08-24 | DEV | Connor Pham | PR #41 security posture — SECURITY.md, Scorecard+CodeQL+provenance CI, pinned actions, best-practices dossier | done (frontier) · tok ≈ 50k | PR #41 |
 | 2026-09-03 | DEV | Connor Pham | PR #57 README for both surfaces — 9 relative links absolutised for the npm page, selftest count 22→25 (prose+transcript+svg), e2e guard so it cannot drift again | done (frontier) · tok ≈ 90k | PR #57 |
+| 2026-09-03 | DEV | Connor Pham | PR #58 README describes the last three releases — specialists section + diagram, watchable dev/QA sessions, CHANGELOG, 2 drift guards | done (frontier) · tok ≈ 110k | PR #58 |

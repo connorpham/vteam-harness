@@ -29,7 +29,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 - [Requirements](#requirements)
 - [The problem it solves](#the-problem-it-solves)
 - [The five laws](#the-five-laws)
-- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [gates](#gates-14-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [evidence](#what-a-verdict-has-to-carry) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
+- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [specialists](#the-specialists-7-deep-skill-agents-the-lanes-can-hire) · [watchable sessions](#watchable-dev-and-qa-sessions) · [gates](#gates-14-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [evidence](#what-a-verdict-has-to-carry) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
 - [Configuration](#configuration)
 - [Command reference](#command-reference)
 - [What you get out of it](#what-you-get-out-of-it)
@@ -205,6 +205,38 @@ Each lane is one command in your agent tool. What matters is not the persona —
 **`/verify` — the gate, on demand.** Lint → types → unit → build → reality checks → integration → e2e, cheapest-first. A skipped step must declare why; a silent skip is a failure. On a repo with no test suite it prints `GREEN (WEAK — no test suite ran)` instead of a green that lies.
 
 **`guidelines` — the method, not a role.** Behavioural defaults that prevent classic LLM coding mistakes: think before writing, surgical diffs, red-first tests.
+
+### The specialists (7 deep-skill agents the lanes can hire)
+
+A generalist dev agent guesses at domain trade-offs; a specialist names them. A migration strategy, a rendering stall, a flaky pipeline, a RAG quality drop — each gets a better first pass from an agent whose prompt already carries that domain's failure modes.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/specialists.svg" alt="Seven specialist subagents the dev and pm lanes can dispatch — backend, frontend-mobile, devops-cloud, ai-data, data-engineer, security and qa-automation — each with its domain depth. A ticket that lives in one domain goes to one specialist; cross-domain tickets stay with the generalist dev flow. Every specialist works inside the same dev pipeline: the spec is the oracle, evidence lands under evd/&lt;TICKET&gt;/, and gate.sh must be green before done. Specialists advise, the lane decides." width="100%">
+</p>
+
+| Subagent | Dispatch when the ticket is about |
+|---|---|
+| `backend-specialist` | endpoints, schema and migrations, background jobs, caching, backend bugs or slowness |
+| `frontend-mobile-specialist` | screens from a design source, UI bugs, layout and interaction, web vitals, accessibility |
+| `devops-cloud-specialist` | pipeline failures, Dockerfiles, deploy config, secrets handling, *"works locally, not in CI"* |
+| `ai-data-specialist` | model-API features, prompt and tool design, retrieval quality, eval and embedding data prep |
+| `data-engineer-specialist` | data pipelines, warehouse schemas, ingestion and backfills, slow or expensive analytical queries |
+| `security-specialist` | security review of a diff or PR, auth flows, untrusted input, hardening, dependency audits — defensive scope only |
+| `qa-automation-specialist` | writing or restructuring automated tests, flaky-test hunts, slow suites, test harnesses |
+
+**They are hires, not shortcuts.** A specialist obeys every `/dev` invariant: the spec is the oracle, the diff stays minimal, evidence lands under `evd/<TICKET>/`, and `gate.sh` is green before anything is called done. A specialist claim with no recorded output is not a claim. One domain gets one specialist; a cross-domain ticket stays with the generalist flow, which may consult one for its slice. And a recommendation that widens scope or touches an exemption — real money, credentials — goes to your decision queue like anything else. **Specialists advise; the lane decides.**
+
+On Claude Code they install as native subagents in `.claude/agents/` and are spawned through the Agent tool, with the model resolved from `model-routing.data.yaml` like any other role. On tools without a subagent primitive, the same roster ships as doctrine (`docs/team/roles/specialists.md`) that the lane consults in-session.
+
+### Watchable dev and QA sessions
+
+Autonomy you cannot see is autonomy you cannot trust. Point the `app:` block at your running app and both working lanes stop being a wall of logs:
+
+- **Bring-up is a quotable proof.** `app_check.sh` pings the app for real and prints `APP: UP` — no lane starts by assuming the environment is fine.
+- **QA runs in a real Chrome window you can watch.** `browser.mjs` drives a headed browser through the actual user journey, and keeps the script as re-runnable evidence. `headed: never` makes unattended 24/7 shifts windowless without dropping a single screenshot.
+- **`/dev` opens the files it edits.** `open_files.sh` surfaces them in Cursor or VS Code (auto-detected), so you read the diff where you already work instead of scrolling a transcript.
+
+Leave `app:` empty on repos with no web app and the lanes render a *"not configured"* block instead of pretending.
 
 ### Gates (14 checks that exit non-zero)
 
@@ -557,10 +589,11 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **156 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **157 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 
+- What changed in each version: [CHANGELOG.md](https://github.com/connorpham/vteam-harness/blob/main/CHANGELOG.md)
 - Architecture and design decisions: [docs/DESIGN.md](https://github.com/connorpham/vteam-harness/blob/main/docs/DESIGN.md)
 - Build history and what's next: [docs/ROADMAP.md](https://github.com/connorpham/vteam-harness/blob/main/docs/ROADMAP.md)
 - The incidents behind the rules: [core/doctrine/provenance.md](https://github.com/connorpham/vteam-harness/blob/main/core/doctrine/provenance.md)
