@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" role="img" aria-label="Seven specialist subagents the dev and pm lanes can dispatch: backend for APIs, schema, transactions and query performance; frontend-mobile for components, state, rendering performance and design fidelity; devops-cloud for CI/CD, containers, infrastructure as code and observability; ai-data for LLM integration, agents, RAG and evals; data-engineer for warehouse modeling, ELT, streaming and data quality; security for threat modeling, authn/authz, injection classes and supply chain; qa-automation for test strategy, E2E frameworks, flaky-test forensics and CI test infrastructure. A ticket that lives in one domain goes to one specialist; cross-domain tickets stay with the generalist dev flow. Every specialist works inside the same dev pipeline: the spec is the oracle, evidence lands under evd slash ticket, and gate.sh must be green before done. Specialists advise, the lane decides.">
+  <style>
+    .ink{fill:#1C1F22}.muted{fill:#5A6065}.card{fill:#FFFFFF;stroke:#C9CBC4}
+    .line{stroke:#9BA1A7}.lane{fill:#EFF3F8;stroke:#3C6E9F}.lanex{fill:#2C5B8A}
+    .spec{fill:#F4F4F1;stroke:#C9CBC4}.specx{fill:#1C1F22}
+    .rail{fill:#FBEEEC;stroke:#C03B2B}.gatex{fill:#C03B2B}
+    @media (prefers-color-scheme: dark){
+      .ink{fill:#E8E6E1}.muted{fill:#9BA1A7}.card{fill:#1D2024;stroke:#3A3E43}
+      .line{stroke:#6B7278}.lane{fill:#1B2733;stroke:#6FA3D4}.lanex{fill:#8FBEE8}
+      .spec{fill:#22252A;stroke:#3A3E43}.specx{fill:#E8E6E1}
+      .rail{fill:#2E1E1C;stroke:#E4604F}.gatex{fill:#E4604F}
+    }
+    text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9BA1A7"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="32" class="ink" font-size="17" font-weight="700">Seven specialists the lanes can hire — and not one of them skips a gate</text>
+  <text x="24" y="53" class="muted" font-size="12.5">A generalist guesses at domain trade-offs; a specialist names them. Suffix <tspan class="mono">-specialist</tspan> is implied on every card.</text>
+
+  <!-- dispatchers -->
+  <rect x="24" y="74" width="150" height="38" rx="7" class="lane"/>
+  <text x="99" y="98" class="lanex mono" font-size="13.5" font-weight="700" text-anchor="middle">/dev</text>
+  <rect x="188" y="74" width="150" height="38" rx="7" class="lane"/>
+  <text x="263" y="98" class="lanex mono" font-size="13.5" font-weight="700" text-anchor="middle">/pm</text>
+
+  <path d="M338,93 L470,93" class="line" fill="none" stroke-width="1.4" marker-end="url(#a)"/>
+  <text x="482" y="89" class="ink" font-size="12.5" font-weight="600">One domain → one specialist.</text>
+  <text x="482" y="106" class="muted" font-size="12">Cross-domain tickets stay with the generalist /dev flow.</text>
+
+  <!-- row 1 -->
+  <g>
+    <rect x="24" y="136" width="220" height="88" rx="8" class="spec"/>
+    <text x="38" y="160" class="specx mono" font-size="12.5" font-weight="700">backend</text>
+    <text x="38" y="182" class="muted" font-size="11">APIs · schema · migrations</text>
+    <text x="38" y="199" class="muted" font-size="11">transactions · concurrency</text>
+    <text x="38" y="216" class="muted" font-size="11">query performance</text>
+  </g>
+  <g>
+    <rect x="260" y="136" width="220" height="88" rx="8" class="spec"/>
+    <text x="274" y="160" class="specx mono" font-size="12.5" font-weight="700">frontend-mobile</text>
+    <text x="274" y="182" class="muted" font-size="11">components · state</text>
+    <text x="274" y="199" class="muted" font-size="11">rendering perf · a11y</text>
+    <text x="274" y="216" class="muted" font-size="11">design fidelity</text>
+  </g>
+  <g>
+    <rect x="496" y="136" width="220" height="88" rx="8" class="spec"/>
+    <text x="510" y="160" class="specx mono" font-size="12.5" font-weight="700">devops-cloud</text>
+    <text x="510" y="182" class="muted" font-size="11">CI/CD · containers · K8s</text>
+    <text x="510" y="199" class="muted" font-size="11">IaC · observability</text>
+    <text x="510" y="216" class="muted" font-size="11">“works locally, not in CI”</text>
+  </g>
+  <g>
+    <rect x="732" y="136" width="220" height="88" rx="8" class="spec"/>
+    <text x="746" y="160" class="specx mono" font-size="12.5" font-weight="700">ai-data</text>
+    <text x="746" y="182" class="muted" font-size="11">LLM integration · agents</text>
+    <text x="746" y="199" class="muted" font-size="11">RAG · retrieval quality</text>
+    <text x="746" y="216" class="muted" font-size="11">evals, not vibes</text>
+  </g>
+
+  <!-- row 2 -->
+  <g>
+    <rect x="24" y="240" width="220" height="88" rx="8" class="spec"/>
+    <text x="38" y="264" class="specx mono" font-size="12.5" font-weight="700">data-engineer</text>
+    <text x="38" y="286" class="muted" font-size="11">warehouse · ELT · dbt</text>
+    <text x="38" y="303" class="muted" font-size="11">streaming · backfills</text>
+    <text x="38" y="320" class="muted" font-size="11">data-quality contracts</text>
+  </g>
+  <g>
+    <rect x="260" y="240" width="220" height="88" rx="8" class="spec"/>
+    <text x="274" y="264" class="specx mono" font-size="12.5" font-weight="700">security</text>
+    <text x="274" y="286" class="muted" font-size="11">threat modeling · authz</text>
+    <text x="274" y="303" class="muted" font-size="11">injection classes · crypto</text>
+    <text x="274" y="320" class="muted" font-size="11">supply chain (defensive)</text>
+  </g>
+  <g>
+    <rect x="496" y="240" width="220" height="88" rx="8" class="spec"/>
+    <text x="510" y="264" class="specx mono" font-size="12.5" font-weight="700">qa-automation</text>
+    <text x="510" y="286" class="muted" font-size="11">test strategy · E2E</text>
+    <text x="510" y="303" class="muted" font-size="11">flaky-test forensics</text>
+    <text x="510" y="320" class="muted" font-size="11">CI test infrastructure</text>
+  </g>
+  <g>
+    <rect x="732" y="240" width="220" height="88" rx="8" class="card" stroke-dasharray="4 3"/>
+    <text x="746" y="264" class="ink" font-size="12.5" font-weight="700">Specialists advise,</text>
+    <text x="746" y="283" class="ink" font-size="12.5" font-weight="700">the lane decides.</text>
+    <text x="746" y="305" class="muted" font-size="11">A recommendation that widens</text>
+    <text x="746" y="322" class="muted" font-size="11">scope goes to the decision queue.</text>
+  </g>
+
+  <path d="M488,328 L488,352" class="line" fill="none" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- the rail nobody gets around -->
+  <rect x="24" y="360" width="928" height="86" rx="8" class="rail"/>
+  <text x="44" y="386" class="gatex" font-size="13" font-weight="700">Same pipeline. Same gates. No exceptions.</text>
+  <text x="44" y="409" class="muted" font-size="11.5">The spec is the oracle — not the ticket prose. The diff stays minimal. Evidence lands under <tspan class="mono">evd/&lt;TICKET&gt;/</tspan>.</text>
+  <text x="44" y="429" class="muted" font-size="11.5"><tspan class="mono">gate.sh</tspan> is green before anything is called done. A specialist claim with no recorded output is not a claim.</text>
+</svg>

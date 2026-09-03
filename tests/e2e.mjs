@@ -153,9 +153,13 @@ console.log("3. installed gate selftests (discovered — mirrors doctor)");
   // 2026-09-03 review — same drift the "N checks" guard at the bottom exists
   // for. Every place that prints the number must agree with discovery.
   {
+    // Three different phrasings state it, and before this guard existed the README
+    // said 25 in two of them and 22 in the other four — at the same time.
     const readme = fs.readFileSync(path.join(PKG, "README.md"), "utf8");
-    const claims = [...readme.matchAll(/(\d+) (?:discovered )?(?:selftests|discovered checks)/g)]
-      .map((m) => Number(m[1]));
+    const claims = [
+      ...readme.matchAll(/(\d+) (?:discovered )?(?:selftests|discovered checks)/g),
+      ...readme.matchAll(/\((\d+) today\)/g),
+    ].map((m) => Number(m[1]));
     check(`README's selftest count matches discovery (${gates.length})`,
       claims.length > 0 && claims.every((c) => c === gates.length),
       `README claims ${JSON.stringify(claims)}, discovery found ${gates.length}`);
@@ -734,6 +738,19 @@ console.log("19. resume — derived crash recovery (artifact ladder)");
   // determinism: a reader run twice answers the same
   check("resume is a pure reader (two runs, identical output)",
     vteam(repo19, "resume", "DEMO-9").stdout === r.stdout);
+}
+
+// ── every shipped version has a CHANGELOG entry ────────────────────────────
+// 22 versions were published before this file existed and none of them said
+// what changed. A changelog nobody is forced to write is a changelog that stops
+// at the version someone last remembered.
+{
+  const pkgVersion = JSON.parse(fs.readFileSync(path.join(PKG, "package.json"), "utf8")).version;
+  const changelog = fs.readFileSync(path.join(PKG, "CHANGELOG.md"), "utf8");
+  const newest = changelog.match(/^## (\d+\.\d+\.\d+)/m);
+  check(`CHANGELOG's newest entry is the shipping version (${pkgVersion})`,
+    newest && newest[1] === pkgVersion,
+    `package.json is ${pkgVersion}, CHANGELOG's newest entry is ${newest ? newest[1] : "(none found)"}`);
 }
 
 // ── the README's "N checks" claim is machine-verified ──────────────────────
