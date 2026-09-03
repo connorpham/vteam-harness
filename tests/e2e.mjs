@@ -148,6 +148,18 @@ console.log("3. installed gate selftests (discovered — mirrors doctor)");
   check("discovery finds the full battery (≥ 15, spanning py+sh+mjs)",
     gates.length >= 15 && ["python3", "bash", "node"].every((c) => gates.some((g) => g.cmd === c)),
     JSON.stringify(gates));
+  // The README states this count in prose, in the doctor transcript and in the
+  // commands.svg alt text. Found stale (said 22, doctor ran 25) in the
+  // 2026-09-03 review — same drift the "N checks" guard at the bottom exists
+  // for. Every place that prints the number must agree with discovery.
+  {
+    const readme = fs.readFileSync(path.join(PKG, "README.md"), "utf8");
+    const claims = [...readme.matchAll(/(\d+) (?:discovered )?(?:selftests|discovered checks)/g)]
+      .map((m) => Number(m[1]));
+    check(`README's selftest count matches discovery (${gates.length})`,
+      claims.length > 0 && claims.every((c) => c === gates.length),
+      `README claims ${JSON.stringify(claims)}, discovery found ${gates.length}`);
+  }
   for (const { s, cmd } of gates) {
     const r = run(cmd, [path.join(dir, s), "--selftest"], { cwd: repo });
     check(`selftest ${s}`, r.status === 0, r.stdout + r.stderr);
