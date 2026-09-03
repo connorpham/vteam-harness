@@ -20,3 +20,4 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-24 | QA | Connor Pham | VT-1 self-install verified (doctor+gates+audit 91/A) | done · tok ≈ 30k | evd/VT-1 |
 | 2026-08-24 | DEV | Connor Pham | PR #39 README command reference end-to-end + commands.svg + usage synthetic filter | done (frontier) · tok ≈ 60k | PR #39 |
 | 2026-08-24 | DEV | Connor Pham | PR #41 security posture — SECURITY.md, Scorecard+CodeQL+provenance CI, pinned actions, best-practices dossier | done (frontier) · tok ≈ 50k | PR #41 |
+| 2026-09-03 | DEV | Connor Pham | PR #57 README for both surfaces — 9 relative links absolutised for the npm page, selftest count 22→25 (prose+transcript+svg), e2e guard so it cannot drift again | done (frontier) · tok ≈ 90k | PR #57 |
