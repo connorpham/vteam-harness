@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/vteam-harness?color=%23C03B2B&label=npm)](https://www.npmjs.com/package/vteam-harness)
 [![ci](https://github.com/connorpham/vteam-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/connorpham/vteam-harness/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/vteam-harness)](https://nodejs.org)
-[![license](https://img.shields.io/npm/l/vteam-harness)](LICENSE)
+[![license](https://img.shields.io/npm/l/vteam-harness)](https://github.com/connorpham/vteam-harness/blob/main/LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/connorpham/vteam-harness/badge)](https://scorecard.dev/viewer/?uri=github.com/connorpham/vteam-harness)
 [![codeql](https://github.com/connorpham/vteam-harness/actions/workflows/codeql.yml/badge.svg)](https://github.com/connorpham/vteam-harness/actions/workflows/codeql.yml)
 
@@ -124,7 +124,7 @@ error: failed to push some refs to 'origin'
 
 ---
 
-**Want proof before belief?** [The 15-minute tour](docs/TUTORIAL.md) — install into a scratch repo and watch every gate refuse you for the right reason, then let you through: DoR red→green, the push fence blocking undossiered code, and a QA verdict that **expires when the code changes after it**. No AI calls, no services.
+**Want proof before belief?** [The 15-minute tour](https://github.com/connorpham/vteam-harness/blob/main/docs/TUTORIAL.md) — install into a scratch repo and watch every gate refuse you for the right reason, then let you through: DoR red→green, the push fence blocking undossiered code, and a QA verdict that **expires when the code changes after it**. No AI calls, no services.
 
 ## Requirements
 
@@ -344,7 +344,7 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 Eight commands, one journey. Gates exit 1; the two mirrors (`board`, `graph`) always exit 0; nothing calls a network except the preflight pings you configured. Every transcript below is captured from a real run — most of them from **this repository**, which installs vteam into itself and keeps its own ledger and evidence (`evd/VT-1/`).
 
 <picture>
-  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 22 selftests. Daily: the agent tool runs the workday, 14 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 25 selftests. Daily: the agent tool runs the workday, 14 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
 </picture>
 
 | Command | What it does |
@@ -392,22 +392,20 @@ vteam installed. Next steps:
 
 ### `doctor` — prove the install
 
-Reads everything init wrote and **runs the proof**: python present, config parses in all three parser languages, every manifest hash intact (files someone edited are *named*, not counted), hooks wired, then all 22 discovered selftests — each one feeds its gate a violating fixture and demands RED — then pings the tracker, git remote and hosting CLI for real. From this repository:
+Reads everything init wrote and **runs the proof**: python present, config parses in all three parser languages, every manifest hash intact (files someone edited are *named*, not counted), hooks wired, then all 25 discovered selftests — each one feeds its gate a violating fixture and demands RED — then pings the tracker, git remote and hosting CLI for real. From this repository:
 
 ```console
 $ npx vteam-harness doctor
 ✅ python3 available (Python 3.9.6)
 ✅ config parses (version 1)
 ✅ .vteam runtime complete
-✅ manifest verified (55 framework-owned files intact)
+✅ manifest verified (59 framework-owned files intact)
 ✅ core.hooksPath = .githooks
 ✅ code_paths alive (src/, core/, bin/)
 ✅ model-routing snapshot fresh (2026-08-17)
-✅ gate selftests green (22 discovered checks prove they can red)
-  … (14 more green lines)
-✅ gate selftests green (22 discovered checks prove they can red)
+✅ gate selftests green (25 discovered checks prove they can red)
 ── preflight ──
-✅ Tracker: backlog dir docs/backlog (1 tickets)
+✅ Tracker: backlog dir docs/backlog (2 tickets)
 ✅ Design: no design source configured
 ✅ Git: remote origin https://github.com/connorpham/vteam-harness.git
 ✅ Hooks: core.hooksPath = .githooks
@@ -559,14 +557,14 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **155 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **156 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 
-- Architecture and design decisions: [docs/DESIGN.md](docs/DESIGN.md)
-- Build history and what's next: [docs/ROADMAP.md](docs/ROADMAP.md)
-- The incidents behind the rules: [core/doctrine/provenance.md](core/doctrine/provenance.md)
-- The excuses agents use to route around gates: [core/doctrine/red-flags.md](core/doctrine/red-flags.md)
+- Architecture and design decisions: [docs/DESIGN.md](https://github.com/connorpham/vteam-harness/blob/main/docs/DESIGN.md)
+- Build history and what's next: [docs/ROADMAP.md](https://github.com/connorpham/vteam-harness/blob/main/docs/ROADMAP.md)
+- The incidents behind the rules: [core/doctrine/provenance.md](https://github.com/connorpham/vteam-harness/blob/main/core/doctrine/provenance.md)
+- The excuses agents use to route around gates: [core/doctrine/red-flags.md](https://github.com/connorpham/vteam-harness/blob/main/core/doctrine/red-flags.md)
 
 ## Layout
 
@@ -582,7 +580,7 @@ tests/       the end-to-end suite behind every claim above
 
 ## Security
 
-The same law as everything else here: a security claim without a machine check is a hope. **Zero runtime dependencies** (`npm ls --all` — empty tree), no network calls beyond the preflight pings you configure, a dashboard that is read-only *by construction*, a secret scan that **fails closed**, and releases published from CI with **npm provenance** (Sigstore) so the tarball is cryptographically tied to its commit. OpenSSF Scorecard re-grades the repo weekly (badge above), CodeQL scans every push. Reporting a vulnerability: [SECURITY.md](SECURITY.md). The full posture, control by control, each with the command that verifies it: [docs/security/](docs/security/README.md).
+The same law as everything else here: a security claim without a machine check is a hope. **Zero runtime dependencies** (`npm ls --all` — empty tree), no network calls beyond the preflight pings you configure, a dashboard that is read-only *by construction*, a secret scan that **fails closed**, and releases published from CI with **npm provenance** (Sigstore) so the tarball is cryptographically tied to its commit. OpenSSF Scorecard re-grades the repo weekly (badge above), CodeQL scans every push. Reporting a vulnerability: [SECURITY.md](https://github.com/connorpham/vteam-harness/blob/main/SECURITY.md). The full posture, control by control, each with the command that verifies it: [docs/security/](https://github.com/connorpham/vteam-harness/blob/main/docs/security/README.md).
 
 ## License
 
