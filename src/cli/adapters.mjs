@@ -90,6 +90,28 @@ function workflows() {
   });
 }
 
+/** Competencies — the craft files under core/doctrine/competencies/<role>/.
+ * They are doctrine (rendered into paths.team by init/update) AND skills: the
+ * lane tells the agent WHEN to load one, the tool's skill mechanism lets the
+ * model find it by description. Rendered like workflows, minus the routing
+ * block — a competency spawns nobody. INDEX.md is the lane's routing table,
+ * not a skill. */
+function competencies() {
+  const dir = path.join(pkgRoot, "core", "doctrine", "competencies");
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const role of fs.readdirSync(dir)) {
+    const rd = path.join(dir, role);
+    if (!fs.statSync(rd).isDirectory()) continue;
+    for (const f of fs.readdirSync(rd)) {
+      if (!f.endsWith(".md") || f === "INDEX.md") continue;
+      const { meta, body } = parseFrontmatter(fs.readFileSync(path.join(rd, f), "utf8"));
+      out.push({ meta, body });
+    }
+  }
+  return out;
+}
+
 /** Render all workflows for one tool into the target repo. Returns written
  * paths. `write(relPath, text)` lets init/update route output through the
  * manifest guard; the default writes directly. */
@@ -110,6 +132,17 @@ export async function renderTool(tool, root, cfg,
       // must bring the app up and run it headed)
       body: (name === "guidelines" ? "" : routing) +
         (ENV_WORKFLOWS.has(name) ? envBlock(cfg) : "") + render(raw.body, cfg),
+    };
+    const out = adapter.render(wf, ctx);
+    write(out.path, out.text);
+    written.push(out.path);
+  }
+  for (const raw of competencies()) {
+    const wf = {
+      name: raw.meta.name,
+      description: render(raw.meta.description || "", cfg),
+      args: "",
+      body: render(raw.body, cfg), // craft, not orchestration: no routing block
     };
     const out = adapter.render(wf, ctx);
     write(out.path, out.text);

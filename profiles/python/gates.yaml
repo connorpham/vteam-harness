@@ -11,6 +11,8 @@ steps:
     run: "python3 .vteam/scripts/graph_check.py"
   verbatim:
     run: "python3 .vteam/scripts/verbatim_gate.py"
+  competencies:
+    run: "python3 .vteam/scripts/competency_check.py"
   lint:
     run: "ruff check ."
     requires: "pyproject.toml"

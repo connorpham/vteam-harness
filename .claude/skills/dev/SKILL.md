@@ -101,8 +101,10 @@ version may differ from training data).
 
 ## T1 — READ: ticket + spec + schema + code (build the task-sheet)
 
-**Role playbook:** read `docs/team/roles/dev.md` first — the professional
-baseline this lane is held to.
+**Who is working:** read `docs/team/competencies/dev/dev-identity.md` first —
+the senior engineer this lane runs as (decision posture, what a senior never
+does) — then `docs/team/roles/dev.md`, the professional baseline. The lane
+below says WHEN each thing happens; the competencies say HOW a senior does it.
 
 **KB preflight (index-only — never read the whole file):** read
 `docs/qa/knowledge-base.md` §0 + its INDEX table, open ONLY lessons whose tags
@@ -170,6 +172,17 @@ the next session can resume the work):
 (think first, surgical diff, surface assumptions, verifiable success criteria)
 govern T2–T4; planning without it is a pipeline violation.
 
+**Load the competencies this ticket needs** — from
+`docs/team/competencies/dev/INDEX.md` (read the index, not the tree): every
+row whose `Applies` says `always` and whose `Loads at` is T2, plus every row
+where a token matches this ticket — `label:<x>` against the ticket's labels,
+`path:<prefix>` against the task-sheet's CODE-SCOPE, `profile:<name>` against
+`stack.profile`, `term:<word>` against the ticket + spec text. Rows marked T3
+load at T3. Write the loaded list in the task-sheet under **Competencies:** —
+a data ticket that loaded nothing about data modeling is a planning error, and
+the reviewers will look for exactly that line. Each file's **Decide** table is
+the plan's vocabulary: name the row you followed when the choice was non-obvious.
+
 In the task-sheet, before editing: the minimal file-by-file change list ·
 migration yes/no · test plan (which tests prove the AC — expected values cite
 spec/schema) · what is explicitly OUT of scope. Present the plan to the user only
@@ -178,6 +191,10 @@ spec); otherwise proceed.
 
 ## T3 — IMPLEMENT
 
+- **Competencies marked T3 load now** (INDEX `Loads at` = T3): error handling
+  and security basics on every ticket, the stack file when `stack.profile`
+  matches, debugging the moment anything is red and the cause is not proven.
+  Append them to the task-sheet's **Competencies:** line.
 - `git fetch && git switch -c <type>/<TICKET>-<slug> origin/<protected>` (never
   commit on the protected branch).
 - **Work like a developer, visibly.** Before editing a file, put it on the
@@ -307,7 +324,11 @@ CONFIRMED that doesn't reproduce voids the card and spawns a replacement.
 
 Brief reviewers with the SELF-REVIEW results (T4a) + `fidelity.md` if UI —
 reviewers verify measured numbers instead of re-measuring, and focus where the
-machine can't measure.
+machine can't measure. **Paste the `## Reviewer lens` block of every competency
+the task-sheet lists** into BOTH briefs — those bullets are the "what to try to
+break" list the craft itself asks for (an unauthorized id, the same write twice,
+a FK without an index, a `catch` that swallows). A card that ignores a listed
+lens item without saying why is returned.
 
 - **R1 — spec reviewer:** briefed with task-sheet + diff + spec/schema citations.
   Checks: does the change do exactly what the spec says (each AC → code), is it
@@ -457,4 +478,6 @@ silent skip to one fewer reviewer.
 - [ ] Every phase narrated with a ▶ line; final summary passes the plain-language bar
 - [ ] KB read at T1; lesson appended at T6 (or "no new lesson" stated)
 - [ ] T1: code map queried BEFORE the tree read; any map miss named in the task-sheet
+- [ ] T2/T3: task-sheet carries **Competencies:** — `dev-identity` + every INDEX
+      row matching this ticket; the loaded Reviewer lens blocks went into the R1/R2 briefs
 - [ ] T1: tasksheet declares `CODE-SCOPE:` (arms the derailment gate)

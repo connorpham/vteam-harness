@@ -11,6 +11,30 @@ does not match `package.json`.
 
 ---
 
+## 0.16.0
+
+The competency layer — the framework had supervisors and an iron rulebook but no
+craftspeople. Roles knew *when* things happen and nothing about *how* a senior does them.
+
+- **DEV ships with ten competencies** (`competencies/dev/`): identity, domain-modeling,
+  codebase-design, data-modeling, api-design, error-handling, debugging, testing-craft,
+  security-basics, and a stack file per profile (`nextjs-prisma` first). Each is a short
+  Decide/Rules/**Reviewer lens** file; `/dev` loads them from an `INDEX.md` by ticket
+  label, path, profile or term, and pastes each loaded Reviewer lens into the R1/R2 briefs
+  so the craft is checked by review.
+- **QA ships with nine** (`competencies/qa/`), distilled from the standalone
+  [ai-qa](https://github.com/connorpham/ai-qa) framework: identity, requirement-smells,
+  test-design, user-mindset, case-writing, hostile-inputs, heuristics, report-writing and
+  security-probes. Full hostile-input / heuristic / security / checklist tables live under
+  `competencies/qa/reference/`, which the word-budget gate ignores. `/qa` loads them at
+  V1/V2 and pastes their Reviewer lens into the V6 challenger brief.
+- **A 15th gate: `competency_check.py`** — a craft file with no Reviewer lens, a
+  description that narrates a procedure instead of naming the problem, a routing token with
+  a typo, a body past the word budget, or a stale `INDEX.md` goes red. Ships its
+  `--selftest`, bringing the discovered battery to 26.
+
+---
+
 ## 0.15.4 — unreleased
 
 The README finally describes what the last three releases actually shipped.
