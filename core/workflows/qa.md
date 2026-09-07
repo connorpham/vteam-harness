@@ -81,7 +81,14 @@ External payment/integration environments are SANDBOX — never a real transacti
 
 ## V1 — READ: ticket + spec + schema (understand as QA, not as dev)
 
-**Role playbook:** read `{paths.team}/roles/qa.md` first.
+**Who is verifying:** read `{paths.team}/competencies/qa/qa-identity.md` first —
+the senior tester this lane runs as (the oracle rule, severity by consequence,
+the third outcome) — then `{paths.team}/roles/qa.md`. Immediately after, read
+`{paths.team}/competencies/qa/qa-requirement-smells.md` and run its three-line
+test on every acceptance criterion **before** deriving a single expected value:
+a criterion that fails it is `BLOCKED (not testable as written)`, and that is
+the verification's first finding, batched to the requirement owner now — not the
+developer, and not after a day of testing.
 
 **KB preflight (index-only):** `{paths.qa}/knowledge-base.md` §0 + INDEX BEFORE
 designing anything; open ONLY tag-matching lessons and answer them in the
@@ -114,6 +121,18 @@ appendix; it commits with the V7.4 dossier so the link outlives the session):
 - Ambiguity → ask the user BEFORE spending effort.
 
 ## V2 — DESIGN THE VERIFICATION (before touching a browser)
+
+**Load the competencies this verification needs** — from
+`{paths.team}/competencies/qa/INDEX.md` (read the index, not the tree): the
+`always` rows (`qa-test-design`, `qa-user-mindset`, `qa-case-writing`,
+`qa-hostile-inputs`, `qa-heuristics`) shape the pack; the token rows load when
+the ticket matches — `qa-security-probes` on any auth/roles/money/PII/upload
+ticket (`label:`/`term:` match). Record the loaded list in the verify-sheet
+under **Competencies:**. Their reference tables (full hostile-input, heuristic,
+security and checklist catalogues) live under `competencies/qa/reference/` —
+open the one row-set the field in front of you needs; never paste a whole table
+into the plan. `qa-test-design` governs how the 2–5 TCs below are chosen and
+budgeted by consequence:
 
 Plan in the verify-sheet — usually 2–5 TCs:
 - ① **Exact acceptance path** — the criterion as the ticket/spec states it.
@@ -149,6 +168,15 @@ Plan in the verify-sheet — usually 2–5 TCs:
 - **Data check (read-only):** does the needed data exist? Never trust values in
   the ticket to still exist — resolve a currently-valid key; an empty list from
   stale data = "data moved", not a bug.
+- **The boundary value (②) is chosen with `qa-hostile-inputs`** — one value the
+  spec refuses + one a real user produces this week; a boundary chosen for
+  convenience is a happy-path case with a different number. **Every TC's STEPS
+  carries at least one real-user move** (`qa-user-mindset` — Enter not Save,
+  double-click, Back after, refresh, paste) and names its `PERSONA:`. When the
+  spec is silent, `qa-heuristics` supplies a consistency oracle so the finding
+  has a named owner, not a shrug. Write each record to the
+  `qa-case-writing` fifteen-second standard — TITLE a behaviour sentence,
+  EXPECTED an observable fact with a citation, none of the banned filler words.
 
 ## V2b — ENV BRING-UP
 
@@ -304,11 +332,16 @@ verify-sheet · spec §/schema citations · debate.md · remaining evidence file
 1. Write YOUR verdict card into `debate.md` FIRST (verdict + strongest evidence +
    `MY WEAK SPOT:` the one thing most likely to be wrong).
 2. Spawn ONE fresh agent (never forked; model `standard` per model-routing) with:
-   ticket verbatim + verify-sheet + evidence paths + REPORT.md + this
-   instruction: "FALSIFY this verification: wrong role/account? data-shaped
-   difference? boundary untested? evidence stale or not showing what the caption
-   says? any REPORT.md sentence a non-technical reader can't follow? Return your
-   own card."
+   ticket verbatim + verify-sheet + evidence paths + REPORT.md + **the
+   `## Reviewer lens` block of every competency the verify-sheet lists under
+   Competencies:** + this instruction: "FALSIFY this verification: wrong
+   role/account? data-shaped difference? boundary untested or chosen for
+   convenience? a 'unique/normalised' rule never tested across representations?
+   an illegal transition tried only through the UI button? evidence stale or not
+   showing what the caption says? a FAIL whose severity or origin is wrong? any
+   REPORT.md sentence a non-technical reader can't follow? Work the pasted lens
+   items one by one. Return your own card." A challenger card that ignores a
+   pasted lens item without saying why is returned.
 3. Challenger found a hole → run the decisive experiment (a re-run, a SELECT),
    never argue in prose. Append the resolution + `Remaining dissent:` line.
 4. Consensus without a run that actually executed = UNCLEAR, never PASS.
@@ -372,6 +405,11 @@ verify-sheet · spec §/schema citations · debate.md · remaining evidence file
 - [ ] Every TC ran HEADED this session against the running app; blocked TCs carry
       reason + unblock path
 - [ ] Boundary TC + whole-screen sanity TC ran (not only the happy path)
+- [ ] V1/V2: verify-sheet carries **Competencies:** — `qa-identity` +
+      `qa-requirement-smells` + every INDEX row matching this ticket; the loaded
+      Reviewer lens blocks went into the V6 challenger brief
+- [ ] V1: requirement-smells three-line test run on each criterion; untestable
+      ones raised as questions to the owner before testing (not after)
 - [ ] Writes verified via read-only DB checks; all test data UI-created, per the
       write gate (ask when present / minutes-first when absent), ZZTEST-marked,
       cleaned up
