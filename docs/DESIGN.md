@@ -23,6 +23,7 @@ review. A PR that hardcodes any adopter detail into core is rejected on sight.
 │ CORE  (tool-agnostic, English)                              │
 │ doctrine/   ops, raci, review-standard, model-routing,      │
 │             roles/{pm,ba,sa,dev,qa,design,devops}           │
+│             competencies/<role>/ — the craft each role knows │
 │ workflows/  team, pm, ba, dev, qa, verify-gate, guidelines  │
 │ scripts/    gates (py/mjs/sh) + scripts/lib (ctx, config)   │
 │ templates/  decisions.md, log.md, changes.md, KB,           │

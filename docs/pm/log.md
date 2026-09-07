@@ -22,3 +22,6 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-08-24 | DEV | Connor Pham | PR #41 security posture — SECURITY.md, Scorecard+CodeQL+provenance CI, pinned actions, best-practices dossier | done (frontier) · tok ≈ 50k | PR #41 |
 | 2026-09-03 | DEV | Connor Pham | PR #57 README for both surfaces — 9 relative links absolutised for the npm page, selftest count 22→25 (prose+transcript+svg), e2e guard so it cannot drift again | done (frontier) · tok ≈ 90k | PR #57 |
 | 2026-09-03 | DEV | Connor Pham | PR #58 README describes the last three releases — specialists section + diagram, watchable dev/QA sessions, CHANGELOG, 2 drift guards | done (frontier) · tok ≈ 110k | PR #58 |
+| 2026-09-07 | DEV | Connor Pham | VT-3 competencies — DEV craft layer (10 files) + competency_check gate + /dev routing | done (frontier) · tok ≈ 350k | branch feat/VT-3-competencies |
+| 2026-09-07 | DEV | Connor Pham | VT-4 QA competencies — 9 files distilled from ai-qa + reference tables + /qa routing | done (frontier) · tok ≈ 300k | branch feat/VT-4-qa-competencies |
+| 2026-09-07 | DEV | Connor Pham | 0.16.0 — VT-3+VT-4 competency layer integrated onto main (DEV 10 + QA 9), README reconciled, gate 14→15 / selftest 25→26 | done (frontier) · tok ≈ 120k | release/0.16.0 |
