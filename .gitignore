@@ -19,3 +19,7 @@ evd/**
 
 # vteam: QA journey scripts are re-runnable evidence — text, so they commit
 !evd/**/*.mjs
+
+# stray editor/sed backups
+*.bak
+*.orig
