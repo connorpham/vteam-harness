@@ -246,6 +246,10 @@ team:
   # termination as DATA (MAST 1.5): graph_check reds an item dispatched more
   # than this many times in one day — thrash, not persistence
   loop_budget_per_day: 4
+  # max DEV agents /team runs concurrently, each in its own worktree on a
+  # DISJOINT code scope (parallel_check enforces disjoint + this cap). 1 =
+  # sequential (safe default); >1 turns on /team parallel mode.
+  parallel: 1
 
 autonomy:
   level: ${autonomy}

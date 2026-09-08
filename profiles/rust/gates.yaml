@@ -8,6 +8,8 @@ steps:
     run: "python3 .vteam/scripts/verbatim_gate.py"
   competencies:
     run: "python3 .vteam/scripts/competency_check.py"
+  parallel:
+    run: "python3 .vteam/scripts/parallel_check.py"
   fmt:
     run: "cargo fmt --check"
     requires: "Cargo.toml"

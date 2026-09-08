@@ -36,9 +36,16 @@ and keeps the beat:
    traceable, always in the acceptance dossier.
 2. **Child-lane gates stay intact.** /pm schedules and forwards; it never
    loosens a child gate "in the name of automation".
-3. **One coding item at a time.** /dev needs a branch + gate on the working tree
-   — never 2 DEV items in parallel. Non-code lanes (BA/SA/QA read-only) may
-   interleave while waiting.
+3. **Coding may fan out; integration never does.** DEV runs up to `team.parallel`
+   agents at once (config; default **1 = sequential**), each in its OWN
+   worktree/branch on a **disjoint `CODE-SCOPE`** — `parallel_check` reds two
+   in-flight branches that share a file, and any count past the cap. But
+   **merging is serialized**: one PR onto the protected branch at a time, the
+   /verify gate re-run between each (a green PR goes stale the moment a sibling
+   lands under it — `stale_verdict_check`). And **the ledger, the decision queue
+   and the merges are the PM's SINGLE hand** (principle #5) — worktree agents
+   return their ledger row + report as TEXT; the PM writes them. Non-code lanes
+   (BA/SA/QA read-only) interleave as before.
 4. **Everything needing the owner funnels to ONE place:** the decision queue
    (`{paths.pm}/decisions.md`) + the "Your desk" table at session end. The owner
    never has to read the tracker/PRs/logs to know what they must do.
@@ -111,7 +118,7 @@ and keeps the beat:
 
 ## P1 — PICK THE WORK
 
-An item is **UNBLOCKED** when all 6 hold: (a) no 🔴 OPEN question/action blocks
+An item is **UNBLOCKED** when all 7 hold: (a) no 🔴 OPEN question/action blocks
 it; (b) if it's a UI ticket, its **design oracle** exists — a real design link on
 the ticket (missing → dispatch the DESIGN lane first; the dev ticket queues right
 after); (c) no blocked-by ticket still un-Done; (d) it belongs to the current
@@ -120,7 +127,10 @@ no `feat|fix/<KEY>-*` branch being pushed; (f) **it is a row in the sprint plan*
 — including harness/process work: work without a day-cost in the plan consumes
 capacity off the books (a real week lost 4 days to exactly this without the desk
 report noticing). Worthwhile ad-hoc harness work → add the plan row FIRST (with a
-day-cost), then dispatch.
+day-cost), then dispatch. **(g) In parallel mode only** — its `CODE-SCOPE` is
+disjoint from every branch already in flight this session; an item that would
+share a file with a running agent is not unblocked *yet*, it is *next*
+(`parallel_check` is the machine that reds a violation).
 
 Dispatch priority (top down, first match wins):
 
@@ -142,7 +152,10 @@ Dispatch priority (top down, first match wins):
 1. **QA** — a ticket the dev reported done (PR merged / report posted) but not
    yet verified. Verification debt is quality debt; pay it first.
 2. **DEV** — the next unblocked item, in sprint-plan order (the order means
-   something).
+   something). **Parallel mode** (`team.parallel > 1`): pick up to that many
+   unblocked items whose `CODE-SCOPE` are pairwise disjoint (leg (g)), dispatch
+   each as a worktree agent, and integrate their PRs serially (see /team T2).
+   Items that would touch a file another in-flight branch owns wait their turn.
 3. **BA** — the current sprint has ≤1 item left and the next sprint lacks
    tickets → /ba creates the next batch from the existing draft.
 4. **SA** — an ADR in the decision queue whose underlying question is answered

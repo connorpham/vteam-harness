@@ -113,6 +113,7 @@ team:
   capacity_per_day: 0.8
   hours_per_day: 8           # a workday in hours; plan costs "12h" ÷ this → days
   loop_budget_per_day: 4     # graph_check reds >N same-item dispatches/day (MAST 1.5)
+  parallel: 1                # max concurrent DEV worktree agents (parallel_check: disjoint scopes + this cap); 1 = sequential
 autonomy:
   level: full                # off | assisted | full
   self_merge: true           # per-project off switch for agent-merged PRs (level: full only)
@@ -262,9 +263,13 @@ What `size > 1` does TODAY, as machinery (the team round, 2026-08):
 - two humans appending the same ledger merge conflict-free: init writes a
   `merge=union` gitattribute for the append-only file
 
-Still prose, not gates (stated here so nobody oversells): WIP limit = size,
-the 2h claim TTL (raci.md is its one home; the PM recovery lane enforces it),
-and self-merge-requires-human-review at size > 1. vteam measures artifacts,
+Now a gate (VT-5, 2026-09): `team.parallel > 1` turns on true fan-out — the PM
+runs that many DEV agents in their own worktrees on **disjoint `CODE-SCOPE`**
+(`parallel_check` reds an overlap or an over-cap count) and MERGES them serially,
+re-gating between; coding is parallel, integration and the ledger stay the PM's
+single hand. Still prose (stated so nobody oversells): the 2h claim TTL (raci.md
+is its one home; the PM recovery lane enforces it) and self-merge-requires-human-
+review at size > 1. vteam measures artifacts,
 tokens and routing per person — never anyone's chat.
 
 ## 8. Adapter contract

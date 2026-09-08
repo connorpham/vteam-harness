@@ -1,7 +1,7 @@
 ---
 name: team
 command: /team
-description: One command puts the whole virtual team to work. /team runs a full "workday" — clears the owner's decision queue first (batched questions), then works through every UNBLOCKED item (DEV tickets sequentially via /dev, BA drafts and SA ADRs in parallel background worktrees, QA verification between dev tasks) until everything left needs the owner, then prints one end-of-day desk report. The autonomous entry point on top of /pm — same rules, same gates, same decision queue.
+description: One command puts the whole virtual team to work. /team runs a full "workday" — clears the owner's decision queue first (batched questions), then works through every UNBLOCKED item (DEV tickets via /dev — one at a time, or up to team.parallel agents in their own worktrees on disjoint scopes, merged serially; BA drafts and SA ADRs in parallel background worktrees; QA verification between dev tasks) until everything left needs the owner, then prints one end-of-day desk report. The autonomous entry point on top of /pm — same rules, same gates, same decision queue.
 args: "[n=N item cap | full: run until dry | no-decide: skip the asking step | lite: no background lanes, cheapest]"
 ---
 
@@ -58,10 +58,34 @@ The default 5 is /team's OWN cap, deliberately higher than /pm's `run n=3`
 because /team is "a full workday" — an intentional override, not a
 contradiction.
 
-**The main track (sequential, on the working tree):** /pm P1 priority order —
-QA debt → the sprint's next DEV ticket → BA's next ticket batch → the SA ADR
-whose turn it is. The DEV WIP limit is `team.size` (config; default 1 — one
-coding item at a time, /pm principle #3).
+**The main track — the PM as coordinator:** /pm P1 priority order — QA debt →
+the sprint's next DEV ticket(s) → BA's next ticket batch → the SA ADR whose turn
+it is. How DEV runs is set by `team.parallel` (config; default **1**):
+
+- **Sequential (`team.parallel: 1`):** one DEV ticket at a time on the working
+  tree — branch, code, /verify, two reviewers, PR — then the next.
+- **Parallel (`team.parallel: N > 1`) — fan out the coding, serialize the
+  integration:** the PM picks up to **N** unblocked tickets whose `CODE-SCOPE`
+  are **pairwise disjoint** (/pm P1 leg (g)) and dispatches each as a DEV agent
+  in its **own git worktree** (`Agent(isolation: "worktree")`, or the
+  `orchestration` skill's coordinator loop / `EnterWorktree`). Each agent runs
+  the FULL /dev pipeline to a PR inside its worktree — DoR, code, /verify, two
+  fresh reviewers, committed dossier, push. The PM itself writes no product
+  code; it assigns, waits on each agent's completion, and INTEGRATES under three
+  rules that keep vteam's own gates honest:
+  1. **Serialized merge, re-gate between.** Merge ONE PR onto the protected
+     branch, run the /verify gate, then the next — a PR that was green can go
+     red once a sibling lands beneath it (`stale_verdict_check` expires a verdict
+     whose code moved). Never two merges at once.
+  2. **One hand on the books.** Each worktree agent RETURNS its ledger row +
+     7-part report as TEXT; the PM writes every ledger line, decision-queue row
+     and session minute itself — two writers on one bookkeeping file lose rows
+     (/pm principle #5). Agents write only inside their own worktree.
+  3. **Collision is a gate, not a hope.** `parallel_check` reds two in-flight
+     branches that share a file and any count past N; the PM never dispatches an
+     overlapping pair — it serializes them.
+  `team.parallel` is the concurrency ceiling; `team.size` stays the headcount for
+  actor accounting on the ledger/board.
 
 **Background lanes (parallel with the main track, when there's work):** while
 DEV codes, spawn background agents for work that does NOT touch the working
@@ -178,8 +202,10 @@ questions awaiting answers) → ③ risks in the next 7 days.
 ## Definition of Done (every /team run)
 
 - [ ] T1 ran (or the user chose `no-decide`) — no overdue question silently ignored
-- [ ] Every dispatched item traveled its lane's full pipeline; DEV sequential;
-      background lanes only in separate worktrees
+- [ ] Every dispatched item traveled its lane's full pipeline; parallel DEV
+      agents (if `team.parallel > 1`) ran in their own worktrees on disjoint
+      scopes and MERGED serially with a re-gate between; background lanes only in
+      separate worktrees; every ledger row written by the PM's single hand
 - [ ] No invented answers (provisional decisions carry the 🟡 record +
       pending-acceptance label), no quality gate loosened; self-merge/self-close/
       self-create only under the corresponding autonomy rules
