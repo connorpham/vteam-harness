@@ -160,11 +160,14 @@ Dispatch priority (top down, first match wins):
 2. **DEV** — the next unblocked item, in sprint-plan order (the order means
    something). **Parallel mode** (`team.parallel > 1`): pick up to that many
    unblocked items whose `CODE-SCOPE` are pairwise disjoint (leg (g)), dispatch
-   each as a worktree agent — hand each one the OTHER agents' handles + the
-   `docs/pm/coordination.md` path so they can split scope / hand off a shared
-   contract directly (`coord_check` keeps those decisions honest) — and integrate
-   their PRs serially (see /team T2), re-running `parallel_check` + `coord_check`
-   after any handoff. Items that would touch a file another in-flight branch owns
+   each as a worktree agent over the transport in
+   `docs/team/parallel-transport.md` (Claude Code: the Orca Run mailbox via
+   `bash .vteam/scripts/orca_team.sh open-run …`; else the text-relay fallback) —
+   hand each one how to reach the others + the `docs/pm/coordination.md` path
+   so they can split scope / hand off a shared contract (`coord_check` keeps those
+   decisions honest) — and integrate their PRs serially (see /team T2), re-running
+   `parallel_check` + `coord_check` after any handoff. Items that would touch a
+   file another in-flight branch owns
    wait their turn.
 3. **BA** — the current sprint has ≤1 item left and the next sprint lacks
    tickets → /ba creates the next batch from the existing draft.

@@ -67,10 +67,13 @@ it is. How DEV runs is set by `team.parallel` (config; default **1**):
 - **Parallel (`team.parallel: N > 1`) — fan out the coding, serialize the
   integration:** the PM picks up to **N** unblocked tickets whose `CODE-SCOPE`
   are **pairwise disjoint** (/pm P1 leg (g)) and dispatches each as a DEV agent
-  in its **own git worktree** (`Agent(isolation: "worktree")`, or the
-  `orchestration` skill's coordinator loop / `EnterWorktree`). Each agent runs
-  the FULL /dev pipeline to a PR inside its worktree — DoR, code, /verify, two
-  fresh reviewers, committed dossier, push. The PM itself writes no product
+  in its **own git worktree** on the transport in `{paths.team}/parallel-transport.md`
+  — on Claude Code, an Orca `worker-start` bound to the Run
+  (`bash .vteam/scripts/orca_team.sh open-run …`); elsewhere the text-relay
+  fallback. Each agent runs the FULL /dev pipeline to a PR inside its worktree —
+  DoR, code, /verify, two fresh reviewers, committed dossier, push; the PM blocks
+  on `worker_done`/escalation (`orca_team.sh wait <run>`), never a poll loop. The
+  PM itself writes no product
   code; it assigns, waits on each agent's completion, and INTEGRATES under three
   rules that keep vteam's own gates honest:
   1. **Serialized merge, re-gate between.** Merge ONE PR onto the protected
@@ -181,12 +184,19 @@ independence is the whole point of a second pair of eyes. On that base:
 
 ### Parallel DEV coordination — talk, but the decision becomes an artifact
 
-When `team.parallel > 1`, the PM hands each DEV agent (a) the others' agent
-handles and (b) the path to `{paths.pm}/coordination.md`. The agents MAY message
-each other directly (`SendMessage`) for exactly two reasons: to split a scope
-that turned out to overlap, and to hand off a shared contract (a type, an API
-shape, a DB field) one owns and another consumes. This closes the FUNCTIONAL
-conflict `parallel_check` can't see — two files, one hidden contract.
+When `team.parallel > 1`, the agents coordinate on a REAL transport, not a
+hoped-for one — **`{paths.team}/parallel-transport.md` is the wire**. On Claude
+Code that is the Orca orchestration bus (a persistent, addressable Run mailbox);
+the PM opens it with `bash .vteam/scripts/orca_team.sh status` / `open-run` and
+binds each worker to the Run. Where no bus exists the same helper prints the
+text-relay fallback. Either way the PM hands each DEV agent (a) how to reach the
+others (the Run, or the PM as relay) and (b) the path to
+`{paths.pm}/coordination.md`. The agents coordinate for exactly two reasons: to
+split a scope that turned out to overlap, and to hand off a shared contract (a
+type, an API shape, a DB field) one owns and another consumes. This closes the
+FUNCTIONAL conflict `parallel_check` can't see — two files, one hidden contract.
+(The subagent `SendMessage`/`ListAgents` path is NOT the transport — `ListAgents`
+is disabled for spawned agents, so peer discovery fails; use the bus or the relay.)
 
 Four rules keep the chat from becoming the ephemeral, unauditable mess vteam
 exists to prevent:
