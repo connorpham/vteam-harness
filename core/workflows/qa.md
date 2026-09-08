@@ -370,6 +370,12 @@ verify-sheet · spec §/schema citations · debate.md · remaining evidence file
    never argue in prose. Append the resolution + `Remaining dissent:` line.
 4. Consensus without a run that actually executed = UNCLEAR, never PASS.
 
+**Optional human report (BDD).** Alongside REPORT.md you MAY emit
+`{paths.evidence}/<TICKET>/REPORT.bdd.md` — the verdict as Given/When/Then
+scenarios a non-programmer scans in a minute (`{paths.team}/bdd-report.md`;
+`bdd_report_check` guards it: every scenario complete, no code-speak, not
+rambling). Code details stay in cmd_verify.md, never in a scenario.
+
 ## V7 — REPORT + CLOSE THE LOOP
 
 1. Finalize REPORT.md (challenger's readability fixes applied). Re-run

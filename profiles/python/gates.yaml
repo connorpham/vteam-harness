@@ -17,6 +17,8 @@ steps:
     run: "python3 .vteam/scripts/parallel_check.py"
   coord:
     run: "python3 .vteam/scripts/coord_check.py"
+  bdd-report:
+    run: "python3 .vteam/scripts/bdd_report_check.py"
   lint:
     run: "ruff check ."
     requires: "pyproject.toml"

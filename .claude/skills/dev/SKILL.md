@@ -410,6 +410,11 @@ silent skip to one fewer reviewer.
    `git switch <protected> && git pull` after merging.
 4. List every side finding from T3 and what was done with it.
 
+**Optional human report (BDD).** Beside the 7-part comment you MAY write
+`evd/<TICKET>/dev/REPORT.bdd.md` — what you built as
+Given/When/Then scenarios in plain words (`docs/team/bdd-report.md`;
+`bdd_report_check` guards completeness + conciseness + no code-speak).
+
 ## T6 — TRACKER CLOSE LOOP (report comment is REQUIRED)
 
 1. Write the **7-part report comment** — sentinel-tagged sections
