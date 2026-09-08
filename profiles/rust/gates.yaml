@@ -10,6 +10,8 @@ steps:
     run: "python3 .vteam/scripts/competency_check.py"
   parallel:
     run: "python3 .vteam/scripts/parallel_check.py"
+  coord:
+    run: "python3 .vteam/scripts/coord_check.py"
   fmt:
     run: "cargo fmt --check"
     requires: "Cargo.toml"

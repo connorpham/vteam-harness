@@ -114,6 +114,7 @@ team:
   hours_per_day: 8           # a workday in hours; plan costs "12h" ÷ this → days
   loop_budget_per_day: 4     # graph_check reds >N same-item dispatches/day (MAST 1.5)
   parallel: 1                # max concurrent DEV worktree agents (parallel_check: disjoint scopes + this cap); 1 = sequential
+  coord_budget: 3            # max peer-coordination rounds between parallel DEV agents (coord_check)
 autonomy:
   level: full                # off | assisted | full
   self_merge: true           # per-project off switch for agent-merged PRs (level: full only)

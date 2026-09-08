@@ -250,6 +250,7 @@ team:
   # DISJOINT code scope (parallel_check enforces disjoint + this cap). 1 =
   # sequential (safe default); >1 turns on /team parallel mode.
   parallel: 1
+  coord_budget: 3
 
 autonomy:
   level: ${autonomy}

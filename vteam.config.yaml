@@ -80,6 +80,9 @@ team:
   # DISJOINT code scope (parallel_check gate enforces disjoint + this cap).
   # 1 = sequential (the safe default); >1 turns on /team parallel mode.
   parallel: 1
+  # max peer-coordination rounds between parallel DEV agents before the PM
+  # must step in (coord_check reds a round past this). Bounded chat, not endless.
+  coord_budget: 3
 
 autonomy:
   level: assisted

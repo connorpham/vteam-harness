@@ -87,6 +87,8 @@ team:
   parallel: 1            # max DEV agents /team runs at once, each in its own worktree on a
                          # DISJOINT code scope (parallel_check enforces disjoint + this cap).
                          # 1 = sequential; >1 turns on /team parallel mode
+  coord_budget: 3        # max peer-coordination rounds between parallel DEV agents before
+                         # the PM steps in (coord_check reds a round past this)
 
 autonomy:
   level: assisted

@@ -148,10 +148,12 @@ by a checkout before, and had to be rewritten from memory.
 
 ## Token discipline (no burning money on idle chatter)
 
-Agents in this system do NOT chat with each other. Every "exchange" is **one
-turn**: receive 1 brief → return 1 card → end. No message threads, no
-multi-round debates (the single evidence-paid exception in item 3). On that
-base:
+Agents in this system do NOT chat with each other by default. Every "exchange"
+is **one turn**: receive 1 brief → return 1 card → end. No message threads, no
+multi-round debates (the evidence-paid review exception in item 3). **The one
+other exception: parallel DEV coordination** (see below) — and reviewers are
+never part of it: a reviewer/challenger is always fresh and isolated, because
+independence is the whole point of a second pair of eyes. On that base:
 
 1. **A spawn brief = paths, not content.** A child agent's brief contains only:
    file paths + a precise reading scope (`docs/specs/catalog.md §2`, `the
@@ -181,6 +183,36 @@ base:
    sure progress at minimum cost.
 7. Standing anti-bloat still applies: KB reads index-only; minutes are summary +
    links.
+
+
+### Parallel DEV coordination — talk, but the decision becomes an artifact
+
+When `team.parallel > 1`, the PM hands each DEV agent (a) the others' agent
+handles and (b) the path to `docs/pm/coordination.md`. The agents MAY message
+each other directly (`SendMessage`) for exactly two reasons: to split a scope
+that turned out to overlap, and to hand off a shared contract (a type, an API
+shape, a DB field) one owns and another consumes. This closes the FUNCTIONAL
+conflict `parallel_check` can't see — two files, one hidden contract.
+
+Four rules keep the chat from becoming the ephemeral, unauditable mess vteam
+exists to prevent:
+
+1. **Every decision is written down.** A scope split or contract handoff agreed
+   in chat is appended to `docs/pm/coordination.md` as one row —
+   `| Round | From | To | Path/Contract | What/why |` — and the two tickets'
+   `CODE-SCOPE` lines are updated to match. `coord_check` reds a handoff whose
+   scopes don't reflect it: a chat agreement that never became real is a defect.
+2. **Chat coordinates; it never reviews.** Reviewers and challengers stay fresh
+   and isolated — the coordination channel is for DEV agents dividing work, not
+   for anyone judging it.
+3. **Bounded rounds.** At most `team.coord_budget` rounds (config, default 3);
+   past that the PM steps in and re-partitions — `coord_check` reds an
+   over-budget round. Endless negotiation is a routing failure, not teamwork.
+4. **The PM still owns the books and the merges.** Agents coordinate and update
+   their own tasksheet + the coordination log; the PM writes every ledger row
+   and performs every serialized merge (principle #5). After any handoff the PM
+   re-runs `parallel_check` + `coord_check` before continuing.
+
 
 ## Loop guards
 
