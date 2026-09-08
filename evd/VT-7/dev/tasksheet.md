@@ -1,6 +1,12 @@
 # VT-7 task-sheet — /team parallel uses Orca orchestration as transport
 
-CODE-SCOPE: core/scripts/orca_team.sh core/doctrine/parallel-transport.md core/workflows/team.md core/workflows/pm.md docs/backlog/VT-7.md docs/pm/log.md docs/team/ .claude/skills/ .vteam/ evd/VT-7/
+CODE-SCOPE: core/scripts/orca_team.sh core/scripts/parallel_check.py core/scripts/coord_check.py core/doctrine/parallel-transport.md core/workflows/team.md core/workflows/pm.md docs/backlog/VT-7.md docs/pm/log.md docs/team/ .claude/skills/ .vteam/ evd/VT-7/
+
+> SCOPE widened deliberately (graph_check MAST 2.3): the combined VT-5+VT-6+VT-7
+> review found 2 CONFIRMED defects in the VT-5/VT-6 gate files
+> (`parallel_check.py`, `coord_check.py`); fixing them here is correct — the
+> review covered all three tickets together — so those two paths are added to
+> this ticket's scope rather than left as a stray cross-ticket edit.
 
 Competencies: dev-identity · dev-codebase-design (a shell tool + doctrine + workflow wiring; no gate change).
 

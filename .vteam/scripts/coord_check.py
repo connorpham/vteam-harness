@@ -30,9 +30,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
-ROW = re.compile(r"^\s*\|(.+)\|\s*$")
-
-
 def norm(p: str) -> str:
     return p.strip().rstrip("/")
 
@@ -51,10 +48,13 @@ def parse_log(text: str) -> list[dict]:
     A row that can't yield those four fields is returned with an `error`."""
     rows: list[dict] = []
     for line in text.splitlines():
-        m = ROW.match(line)
-        if not m:
-            continue
-        cells = [c.strip() for c in m.group(1).split("|")]
+        s = line.strip()
+        if not s.startswith("|"):
+            continue  # a table row starts with `|`; prose does not
+        inner = s[1:]
+        if inner.endswith("|"):
+            inner = inner[:-1]  # the trailing outer pipe is optional (GFM); don't require it
+        cells = [c.strip() for c in inner.split("|")]
         low = [c.lower() for c in cells]
         if "round" in low and "from" in low and "to" in low:
             continue  # header
@@ -169,7 +169,13 @@ def _selftest() -> None:
     # nesting: a dir handoff covered by a broader dir scope
     rows2 = parse_log("| Round | From | To | Path |\n|-|-|-|-|\n| 2 | VT-1 | VT-2 | src/featB/x.ts | y |\n")
     assert check_handoffs(rows2, {"VT-1": ["src/featA/"], "VT-2": ["src/featB/"]}, 3) == [], "dir covers file"
-    print("coord_check selftest: OK (consistent green + unreflected/giver-keeps/over-budget/malformed red + dir-covers-file)")
+    # C2 regression: a handoff row WITHOUT the trailing outer pipe must still be
+    # parsed and checked, not silently dropped (was a false green).
+    no_pipe = parse_log("| Round | From | To | Path |\n|-|-|-|-|\n| 1 | VT-10 | VT-11 | src/lib/order.ts | h\n")
+    assert len(no_pipe) == 1 and "error" not in no_pipe[0], no_pipe
+    e = check_handoffs(no_pipe, {"VT-10": ["src/lib/order.ts"], "VT-11": ["src/ui/"]}, 3)
+    assert any("never became real" in x or "STILL owns" in x for x in e), ("trailing-pipe-less row must be checked", e)
+    print("coord_check selftest: OK (consistent green + unreflected/giver-keeps/over-budget/malformed red + dir-covers-file + no-trailing-pipe row caught)")
 
 
 if __name__ == "__main__":

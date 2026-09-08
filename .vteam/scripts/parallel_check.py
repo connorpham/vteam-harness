@@ -52,7 +52,9 @@ def parse_scope(text: str) -> list[str]:
 
 def paths_touch(a: str, b: str) -> bool:
     """True when two paths cover overlapping ground: equal, or one nests the
-    other (a file under a dir, either direction)."""
+    other (a file under a dir, either direction). Normalizes internally so a
+    trailing slash never changes the answer (parity with coord_check)."""
+    a, b = norm(a), norm(b)
     if a == b:
         return True
     return b.startswith(a + "/") or a.startswith(b + "/")
@@ -148,6 +150,9 @@ def _selftest() -> None:
     assert paths_touch("src/a", "src/a")                     # equal
     assert not paths_touch("src/auth", "src/catalog")        # disjoint siblings
     assert not paths_touch("src/lib/a.ts", "src/lib/b.ts")   # different files, same dir
+    assert paths_touch("src/lib/", "src/lib/x.ts")           # trailing slash normalized (Q1)
+    assert not paths_touch("src", "src2")                    # prefix, not nested — must NOT overlap
+    assert not paths_touch("src/a", "src/ab")                # prefix, not nested
     # disjoint set → no conflicts
     disjoint = {"VT-1": ["src/auth/"], "VT-2": ["src/catalog/"]}
     assert find_conflicts({k: [norm(p) for p in v] for k, v in disjoint.items()}) == [], "disjoint must be clean"

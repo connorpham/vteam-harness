@@ -21,11 +21,17 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
 
 # --- resolve the Orca CLI (per the orchestration skill's rules) --------------
 resolve_cli() {
+  # An explicit override is the caller's responsibility (it is honored as-is,
+  # even on Linux); the no-bare-orca guard below is for the AUTO path only.
   if [ -n "${ORCA_CLI_COMMAND:-}" ]; then echo "$ORCA_CLI_COMMAND"; return; fi
   if [ -n "${ORCA_DEV_REPO_ROOT:-}" ] && command -v orca-dev >/dev/null 2>&1; then echo orca-dev; return; fi
-  # Linux outside an Orca terminal: never bare `orca` (GNOME screen reader) — prefer orca-ide.
-  if [ "$(uname -s)" = "Linux" ] && command -v orca-ide >/dev/null 2>&1; then echo orca-ide; return; fi
-  echo orca
+  if [ "$(uname -s)" = "Linux" ]; then
+    # On Linux, bare `orca` is the GNOME screen reader — NEVER run it. Use orca-ide
+    # or nothing (empty → caller treats the transport as unavailable → fallback).
+    command -v orca-ide >/dev/null 2>&1 && echo orca-ide || echo ""
+    return
+  fi
+  echo orca   # macOS / Windows: `orca` is the Orca CLI
 }
 ORCA="$(resolve_cli)"
 
@@ -45,8 +51,17 @@ fallback() {
 }
 
 transport_up() {
+  [ -n "$ORCA" ] || return 1                 # no safe CLI resolved (e.g. Linux, no orca-ide)
   command -v "$ORCA" >/dev/null 2>&1 || return 1
-  "$ORCA" status --json 2>/dev/null | grep -q '"reachable": true' || return 1
+  # Parse the JSON properly (not a literal grep that a whitespace/key change breaks).
+  "$ORCA" status --json 2>/dev/null | python3 -c '
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+sys.exit(0 if d.get("result", {}).get("runtime", {}).get("reachable") is True else 1)
+' || return 1
   return 0
 }
 
@@ -69,7 +84,13 @@ case "${1:-}" in
     ensure_coord
     if ! transport_up; then fallback; echo "COORD=$COORD"; exit 0; fi
     out="$("$ORCA" orchestration run-create --objective "$obj" --json 2>/dev/null)"
-    rid="$(printf '%s' "$out" | grep -oE '"id": *"run_[a-z0-9]+"' | head -1 | grep -oE 'run_[a-z0-9]+')"
+    rid="$(printf '%s' "$out" | python3 -c '
+import sys, json
+try:
+    print(json.load(sys.stdin).get("result", {}).get("run", {}).get("id", ""))
+except Exception:
+    print("")
+')"
     if [ -z "$rid" ]; then echo "⚠ could not create a Run (see: $ORCA orchestration run-create)"; fallback; exit 0; fi
     echo "RUN=$rid"
     echo "COORD=$COORD"
