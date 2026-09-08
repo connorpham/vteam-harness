@@ -28,3 +28,4 @@ machine-mandatory (log_check reds a legacy header and any empty Actor cell).
 | 2026-09-08 | DEV | Connor Pham | VT-5 /team parallel mode — parallel_check gate + PM-coordinated worktree fan-out (pm/team rewritten, team.parallel knob) | done (frontier) · tok ≈ 200k | branch feat/VT-5-parallel-team |
 | 2026-09-08 | DEV | Connor Pham | VT-6 peer coordination — coord_check gate + agents chat to split/hand off work (team/pm rules, coord_budget knob) | done (frontier) · tok ≈ 200k | branch feat/VT-6-agent-coordination |
 | 2026-09-08 | DEV | Connor Pham | VT-7 /team parallel uses Orca orchestration as transport — orca_team.sh helper + parallel-transport doctrine, team/pm rewired off the disabled ListAgents path | done (frontier) · tok ≈ 150k | branch feat/VT-7-orca-transport |
+| 2026-09-08 | REV | Connor Pham | VT-7 review — R1 APPROVE-w-Q + R2 REQUEST-CHANGES(2 CONFIRMED) fixed + re-review APPROVE | done · tok ≈ 260k | evd/VT-7/dev/review.md |
