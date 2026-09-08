@@ -23,3 +23,6 @@ evd/**
 # stray editor/sed backups
 *.bak
 *.orig
+
+# QA workbook is generated from the evidence text (xlsx_export.py) — regenerate, never commit
+evd/**/*.xlsx

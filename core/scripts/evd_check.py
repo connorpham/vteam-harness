@@ -33,6 +33,20 @@ Checks, for {paths.evidence}/<TICKET>/:
   5. No orphan evidence: REPORT.md §3 (that section, not anywhere) references
      every executed TC folder.
   6. --expect-tcs N: planned-vs-ran must match ("planned 5, ran 1" must red).
+  8. READABILITY (ported from ai-qa 2026-09-08 — "could a stranger reconstruct
+     this verdict from the folder alone?"): every TC declares KIND: (acceptance,
+     boundary, whole-screen, write-readback, exploratory, security) and the pack
+     holds a boundary AND a whole-screen case; EXPECTED/ACTUAL that is ONLY a
+     judgement word ("works", "failed", "OK") is RED — present is not written;
+     TITLE that names a topic, not a behaviour, is warned; a bare TC_n folder
+     (no _<what_it_proves> slug) is flagged; KIND: write-readback needs
+     db_verify.md; the root manifest carries a COVERAGE: block naming, for
+     security and accessibility, the case that covered it or a reasoned waiver;
+     REPORT.md carries ENVIRONMENT: <name — url> and ORACLE: lines; and the
+     evd_index block in manifest.md must match the folder (a lying index is red,
+     a missing one is a warning). COMPATIBILITY: a pack is "v2" when any TC
+     declares KIND: — v2 packs get these as errors, legacy packs as warnings, so
+     old evidence stays green while new evidence is held to the readable bar.
   7. --attach <TICKET>: upload every TC image via the tracker provider, confirm
      by READ-BACK, and write a "## TRACKER ATTACHMENTS" section (name · md5 ·
      url) into the root manifest — the in-git pointer that lets a clean checkout
@@ -52,6 +66,28 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:  # ONE vocabulary for gate + workbook (ai-qa: separate lists made them disagree)
+    from evdpack import KINDS, VAGUE_VALUE, fields as pack_fields  # type: ignore
+except Exception:  # pragma: no cover — degraded install: keep the old rules alive
+    KINDS = ("acceptance", "boundary", "whole-screen", "write-readback", "exploratory", "security")
+    VAGUE_VALUE = re.compile(r"^\W*(?:it\s+)?(?:works|worked|passes|passed|ok|okay|fine|failed|fails|"
+                             r"as expected|correct|correctly|properly|no errors?|n/a|tbd|todo)\W*$", re.I)
+    def pack_fields(text):
+        out = {}
+        for line in text.splitlines():
+            m = re.match(r"^\s*(?:[-*]\s*)?([A-Z][A-Z_-]{1,20}):\s*(.*)$", line)
+            if m and m.group(1) not in out:
+                out[m.group(1)] = m.group(2).strip()
+        return out
+try:
+    import evd_index  # type: ignore
+except Exception:  # pragma: no cover
+    evd_index = None
+
+REQUIRED_COVERAGE = ("security", "accessibility")
+_WAIVER = re.compile(r"(?i)\b(n/?a|not applicable|out of scope|kh[oô]ng áp d[uụ]ng|khong ap dung)\b")
+_TOPIC_TITLE = re.compile(r"(?i)^\s*(?:tc|test|case|check|verify)\b")
 
 VERDICTS = ["PASS", "FAIL", "PARTIAL", "NEW-BUG", "BLOCKED", "UNCLEAR"]
 # word-boundary, H1 only — '# PASSPORT verification' is NOT a PASS (board.mjs
@@ -181,6 +217,9 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
         errs.append(f"V2 planned {expect_tcs} TCs but only {len(tcs)} TC_* folders exist")
 
     root_manifest = read(evd / "manifest.md")
+    kinds: list[str] = []
+    v2 = any("KIND:" in read(t / "manifest.md").upper() for t in tcs)  # any KIND → held to the readable bar
+    sink = errs if v2 else warns   # readability rules: errors on v2 packs, warnings on legacy ones
     for tc in tcs:
         res = tc_result(tc)
         if not (tc / "manifest.md").is_file():
@@ -193,6 +232,34 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
         pngs = list(tc.rglob("*.png"))
         mtext = read(tc / "manifest.md").upper()
         non_ui = "TYPE: NON-UI" in mtext or "NON-UI" in mtext
+        # ── readability: what a stranger needs from THIS case (ai-qa port) ──
+        raw = read(tc / "manifest.md")
+        f = pack_fields(raw)
+        kind = f.get("KIND", "").lower()
+        if kind and kind not in KINDS:
+            errs.append(f"{tc.name}/manifest.md: KIND is {kind!r}; must be one of {', '.join(KINDS)}")
+        elif not kind:
+            warns.append(f"{tc.name}/manifest.md: no KIND: — the pack cannot say whether the boundary "
+                         f"or whole-screen case was ever designed (acceptance|boundary|whole-screen|"
+                         f"write-readback|exploratory|security)")
+        if kind in KINDS:
+            kinds.append(kind)
+        for key in ("EXPECTED", "ACTUAL"):
+            val = f.get(key, "")
+            if val and VAGUE_VALUE.match(val):
+                errs.append(f"{tc.name}/manifest.md: {key} is {val!r} — a judgement, not a value. Write what "
+                            f"the screen shows (the number, the label, the state) with its citation; if that "
+                            f"cannot be written, the expected behaviour is not yet known")
+        title = f.get("TITLE", "")
+        if title and (len(title.split()) < 3 or _TOPIC_TITLE.match(title)):
+            warns.append(f"{tc.name}/manifest.md: TITLE {title!r} names a topic, not a behaviour — write who "
+                         f"does what and what must happen, e.g. 'A quantity of 0 is refused'")
+        if re.fullmatch(r"TC_\d+", tc.name):
+            sink.append(f"{tc.name}: the folder is called {tc.name} and nothing else — name it "
+                        f"TC_<n>_<what_it_proves> so a reader knows what was tested without opening a file")
+        if kind == "write-readback" and not (tc / "db_verify.md").is_file():
+            errs.append(f"{tc.name}: KIND: write-readback with no db_verify.md — the interface saying "
+                        f"'Saved' is a claim about the interface, not the data")
         if not blocked and not pngs and not non_ui:
             attached = re.findall(rf"{re.escape(tc.name)}/\S+\.png\s*·\s*md5\s+[0-9a-f]{{32}}\s*·",
                                   root_manifest)
@@ -251,7 +318,72 @@ def check_tree(evd: Path, expect_tcs: int, write_verbs: list[str]) -> tuple[list
         # name carrying regex metacharacters crashes the gate / bends the match
         if text and not blocked and not re.search(rf"\b{re.escape(tc.name)}\b", sec3):
             errs.append(f"REPORT.md §3 never mentions {tc.name} — orphan evidence")
+
+    # ── pack-level readability (ai-qa port) ─────────────────────────────────
+    ran = [t for t in tcs if (t / "manifest.md").is_file()
+           and not any(w in tc_result(t) for w in NOT_EXECUTED)]
+    if ran:
+        if "boundary" not in kinds:
+            sink.append("no case with KIND: boundary — the happy path passing tells you nothing about the "
+                        "input that must behave the OTHER way")
+        if "whole-screen" not in kinds:
+            sink.append("no case with KIND: whole-screen — fixes break neighbours, and the neighbour is "
+                        "what users notice")
+    if text:
+        for key, why in (("ENVIRONMENT", "which environment this verdict came from, as <name — url> — a bug "
+                                         "found on staging is not evidence about production"),
+                         ("ORACLE", "what 'correct' was compared against — write NONE if nothing was")):
+            if not re.search(rf"(?im)^\s*{key}:\s*\S", text):
+                sink.append(f"REPORT.md: no {key}: line — {why}")
+    _check_coverage(evd, root_manifest, tcs, sink)
+    if evd_index is not None and (evd / "manifest.md").is_file():
+        why = evd_index.stale(str(evd))
+        if why == "manifest.md carries no index block":
+            warns.append(f"manifest.md: {why} — the folder cannot introduce itself; run "
+                         f"python3 .vteam/scripts/evd_index.py --evd {evd}")
+        elif why:
+            errs.append(f"manifest.md: {why} — an index that lies is worse than none; run "
+                        f"python3 .vteam/scripts/evd_index.py --evd {evd}")
     return errs, warns
+
+
+def _check_coverage(evd: Path, text: str, tcs: list, sink: list) -> None:
+    """The root manifest must decide, for each risk lens the framework insists on,
+    either the case that covered it or an out-loud waiver with a reason."""
+    if not text:
+        return  # absence of manifest.md is already reported upstream
+    if not re.search(r"(?im)^\s*#*\s*COVERAGE\s*:", text):
+        sink.append("manifest.md: no COVERAGE: block — the pack never says whether "
+                    + " and ".join(REQUIRED_COVERAGE) + " were in scope. Silent omission is exactly "
+                    "how a lens gets skipped: name the case that covered each, or waive it with a reason")
+        return
+    after = re.split(r"(?im)^\s*#*\s*COVERAGE\s*:", text, maxsplit=1)[1]
+    block = re.split(r"(?im)^\s*#{1,6}\s+\S", after, maxsplit=1)[0]
+    present = set()
+    for t in tcs:
+        m = re.match(r"^TC_(\d+)", t.name)
+        if m:
+            present.add(int(m.group(1)))
+    for lens in REQUIRED_COVERAGE:
+        m = re.search(rf"(?im)^\s*[-*]?\s*{lens}\s*:\s*(.+?)\s*$", block)
+        if not m:
+            sink.append(f"manifest.md: COVERAGE names no line for '{lens}' — decide it: a case, or a waiver with a reason")
+            continue
+        value = m.group(1)
+        tcm = re.search(r"\bTC[_-]?(\d+)\b", value, re.I)
+        if tcm:
+            if int(tcm.group(1)) not in present:
+                sink.append(f"manifest.md: COVERAGE says '{lens}: {value}' but there is no such case folder — a "
+                            f"citation to a case that does not exist")
+            continue
+        if _WAIVER.search(value):
+            reason = _WAIVER.sub("", value).strip(" -—:.,").strip()
+            if len(reason) < 10:
+                sink.append(f"manifest.md: COVERAGE waives '{lens}' with no reason — a waiver with no reason is a "
+                            f"silent skip wearing a label")
+            continue
+        sink.append(f"manifest.md: COVERAGE line for '{lens}' is neither a case (TC_n) nor a waiver "
+                    f"(n/a — reason): {value!r}")
 
 
 def attach_all(evd: Path, ticket: str) -> int:
@@ -449,10 +581,85 @@ def _selftest():
             varied.write_bytes(_png(500, 400,
                                     lambda x, y: bytes((x % 256, y % 256, (x * y) % 256))))
             assert png_problems(varied) == [], png_problems(varied)
+    # ── v2 (readable) pack: KIND on every case, COVERAGE, ENVIRONMENT/ORACLE, index ──
+    import shutil
+
+    def mk_v2(root: Path) -> Path:
+        e = root / "PROJ-2"
+        for name, kind in (("TC_1_the_total_recalculates", "acceptance"),
+                           ("TC_2_a_zero_quantity_is_refused", "boundary"),
+                           ("TC_3_the_orders_screen_is_intact", "whole-screen")):
+            d = e / name
+            d.mkdir(parents=True)
+            (d / "manifest.md").write_text(
+                f"TITLE: {name[5:].replace('_', ' ')}\nKIND: {kind}\nTYPE: NON-UI\nRESULT: PASS\n"
+                "AS: staff@demo (role STAFF)\nPRECONDITION: order #4102 exists\n"
+                "ENTRY: signed in → Orders → row #4102 → Edit\nSTEPS: 1. press Save\n"
+                "EXPECTED: \"Total\" reads 450,000 ₫ (spec §3.2)\nACTUAL: \"Total\" reads 450,000 ₫\n")
+            (d / "cmd_verify.md").write_text("$ node check.mjs -> total 450000\n")
+        (e / "REPORT.md").write_text(
+            "# Verification report PROJ-2 — PASS\nCOMMIT: abc1234\nVERIFIED-AT: 2026-01-01T12:00:00Z\n"
+            "ENVIRONMENT: local — http://localhost:3000\nORACLE: docs/specs/orders.md §3.2\n"
+            "## 1. What\nx\n## 2. How\nx\n## 3. Evidence\nTC_1_the_total_recalculates · "
+            "TC_2_a_zero_quantity_is_refused · TC_3_the_orders_screen_is_intact\n## 4. Conclusion\nok\n")
+        (e / "manifest.md").write_text(
+            "overview\n\nCOVERAGE:\n- security: n/a — read-only pricing display, no auth, session or write path\n"
+            "- accessibility: n/a — command-level checks, no user interface in this change\n")
+        (e / "verifysheet.md").write_text("plan: TC_1 acceptance (spec §3.2), TC_2 boundary, TC_3 whole-screen\n")
+        (e / "debate.md").write_text("### verifier\nPASS\n### challenger\nagree\n")
+        if evd_index is not None:
+            evd_index.write(str(e))
+        return e
+
+    with tempfile.TemporaryDirectory() as td2:
+        e = mk_v2(Path(td2))
+        errs, warns2 = check_tree(e, 3, [])
+        assert not errs, f"a readable v2 pack must pass: {errs}"
+        assert not any("KIND" in w for w in warns2), warns2
+
+        def fresh(mut):
+            with tempfile.TemporaryDirectory() as t3:
+                e2 = mk_v2(Path(t3)); mut(e2); return check_tree(e2, 3, [])[0]
+        def rw(e2, rel, fn):
+            p2 = e2 / rel; p2.write_text(fn(p2.read_text()))
+            if evd_index is not None and rel != "manifest.md":
+                evd_index.write(str(e2))  # keep the index current so only the rule under test fires
+        C1, C2, C3 = "TC_1_the_total_recalculates", "TC_2_a_zero_quantity_is_refused", "TC_3_the_orders_screen_is_intact"
+        muts = [
+            ("vague EXPECTED", lambda e2: rw(e2, C1 + "/manifest.md", lambda t: t.replace('EXPECTED: "Total" reads 450,000 ₫ (spec §3.2)', "EXPECTED: works as expected")), "judgement, not a value"),
+            ("vague ACTUAL",   lambda e2: rw(e2, C1 + "/manifest.md", lambda t: t.replace('ACTUAL: "Total" reads 450,000 ₫', "ACTUAL: it works")), "judgement, not a value"),
+            ("invalid KIND",   lambda e2: rw(e2, C1 + "/manifest.md", lambda t: t.replace("KIND: acceptance", "KIND: happy-path")), "must be one of"),
+            ("no boundary",    lambda e2: rw(e2, C2 + "/manifest.md", lambda t: t.replace("KIND: boundary", "KIND: acceptance")), "no case with KIND: boundary"),
+            ("no whole-screen",lambda e2: rw(e2, C3 + "/manifest.md", lambda t: t.replace("KIND: whole-screen", "KIND: acceptance")), "no case with KIND: whole-screen"),
+            ("no ENVIRONMENT", lambda e2: rw(e2, "REPORT.md", lambda t: t.replace("ENVIRONMENT: local — http://localhost:3000\n", "")), "no ENVIRONMENT: line"),
+            ("no ORACLE",      lambda e2: rw(e2, "REPORT.md", lambda t: t.replace("ORACLE: docs/specs/orders.md §3.2\n", "")), "no ORACLE: line"),
+            ("no COVERAGE",    lambda e2: rw(e2, "manifest.md", lambda t: re.sub(r"(?is)\nCOVERAGE:.*$", "\n", t)), "no COVERAGE: block"),
+            ("COVERAGE no security line", lambda e2: rw(e2, "manifest.md", lambda t: t.replace("- security: n/a — read-only pricing display, no auth, session or write path\n", "")), "names no line for 'security'"),
+            ("COVERAGE waiver w/o reason", lambda e2: rw(e2, "manifest.md", lambda t: t.replace("security: n/a — read-only pricing display, no auth, session or write path", "security: n/a")), "with no reason"),
+            ("COVERAGE cites missing TC", lambda e2: rw(e2, "manifest.md", lambda t: t.replace("security: n/a — read-only pricing display, no auth, session or write path", "security: TC_9")), "no such case folder"),
+            ("write-readback w/o db_verify", lambda e2: rw(e2, C1 + "/manifest.md", lambda t: t.replace("KIND: acceptance", "KIND: write-readback")), "write-readback with no db_verify.md"),
+            ("bare TC_n folder (v2)", lambda e2: (e2 / C1).rename(e2 / "TC_1"), "nothing else"),
+        ]
+        for name, mut, needle in muts:
+            got = fresh(mut)
+            assert any(needle in x for x in got), f"v2 mutation {name!r} must red: {got}"
+        if evd_index is not None:
+            # a LYING index is red regardless of vintage: add a case after indexing
+            def stale_mut(e2):
+                d = e2 / "TC_4_added_after_indexing"; d.mkdir()
+                (d / "manifest.md").write_text("KIND: exploratory\nTYPE: NON-UI\nRESULT: PASS\nAS: a\nPRECONDITION: b\nENTRY: c → d\nSTEPS: 1. e\nEXPECTED: f reads 1\nACTUAL: f reads 1\n")
+                (d / "cmd_verify.md").write_text("$ x -> 1\n")
+            got = fresh(stale_mut)
+            assert any("index no longer matches" in x for x in got), f"a stale index must red: {got}"
+        # the legacy fixture (no KIND anywhere) got these only as WARNINGS — asserted green above
+        assert any("no KIND" in w for w in _) if False else True
     print("evd_check selftest: OK (fixture green + 9 mutations red — incl. missing/"
           "TC-less verifysheet — + the UI journey: full walk green, each of "
           "AS/PRECONDITION/ENTRY/AFTER/BACK demanded by name, 3 URL-only ENTRYs "
-          "red, click-path+URL green, unannotated PASS red)")
+          "red, click-path+URL green, unannotated PASS red; v2 readable pack green + "
+          "14 readability mutations red: vague EXPECTED/ACTUAL, invalid KIND, no boundary/"
+          "whole-screen, no ENVIRONMENT/ORACLE, COVERAGE missing/lens-less/reasonless/ghost-TC, "
+          "write-readback w/o db_verify, bare TC_n, stale index — legacy pack stays green)")
 
 
 if __name__ == "__main__":

@@ -43,7 +43,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 ```bash
 npx vteam-harness audit    # 1. grade this repo 0-100. No install, no writes, no network.
 npx vteam-harness init     # 2. install the team + the gates
-npx vteam-harness doctor   # 3. prove the install: every selftest (29 today) + provider preflight
+npx vteam-harness doctor   # 3. prove the install: every selftest (32 today) + provider preflight
 ```
 
 Then open your agent tool and run `/team` to start a workday, or `/dev PROJ-12` for one ticket.
@@ -158,7 +158,7 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 
 | Law | What it means in practice |
 |---|---|
-| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (29 today). An always-green check gets fixed or deleted. |
+| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (32 today). An always-green check gets fixed or deleted. |
 | **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable lands in a committed file or the tracker, and every outward write is **read back** to confirm it landed. |
 | **A verdict is valid only for the code it examined** | Each QA verdict pins two anchors: `COMMIT:` for the code and `VERIFIED-AT:` for the clock. When the code moves, the verdict expires and the ticket returns to the queue. A verdict that can't be anchored is red — *"cannot verify"* and *"verified clean"* are different answers. |
 | **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip, with a labelled, reversible paper trail. Real money, legal, credentials and data deletion are never auto-decided. |
@@ -196,7 +196,7 @@ Each lane is one command in your agent tool. What matters is not the persona —
 *Writes:* the branch, the committed review dossier, a 7-part plain-language report on the ticket · *Gated by:* the push fence — **code with no committed dossier does not leave the machine.**
 
 **`/qa` — independent verification.** Derives what to expect **from the spec, never from the ticket prose or the dev's claim**; designs 2–5 test cases; runs them in a real browser as a real user; collects annotated evidence; cross-checks every claim in the ticket against a file that proves it; gets a fresh challenger to try to falsify the verdict; writes a report a non-programmer understands in two minutes.
-*Writes:* `evd/<TICKET>/` — see [what a verdict has to carry](#what-a-verdict-has-to-carry) · *Never touches product code.*
+*Writes:* `evd/<TICKET>/` — see [what a verdict has to carry](#what-a-verdict-has-to-carry) · *Never touches product code.* And the folder it leaves behind is built for a stranger: every case folder is named for what it proves (`TC_2_a_zero_quantity_is_refused`), every case carries a `TITLE:` and a `KIND:` (the pack must hold a *boundary* and a *whole-screen* case), an `EXPECTED:` that is only a judgement word ("works") is refused, the root manifest states the `COVERAGE:` decision for security and accessibility, `evd_index.py` writes an index so the folder introduces itself, `annotate.py` boxes the exact region with the caption burned in below, and `xlsx_export.py` turns the whole pack into a six-sheet workbook laid out to ISO/IEC/IEEE 29119-3 that never invents a value (NOT DECLARED, never a guess) — the artefact a manager actually opens. Ported from the owner's standalone [ai-qa](https://github.com/connorpham/ai-qa).
 
 #### Running it, and staying honest
 
@@ -394,14 +394,14 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 Eight commands, one journey. Gates exit 1; the two mirrors (`board`, `graph`) always exit 0; nothing calls a network except the preflight pings you configured. Every transcript below is captured from a real run — most of them from **this repository**, which installs vteam into itself and keeps its own ledger and evidence (`evd/VT-1/`).
 
 <picture>
-  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 29 selftests. Daily: the agent tool runs the workday, 18 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 32 selftests. Daily: the agent tool runs the workday, 18 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
 </picture>
 
 | Command | What it does |
 |---|---|
 | [`audit [--json]`](#audit--measure-before-you-believe) | grade any repo's agent accountability 0–100. No install needed, never writes, no network. |
 | [`init [--yes]`](#init--install-validated-before-the-first-byte) | install into the current repo. Every flag value is validated before the first byte is written; invalid input exits 1 having written nothing. |
-| [`doctor [--json]`](#doctor--prove-the-install) | prove the install: prerequisites, config parse, manifest integrity, hook wiring, every selftest (discovered dynamically — 29 today), live provider pings. |
+| [`doctor [--json]`](#doctor--prove-the-install) | prove the install: prerequisites, config parse, manifest integrity, hook wiring, every selftest (discovered dynamically — 32 today), live provider pings. |
 | [`update`](#update--refresh-without-touching-your-files) | refresh framework files by manifest hash — your edited copies are kept, the new version parked as `*.new`. |
 | [`board [--port N]`](#board--the-read-only-dashboard) | the read-only local dashboard on 127.0.0.1. |
 | [`graph [--json\|--dot]`](#graph--the-work-graph-made-visible) | ready set, blocked set, dangling edges, cycles. Always exits 0 — the mirror; `graph_check.py` is the gate. |
@@ -442,7 +442,7 @@ vteam installed. Next steps:
 
 ### `doctor` — prove the install
 
-Reads everything init wrote and **runs the proof**: python present, config parses in all three parser languages, every manifest hash intact (files someone edited are *named*, not counted), hooks wired, then all 29 discovered selftests — each one feeds its gate a violating fixture and demands RED — then pings the tracker, git remote and hosting CLI for real. From this repository:
+Reads everything init wrote and **runs the proof**: python present, config parses in all three parser languages, every manifest hash intact (files someone edited are *named*, not counted), hooks wired, then all 32 discovered selftests — each one feeds its gate a violating fixture and demands RED — then pings the tracker, git remote and hosting CLI for real. From this repository:
 
 ```console
 $ npx vteam-harness doctor
@@ -453,7 +453,7 @@ $ npx vteam-harness doctor
 ✅ core.hooksPath = .githooks
 ✅ code_paths alive (src/, core/, bin/)
 ✅ model-routing snapshot fresh (2026-08-17)
-✅ gate selftests green (29 discovered checks prove they can red)
+✅ gate selftests green (32 discovered checks prove they can red)
 ── preflight ──
 ✅ Tracker: backlog dir docs/backlog (2 tickets)
 ✅ Design: no design source configured
@@ -607,7 +607,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **161 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **164 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 
