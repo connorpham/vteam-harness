@@ -1,0 +1,43 @@
+name: ci-debug git show
+on: [push, pull_request]
+permissions: { contents: read }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }
+      - run: |
+          git --version
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "--- parent of c3239c8: $(git rev-parse c3239c8^ 2>&1)"
+          echo "--- shallow: $(test -f .git/shallow && cat .git/shallow || echo no)"
+          echo "--- git show --name-only --format= c3239c8 → $(git show --name-only --format= c3239c8 | wc -l) files"
+          git show --name-only --format= c3239c8 | sort | head -8
+          echo "--- git diff-tree -r --no-commit-id --name-only c3239c8 → $(git diff-tree -r --no-commit-id --name-only c3239c8 | wc -l) files"
+          echo "--- git show --name-only --format= HEAD (this commit) → $(git show --name-only --format= HEAD | wc -l) files"
+          echo "--- git log -1 --format=%H|%s"; git log -1 --format='%H|%s'
+          echo "--- refs present ---"; git for-each-ref --format='%(refname)' | head -20
+          echo "--- git log -200 head ---"; git log --format='%H|%s' -200 | head -4
+          echo "--- graph_check as the gate runs it ---"; python3 .vteam/scripts/graph_check.py || true
+          echo "--- replicate check_scope for VT-9 with the branch code ---"
+          python3 - <<'PY2'
+          import subprocess, re, sys
+          sys.path.insert(0, ".vteam/scripts"); sys.path.insert(0, ".vteam/scripts/lib")
+          import graph_check as gc
+          log = subprocess.run(["git","log","--format=%H|%s","-200"], capture_output=True, text=True).stdout
+          shas = [ln.split("|",1)[0] for ln in log.splitlines() if gc.attributes(ln.split("|",1)[1], "VT-9")]
+          print("attributed to VT-9:", shas)
+          for sha in shas:
+              out = subprocess.run(["git","show","--name-only","--format=",sha], capture_output=True, text=True)
+              files = out.stdout.split()
+              print(sha[:8], "files:", len(files), "first:", sorted(files)[:4], "stderr:", out.stderr[:120])
+          PY2
+          echo "--- git show c3239c8 again, full sha ---"; git show --name-only --format= c3239c84f2b554a2dc80af786765d53dc44891fc | wc -l
+          echo "--- python3 subprocess replica ---"
+          python3 - <<'PY'
+          import subprocess
+          out = subprocess.run(["git","-C",".","show","--name-only","--format=","c3239c84f2b554a2dc80af786765d53dc44891fc"], capture_output=True, text=True)
+          files = out.stdout.split()
+          print("rc", out.returncode, "| files", len(files), "| first", files[:5], "| stderr", out.stderr[:200])
+          PY
