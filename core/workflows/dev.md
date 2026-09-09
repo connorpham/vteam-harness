@@ -134,9 +134,21 @@ the next session can resume the work):
 - **Requirement** in one paragraph, plus acceptance criteria as the ticket states them.
 - **`CODE-SCOPE:`** one line, the paths this ticket may touch (e.g.
   `CODE-SCOPE: src/auth/ src/lib/session.ts`) — graph_check reds any commit
-  naming this ticket that strays outside them (MAST 2.3: self-expansion).
-  Scope grew mid-ticket? Widen the line DELIBERATELY in the same commit and
-  say why in the task-sheet — or split the ticket.
+  whose subject LEADS with this ticket's key and strays outside them (MAST 2.3:
+  self-expansion). Scope grew mid-ticket? Widen the line DELIBERATELY in the same
+  commit and say why in the task-sheet — or split the ticket.
+  - **Bookkeeping homes are never CODE-SCOPE.** `{paths.pm}` (coordination log,
+    ledger, minutes), `{paths.evidence}` (your own evd/) and `{paths.qa}`
+    (knowledge base, known-issues) are shared by every lane by design, so they
+    prove nothing about disjointness — `parallel_check` discounts them and
+    graph_check already lets every ticket touch them. List the CODE paths only.
+  - **In parallel mode (`team.parallel` > 1) COMMIT the tasksheet FIRST**,
+    before the first code edit. Your worktree is not your siblings' worktree, so
+    their `parallel_check`/`coord_check` read your `CODE-SCOPE` out of the shared
+    object store (`git show <branch>:<path>`) — a sheet that exists only in your
+    working tree makes your territory invisible and reds their gates with
+    `tasksheet missing on <branch>, not committed`. See
+    `{paths.team}/parallel-transport.md`.
 - **Spec check**: the governing spec sections — quote them. Spec silent on a
   detail → list it under "assumptions to confirm" and ask.
 - **Design check (UI tickets)**: the design oracle, in priority order — ① design

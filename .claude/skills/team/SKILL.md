@@ -92,7 +92,10 @@ it is. How DEV runs is set by `team.parallel` (config; default **1**):
      (/pm principle #5). Agents write only inside their own worktree.
   3. **Collision is a gate, not a hope.** `parallel_check` reds two in-flight
      branches that share a file and any count past N; the PM never dispatches an
-     overlapping pair — it serializes them.
+     overlapping pair — it serializes them. Only UNMERGED branches count as
+     in-flight, and the three rules a split worktree makes non-negotiable —
+     commit the tasksheet first, bookkeeping paths are never CODE-SCOPE,
+     pre-trust a new worktree — are in `docs/team/parallel-transport.md`.
   `team.parallel` is the concurrency ceiling; `team.size` stays the headcount for
   actor accounting on the ledger/board.
 

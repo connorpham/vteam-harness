@@ -30,6 +30,9 @@ RUN=$(bash .vteam/scripts/orca_team.sh open-run "<sprint> parallel DEV" | sed -n
 # for each unblocked, scope-disjoint ticket, launch a worker bound to the Run:
 orca orchestration task-create --spec "<ticket + CODE-SCOPE + the contracts it OWNS vs CONSUMES>" --json
 orca orchestration worker-start --task <task_id> --agent claude --worktree new-child --run "$RUN" --json
+# a NEW worktree is a folder Claude has never seen → pre-trust it or the trust
+# dialog eats the injected prompt (rule 3 below):
+bash .vteam/scripts/orca_team.sh trust /abs/path/to/the/new/worktree
 # the PM then blocks for lifecycle events (no sleep/poll loops):
 bash .vteam/scripts/orca_team.sh wait "$RUN"          # → worker_done | escalation | question
 ```
@@ -52,6 +55,54 @@ prints this when the bus is down. Each worktree DEV agent returns its result —
 ledger row, report, any contract it produced — as TEXT to the PM. The PM writes
 `coordination.md` + the ledger and merges serially. Same guards, slower channel,
 no live ask/reply.
+
+## Three rules a split worktree makes non-negotiable
+
+Learned in the first real two-worker run (2026-09-09): both workers hit the same
+class of failure within minutes. In one working tree these rules are invisible; in
+separate worktrees each one is the difference between a green run and a structural
+red. The gates now enforce all three — this section says WHY, so nobody "fixes"
+them back.
+
+**1. In parallel mode the tasksheet is the FIRST commit.** A worker's own
+`evd/<TICKET>/dev/tasksheet.md` lives in its own worktree, and a
+sibling's worktree is a different directory on disk — so a sibling's gate cannot
+see it as a file, no matter how correct it is. What worktrees DO share is one
+object store, so `parallel_check` and `coord_check` read the sibling's
+`CODE-SCOPE` with `git show <branch>:<path>`. That only works on a COMMITTED
+sheet. Write the tasksheet, commit it before the first code edit, and every
+sibling's gate can see your territory. Leave it uncommitted and the red says
+`tasksheet missing on <branch>, not committed` — that message means "commit it",
+not "add a CODE-SCOPE line".
+
+**2. Bookkeeping paths are NEVER CODE-SCOPE.** `docs/pm` (the coordination log,
+the ledger, the minutes), `evd` (every ticket's own evd/) and
+`docs/qa` (the knowledge base, known-issues) are shared by design — this file
+*orders* every agent that hands a path off to append a row to
+`docs/pm/coordination.md`. Two agents that both obeyed and both declared that
+log in CODE-SCOPE were reded for sharing edit territory on the protocol's own
+log. `parallel_check` now discounts these homes (printing what it discounted) and
+`graph_check` has always treated them as always-legal, so you never need them in
+the line. Declare the CODE paths you edit; nothing else.
+
+**3. A worktree Claude has never seen must be PRE-TRUSTED.**
+`orca orchestration worker-start --worktree new-child` creates a brand-new
+directory, so Claude Code opens its "Do you trust the files in this folder?"
+dialog before reading anything — and the injected prompt is consumed by the
+dialog. The worker then sits there and the run reports `agent_prompt_stalled`,
+which looks like a transport failure and is not one. Mark the folder trusted
+before dispatch:
+
+```bash
+bash .vteam/scripts/orca_team.sh trust /abs/path/to/new-worktree
+```
+
+The helper sets `projects["<abs path>"].hasTrustDialogAccepted = true` in
+`~/.claude.json` (exactly that field — the same file Claude Code writes when a
+human clicks "trust"). It is idempotent, backs the pre-existing config up once to
+`~/.claude.json.vteam-bak`, writes via a temp file + rename so the config is never
+torn, refuses a path that does not exist, and refuses a config it cannot parse
+instead of replacing it. Trust the path, then `worker-start`.
 
 ## Serial integration, re-gated (unchanged from VT-5)
 
