@@ -1,0 +1,26 @@
+name: ci-debug git show
+on: [push]
+permissions: { contents: read }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }
+      - run: |
+          git --version
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "--- parent of c3239c8: $(git rev-parse c3239c8^ 2>&1)"
+          echo "--- shallow: $(test -f .git/shallow && cat .git/shallow || echo no)"
+          echo "--- git show --name-only --format= c3239c8 → $(git show --name-only --format= c3239c8 | wc -l) files"
+          git show --name-only --format= c3239c8 | sort | head -8
+          echo "--- git diff-tree -r --no-commit-id --name-only c3239c8 → $(git diff-tree -r --no-commit-id --name-only c3239c8 | wc -l) files"
+          echo "--- git show --name-only --format= HEAD (this commit) → $(git show --name-only --format= HEAD | wc -l) files"
+          echo "--- git log -1 --format=%H|%s"; git log -1 --format='%H|%s'
+          echo "--- python3 subprocess replica ---"
+          python3 - <<'PY'
+          import subprocess
+          out = subprocess.run(["git","-C",".","show","--name-only","--format=","c3239c84f2b554a2dc80af786765d53dc44891fc"], capture_output=True, text=True)
+          files = out.stdout.split()
+          print("rc", out.returncode, "| files", len(files), "| first", files[:5], "| stderr", out.stderr[:200])
+          PY
