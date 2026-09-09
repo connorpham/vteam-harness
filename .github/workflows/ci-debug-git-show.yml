@@ -1,5 +1,5 @@
 name: ci-debug git show
-on: [push]
+on: [push, pull_request]
 permissions: { contents: read }
 jobs:
   probe:
@@ -17,6 +17,10 @@ jobs:
           echo "--- git diff-tree -r --no-commit-id --name-only c3239c8 → $(git diff-tree -r --no-commit-id --name-only c3239c8 | wc -l) files"
           echo "--- git show --name-only --format= HEAD (this commit) → $(git show --name-only --format= HEAD | wc -l) files"
           echo "--- git log -1 --format=%H|%s"; git log -1 --format='%H|%s'
+          echo "--- refs present ---"; git for-each-ref --format='%(refname)' | head -20
+          echo "--- git log -200 head ---"; git log --format='%H|%s' -200 | head -4
+          echo "--- graph_check as the gate runs it ---"; python3 .vteam/scripts/graph_check.py || true
+          echo "--- git show c3239c8 again, full sha ---"; git show --name-only --format= c3239c84f2b554a2dc80af786765d53dc44891fc | wc -l
           echo "--- python3 subprocess replica ---"
           python3 - <<'PY'
           import subprocess
