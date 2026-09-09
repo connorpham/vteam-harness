@@ -18,12 +18,22 @@ Log format ({paths.pm}/coordination.md), a markdown table, append-only:
   | Round | From | To | Path/Contract | What/why |
   | 1 | XOAI-10 | XOAI-11 | src/lib/order.ts | XOAI-11 consumes the Order type |
 
+Each side's CODE-SCOPE is read from GIT when it is not on this disk: the agents
+coordinating here are in SEPARATE worktrees, so the receiver's evd/ is not in the
+checkout running the gate — but every worktree shares one object store, so its
+committed tasksheet is readable as `git show <branch>:<path>`. This is why /dev
+commits the tasksheet FIRST in parallel mode; a sheet that lives only in one
+worker's working tree makes every sibling's scope look empty, and an honest
+handoff goes red for a filesystem reason.
+
 Usage: coord_check.py [--root <dir>]
 Exit 0 = coordination is honest (or off); 1 = exactly which agreement didn't land.
-Selftest: --selftest (consistent handoff green + unreflected/over-budget/malformed red).
+Selftest: --selftest (consistent handoff green + unreflected/over-budget/malformed
+red + a receiver whose tasksheet exists only as a commit on its own branch).
 """
 from __future__ import annotations
 
+import posixpath
 import re
 import sys
 from pathlib import Path
@@ -31,11 +41,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 def norm(p: str) -> str:
-    return p.strip().rstrip("/")
+    """A scope path, canonicalised to ONE spelling per location — trailing slash
+    stripped, backslashes folded, `.`/`..` resolved, the repo root as "".
+    Parity with parallel_check.norm is the contract: the two gates must agree on
+    what a CODE-SCOPE path MEANS, or a handoff can be honest to one and a
+    collision to the other."""
+    p = posixpath.normpath(p.strip().replace("\\", "/"))
+    return "" if p in (".", "/") else p.strip("/")
 
 
 def paths_touch(a: str, b: str) -> bool:
+    """Overlapping ground: equal, or one nests the other. The repo root ("")
+    covers every path (parity with parallel_check.paths_touch)."""
     a, b = norm(a), norm(b)
+    if a == "" or b == "":
+        return True
     return a == b or b.startswith(a + "/") or a.startswith(b + "/")
 
 
@@ -99,11 +119,47 @@ def sh(root, *a):
     return r.stdout if r.returncode == 0 else ""
 
 
+def tasksheet_text(root: Path, ticket: str, ev: str) -> str:
+    """The ticket's tasksheet — working tree first (this worker's own ticket, or
+    single-tree mode), else the COMMITTED sheet on any local branch that names
+    the ticket (`git show <branch>:<path>`).
+
+    Why git at all: in parallel-worktree mode a SIBLING's evd/ is never on this
+    disk, so reading the receiver's CODE-SCOPE from the filesystem reported an
+    empty scope and reded a perfectly honest handoff. Worktrees share one object
+    store, so the sibling's committed sheet is right there.
+
+    Why the branch is SEARCHED rather than given: unlike parallel_check, this
+    gate starts from a ticket key out of the coordination log, not from a branch
+    it is iterating. The key must therefore match a branch name without matching
+    a LONGER key — `VT-1` must not read `feat/VT-11-…`'s tasksheet — hence the
+    digit-guarded boundary rather than a plain substring test.
+
+    Branches are searched NEWEST FIRST (`--sort=-committerdate`). A ticket that
+    was retried keeps its abandoned branch around, and an abandoned branch holds
+    a stale CODE-SCOPE; picking whatever order git happened to list would let a
+    stale scope red a live handoff, non-reproducibly.
+    """
+    rel = f"{ev}/{ticket}/dev/tasksheet.md"
+    ts = Path(root) / rel
+    if ts.is_file():
+        return ts.read_text(encoding="utf-8", errors="replace")
+    key_rx = re.compile(rf"(?<![A-Za-z0-9]){re.escape(ticket)}(?![0-9])", re.I)
+    for br in sh(root, "git", "for-each-ref", "--sort=-committerdate",
+                 "--format=%(refname:short)", "refs/heads/").splitlines():
+        br = br.strip()
+        if br and key_rx.search(br):
+            txt = sh(root, "git", "show", f"{br}:{rel}")
+            if txt:
+                return txt
+    return ""
+
+
 def scope_of(root: Path, ticket: str, ev: str) -> list[str]:
-    ts = root / ev / ticket / "dev" / "tasksheet.md"
-    if not ts.is_file():
+    text = tasksheet_text(root, ticket, ev)
+    if not text:
         return []
-    m = re.search(r"^\s*CODE-SCOPE:\s*(.+)$", ts.read_text(encoding="utf-8", errors="replace"), re.M)
+    m = re.search(r"^\s*CODE-SCOPE:\s*(.+)$", text, re.M)
     return [norm(p) for p in m.group(1).split()] if m else []
 
 
@@ -143,6 +199,20 @@ def main() -> int:
 
 
 def _selftest() -> None:
+    # PARITY with parallel_check.norm/paths_touch: the two gates must agree on
+    # what a CODE-SCOPE path means, or a handoff is honest to one gate and a
+    # collision to the other. Same canonicalisation, same repo-root rule.
+    assert norm("docs/pm/../src/x.ts") == "docs/src/x.ts", norm("docs/pm/../src/x.ts")
+    assert norm("./src/a") == "src/a" and norm("src/a/") == "src/a"
+    assert norm(".") == "" and norm("./") == ""
+    assert paths_touch("./src/lib", "src/lib/x.ts"), "spelling must not decide coverage"
+    assert paths_touch(".", "src/anything"), "the repo root covers every path"
+    assert not paths_touch("src", "src2") and not paths_touch("src/a", "src/ab")
+    # a handoff whose receiver declared the repo root is covered by definition
+    assert covered("src/lib/order.ts", ["."])
+    # …and a `./`-spelled scope still covers the handoff path it names
+    assert covered("src/lib/order.ts", ["./src/lib"])
+
     # a consistent handoff: VT-10 gave src/lib/order.ts to VT-11
     rows = parse_log(
         "| Round | From | To | Path/Contract | What |\n"
@@ -175,7 +245,69 @@ def _selftest() -> None:
     assert len(no_pipe) == 1 and "error" not in no_pipe[0], no_pipe
     e = check_handoffs(no_pipe, {"VT-10": ["src/lib/order.ts"], "VT-11": ["src/ui/"]}, 3)
     assert any("never became real" in x or "STILL owns" in x for x in e), ("trailing-pipe-less row must be checked", e)
-    print("coord_check selftest: OK (consistent green + unreflected/giver-keeps/over-budget/malformed red + dir-covers-file + no-trailing-pipe row caught)")
+    # worktree mode: the receiver's tasksheet exists only as a commit on ITS
+    # branch. Read from disk it looked EMPTY, and an honest handoff went red.
+    import os
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        r = Path(tmp)
+        when = {"GIT_AUTHOR_DATE": "", "GIT_COMMITTER_DATE": ""}
+
+        def g(*a):
+            subprocess.run(["git", *a], cwd=r, capture_output=True, text=True,
+                           check=True, env={**os.environ, **{k: v for k, v in when.items() if v}})
+
+        g("init", "-q", "-b", "main")
+        g("config", "user.email", "t@t")
+        g("config", "user.name", "t")
+        (r / "README").write_text("x")
+        g("add", "-A")
+        g("commit", "-qm", "init")
+        # an ABANDONED earlier attempt at the same ticket, holding a stale scope:
+        # newest-branch-first must beat it, or a retried ticket reds at random
+        when.update(GIT_AUTHOR_DATE="2026-01-01T10:00:00+00:00",
+                    GIT_COMMITTER_DATE="2026-01-01T10:00:00+00:00")
+        g("checkout", "-qb", "feat/VT-11-abandoned")
+        (r / "evd/VT-11/dev").mkdir(parents=True)
+        (r / "evd/VT-11/dev/tasksheet.md").write_text("CODE-SCOPE: src/stale/\n")
+        g("add", "-A")
+        g("commit", "-qm", "stale tasksheet")
+        g("checkout", "-q", "main")
+        when.update(GIT_AUTHOR_DATE="2026-02-02T10:00:00+00:00",
+                    GIT_COMMITTER_DATE="2026-02-02T10:00:00+00:00")
+        g("checkout", "-qb", "feat/VT-11-receiver")
+        (r / "evd/VT-11/dev").mkdir(parents=True)
+        (r / "evd/VT-11/dev/tasksheet.md").write_text("CODE-SCOPE: src/lib/order.ts src/ui/\n")
+        g("add", "-A")
+        g("commit", "-qm", "tasksheet")
+        g("checkout", "-q", "main")
+        assert not (r / "evd/VT-11/dev/tasksheet.md").exists(), \
+            "fixture: the sibling's sheet must be OFF DISK or this proves nothing"
+        assert scope_of(r, "VT-11", "evd") == ["src/lib/order.ts", "src/ui"], \
+            f"newest branch must win over the abandoned one: {scope_of(r, 'VT-11', 'evd')}"
+        # …and the handoff that was reded live now reads as reflected
+        assert check_handoffs(rows, {"VT-10": ["src/lib/wallet.ts"],
+                                     "VT-11": scope_of(r, "VT-11", "evd")}, 3) == [], \
+            "a handoff whose receiver's sheet is only in git must be GREEN"
+        # BOUNDARY: a shorter key must not read a longer key's branch
+        assert scope_of(r, "VT-1", "evd") == [], "VT-1 must not match the VT-11 branch"
+        # step 1 of the order: a sheet ON DISK wins over any branch. This is the
+        # agent's OWN ticket, whose scope it may still be editing — deleting the
+        # working-tree arm survived every other assertion until this one existed.
+        (r / "evd/VT-11/dev").mkdir(parents=True, exist_ok=True)
+        (r / "evd/VT-11/dev/tasksheet.md").write_text("CODE-SCOPE: src/on-disk-wins/\n")
+        assert scope_of(r, "VT-11", "evd") == ["src/on-disk-wins"], \
+            f"the working tree must win over git: {scope_of(r, 'VT-11', 'evd')}"
+        # …and an empty receiver scope reds the handoff rather than passing it
+        assert any("never became real" in x
+                   for x in check_handoffs(rows, {"VT-10": ["src/lib/wallet.ts"],
+                                                  "VT-11": []}, 3)), \
+            "an unreadable receiver scope must RED, never wave the handoff through"
+    print("coord_check selftest: OK (consistent green + unreflected/giver-keeps/over-budget/"
+          "malformed red + dir-covers-file + no-trailing-pipe row caught + sibling scope read "
+          "from git — newest branch beats an abandoned one, working tree beats git, "
+          "VT-1 not matching VT-11, empty receiver scope still red)")
 
 
 if __name__ == "__main__":

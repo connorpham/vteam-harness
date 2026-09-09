@@ -27,16 +27,20 @@ each check below names its MAST mode:
      config — a termination condition prose cannot silently ignore.
   5. SCOPE DERAILMENT (MAST 2.3, task derailment): if a ticket's tasksheet
      declares `CODE-SCOPE: <path> <path>…` ({paths.evidence}/<KEY>/dev/
-     tasksheet.md), commits naming that ticket may only touch files under the
-     declared paths (plus the always-legal homes: evidence, docs, .vteam,
+     tasksheet.md), commits BELONGING to that ticket may only touch files under
+     the declared paths (plus the always-legal homes: evidence, docs, .vteam,
      .githooks, .github, the config). A commit outside the declared scope is
      the machine-visible form of "the dev self-expanded the task". No
      CODE-SCOPE line → the ticket is SKIPPED LOUDLY, never silently green —
      scope enforcement is opt-in per ticket, silence about it is not.
+     "Belonging" is the key LEADING the subject (`TB-5 …`, `feat(TB-5): …`,
+     `[TB-5] …`) — see `attributes()`. A subject that merely MENTIONS the key in
+     prose is another lane's commit; judging it against this ticket's scope was
+     a false derailment red, and a gate that cries wolf gets ignored.
 
 Exit 0 = coherent; 1 = violations listed. Runs in gate.sh (graph step).
 Selftest: graph_check.py --selftest  (green fixture + 7 mutations that must red
-+ the loud-skip paths).
++ the loud-skip paths + the attribution table and its end-to-end negative).
 """
 from __future__ import annotations
 
@@ -58,6 +62,56 @@ SCOPE_PAT = re.compile(r"^CODE-SCOPE:\s*(.+)$", re.M)
 # paths every ticket may always touch — process artifacts, never product code
 ALWAYS_LEGAL = ("docs/", "evd/", ".vteam/", ".githooks/", ".github/",
                 "vteam.config.yaml", ".gitattributes", ".gitignore")
+
+
+def attributes(subject: str, key: str) -> bool:
+    """Does this commit subject BELONG to `key` (vs merely mention it)?
+
+    A commit belongs to a ticket when the key LEADS the subject:
+      · bare          `TB-5 fix the thing` / `TB-5: fix the thing`
+      · type-prefixed `chore: TB-5 …`
+      · conventional  `feat(TB-5): …`, `fix(TB-5)!: …` — and the key may be ANY
+                      scope in a multi-scope group: `feat(api,TB-5): …`,
+                      `merge(TB-5,TB-9): …`. Missing that shape was a silent
+                      FALSE NEGATIVE: the derailment gate simply stopped
+                      watching a real, standard commit, which is the more
+                      dangerous direction of the two.
+      · bracketed     `[TB-5] …`
+      · a revert       `Revert "feat(TB-5): …"` / `Reapply "…"` — undoing TB-5's
+                      work is TB-5's work, judged against TB-5's scope.
+
+    A subject that mentions the key in PROSE is someone else's work — a PM's
+    `chore: drop the leftover found by the TB-5 worker` was attributed to TB-5
+    and reded as derailment, because the old test was `\\bTB-5\\b` anywhere in
+    the subject. Judging one ticket's scope against another lane's commit is a
+    false red, and a false red on a derailment gate teaches agents to ignore it.
+
+    Longer keys are safe by construction: `TB-5` does not lead `TB-50 …`,
+    because the trailing boundary cannot fall between two digits. Keys cannot
+    carry regex metacharacters either (`tracker.KEY_RE` is
+    `[A-Za-z][A-Za-z0-9]*-[0-9]+`), and `re.escape` guards it regardless.
+
+    NOT attributed, deliberately: `Merge branch 'feat/TB-5-x'` and
+    `Merge pull request #12 from …/feat/TB-5-x`. A merge commit shows no files
+    under `git show --name-only --format=`, so attributing it would change no
+    verdict; the integration commit belongs to whoever integrated. Also not
+    attributed: `(TB-5) …` with no colon, which is not a conventional-commit
+    header in any spelling.
+    """
+    s = subject.strip()
+    # `Revert "<original subject>"` (and git's newer `Reapply "…"`) — judge the
+    # revert against the scope of the work it undoes.
+    m = re.match(r'^(?:revert|reapply)\s+"(.*)"\s*$', s, re.I)
+    if m:
+        s = m.group(1).strip()
+    k = re.escape(key)
+    if re.match(rf"^\[{k}\]", s, re.I):                                # [KEY] …
+        return True
+    m = re.match(r"^\w+\(([^)]*)\)!?:", s)                             # type(a,KEY)!: …
+    if m and any(re.fullmatch(k, part.strip(), re.I) for part in m.group(1).split(",")):
+        return True
+    # bare `KEY …` / `KEY: …`, optionally behind a `type:` / `type(scope):` prefix
+    return re.match(rf"^(?:\w+(?:\([^)]*\))?:\s*)?{k}\b", s, re.I) is not None
 
 
 def read_backlog(c: Ctx) -> dict[str, dict]:
@@ -176,7 +230,7 @@ def check_scope(c: Ctx, tickets: list[str], evd_dir: Path) -> tuple[list, list]:
             ["git", "-C", str(c.root), "log", "--format=%H|%s", "-200"],
             capture_output=True, text=True).stdout
         shas = [ln.split("|", 1)[0] for ln in log.splitlines()
-                if re.search(rf"\b{re.escape(k)}\b", ln.split('|', 1)[1], re.I)]
+                if attributes(ln.split('|', 1)[1], k)]
         for sha in shas:
             files = subprocess.run(
                 ["git", "-C", str(c.root), "show", "--name-only", "--format=", sha],
@@ -244,6 +298,56 @@ def _selftest():
     import tempfile
 
     self_path = Path(__file__).resolve()
+
+    # --- attribution: the key must LEAD the subject (MAST 2.3 precision) ------
+    # The rule AC 5 states as seven cases, asserted as seven cases. Cheap here;
+    # in the git fixture below each case would cost a commit.
+    for subj in ("TB-5 fix the thing",
+                 "TB-5: fix the thing",
+                 "feat(TB-5): fix the thing",
+                 "merge(TB-5): integrate",
+                 "fix(TB-5)!: breaking",
+                 "[TB-5] fix the thing",
+                 "chore: TB-5 housekeeping",
+                 "  feat(TB-5): leading whitespace tolerated",
+                 "\tTB-5 leading tab tolerated",
+                 "tb-5 lowercase is the same ticket",
+                 # MULTI-SCOPE conventional commits — a standard shape whose
+                 # absence was a silent false negative (the gate stopped
+                 # watching), not a false red
+                 "feat(api,TB-5): x",
+                 "feat(TB-5,api): x",
+                 "feat(TB-5, api): x",
+                 "fix(TB-5,other)!: message",
+                 "merge(TB-5,TB-9): combine",
+                 # undoing TB-5's work is judged against TB-5's scope
+                 'Revert "feat(TB-5): fix the thing"',
+                 'Reapply "feat(TB-5): fix the thing"'):
+        assert attributes(subj, "TB-5"), f"must be attributed: {subj!r}"
+    for subj in ("chore: drop the leftover found by the TB-5 worker",
+                 "docs: explain why TB-5 needed two rounds",
+                 "feat(TB-50): a longer key is a different ticket",
+                 "TB-50 also a different ticket",
+                 "feat(api,TB-50): a longer key in a scope group",
+                 "fix(other): unrelated",
+                 "fix a bug for TB-5",
+                 "TB-9 and TB-5: the leading key owns it",
+                 "TB-5fix: no separator is not the key",
+                 # a merge commit shows no files, so attribution would change
+                 # nothing; the integration belongs to whoever integrated
+                 "Merge branch 'feat/TB-5-x'",
+                 "Merge pull request #12 from user/feat/TB-5-x",
+                 'Revert "chore: mentions TB-5 in prose"'):
+        assert not attributes(subj, "TB-5"), f"must NOT be attributed: {subj!r}"
+    # the same rule, keyed to the other direction: TB-50's own commits still land
+    assert attributes("feat(TB-50): real work", "TB-50")
+    assert not attributes("feat(TB-5): real work", "TB-50")
+    # a key cannot smuggle regex metacharacters (tracker.KEY_RE forbids them),
+    # and re.escape guards it anyway: a literal dot must not match any char
+    assert not attributes("feat(TBx5): x", "TB.5")
+    # hostile length: prose mention stays unattributed, leading key stays attributed
+    assert not attributes("chore: " + "x" * 10000 + " TB-5", "TB-5")
+    assert attributes("TB-5 " + "x" * 10000, "TB-5")
 
     def sh(cwd, *args):
         r = subprocess.run(list(args), cwd=cwd, capture_output=True, text=True)
@@ -357,6 +461,29 @@ def _selftest():
                        cwd=root, check=True, capture_output=True, env=env)
         r = run_gate(root)
         assert r.returncode == 0, f"in-scope commit must stay green:\n{r.stdout}"
+        # AC 5 END-TO-END, as a boundary pair on the SAME out-of-scope directory:
+        # a subject that only MENTIONS the key is another lane's commit → GREEN…
+        (root / "src" / "billing" / "mentioned.js").write_text("another lane\n")
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-qm",
+                        "chore: drop the leftover found by the PROJ-2 worker"],
+                       cwd=root, check=True, capture_output=True, env=env)
+        r = run_gate(root)
+        assert r.returncode == 0, \
+            f"a prose mention is another lane's commit, not derailment:\n{r.stdout}"
+        assert "mentioned.js" not in r.stdout, \
+            f"the mentioned commit's files must not be judged here:\n{r.stdout}"
+        # …and a MULTI-SCOPE conventional subject IS the ticket's own commit, so
+        # the same out-of-scope directory must RED under it (a reviewer proved
+        # this shape slipped past the gate entirely)
+        (root / "src" / "billing" / "multi.js").write_text("multi scope\n")
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-qm", "fix(PROJ-2,billing)!: sneaky multi-scope"],
+                       cwd=root, check=True, capture_output=True, env=env)
+        r = run_gate(root)
+        assert r.returncode == 1 and "src/billing/multi.js" in r.stdout, \
+            f"a multi-scope conventional commit must be judged:\n{r.stdout}"
+        # …while the very same directory, under a LEADING key, still reds (m7)
         (root / "src" / "billing" / "b.js").write_text("out of scope\n")
         subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
         subprocess.run(["git", "commit", "-qm", "PROJ-2 sneaky billing change"],
@@ -390,7 +517,11 @@ def _selftest():
     print("graph_check selftest: OK (coherent graph green + 7 reds: dangling, "
           "cycle, done-sans-verdict, done-with-FAIL, identical repeat, loop "
           "budget, out-of-scope commit — + loud skips: undeclared scope, "
-          "remote tracker)")
+          "remote tracker — + attribution, 17 positive / 12 negative: leading key "
+          "attributed (bare/`type:`-prefixed/`feat(KEY):`/multi-scope "
+          "`feat(a,KEY):`/`[KEY]`/`Revert \"…\"`), prose mention + longer key + "
+          "merge-commit NOT, both directions proven end-to-end on the same "
+          "out-of-scope directory)")
 
 
 if __name__ == "__main__":
