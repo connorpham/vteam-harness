@@ -11,6 +11,56 @@ does not match `package.json`.
 
 ---
 
+## 0.17.0 — 2026-09-09
+
+Parallel DEV with real coordination, and a QA output layer a person can read. Field-tested
+end to end on a pnpm/Turborepo Next 15 + Prisma monorepo before shipping (four tickets,
+four QA runs, two Orca workers); the gaps that trial found are filed, not hidden (VT-11,
+VT-12 in `docs/backlog/`).
+
+- **`/team` parallel mode (VT-5).** `team.parallel: N` (default 1) lets the PM run up to N
+  DEV agents at once, each in its own git worktree on a **disjoint `CODE-SCOPE`**, and merge
+  their branches serially, re-gating between. New gate **`parallel_check.py`** reds two
+  in-flight branches that share a file and any count past the cap; inert-green when
+  parallel mode is off.
+- **Peer coordination that leaves artifacts (VT-6).** Parallel DEV agents may split scope
+  or hand off a shared contract, but every handoff is appended to
+  `docs/pm/coordination.md` and both `CODE-SCOPE`s are updated. New gate
+  **`coord_check.py`** reds a handoff not reflected in scope, an over-budget round
+  (`team.parallel.coord_budget`, default 3) or a malformed row. Reviewers stay isolated;
+  ledger and merges stay the PM's single hand.
+- **A real transport for that coordination (VT-7).** `orca_team.sh` (`status` /
+  `open-run` / `wait` / `trust`) drives the Orca orchestration Run mailbox — dispatch,
+  heartbeats with a phase, blocking ask/reply, `worker_done` — and degrades to a text-relay
+  fallback when no bus exists. Doctrine `parallel-transport.md` documents the tested flow.
+- **BDD human report (VT-8).** Opt-in `*.bdd.md` reports in Given/When/Then. New gate
+  **`bdd_report_check.py`** reds a scenario missing a step, a Then that says nothing
+  observable, code-speak in the human body, or a step over the length cap. Doctrine
+  `bdd-report.md` + template.
+- **The /qa evidence layer, ported from [ai-qa](https://github.com/connorpham/ai-qa) (VT-9).**
+  One vocabulary for the gate and the workbook (`lib/evdpack.py`); `xlsx_export.py` writes
+  `<TICKET>_testcases.xlsx` — Summary / Test Cases / Defects / Traceability / Evidence /
+  Images to ISO/IEC/IEEE 29119-3, never invents a value, `--strict` names what is undeclared;
+  `evd_index.py` regenerates the folder's own index block and `--check` reds a stale one;
+  `annotate.py` draws an exact-fit box with the caption **below** the image, coordinates
+  intact; `evd_check` gains the v2 rules (a case names its `KIND`, its `COVERAGE`, what it
+  proves — in words a reader can check). Doctrine `evidence.md`.
+- **Gates that survive a split worktree (VT-10).** The first live parallel run broke five
+  gate assumptions in minutes, all one family: a single working tree. Now `parallel_check`
+  and `coord_check` read a sibling's tasksheet from git (`git show <branch>:<path>`), name
+  an uncommitted one instead of reading it as empty, ignore the shared bookkeeping homes
+  (`docs/pm`, `evd/`, `docs/qa`) as edit territory, and tell a **landed** branch from an
+  in-flight one topologically (squash-merge aware). `graph_check` attributes a commit to a
+  ticket only by a **leading** key (`VT-10 …`, `feat(VT-10):`, `[VT-10]`), never a prose
+  mention. `orca_team.sh trust <path>` pre-accepts the agent's trust dialog for a new
+  worktree, which used to eat the injected prompt.
+- **Counts.** 15 → **18 gates**, 26 → **32 selftests**, suite 158 → **164 checks**; the
+  README's three numbers are each guarded by the suite.
+- **Known gaps, filed from the trial:** the `nextjs-prisma` profile assumes the app at the
+  repo root (VT-11); Orca workers report no token usage, `usage --sync` is path-bound, a
+  login expiry idles every agent silently, `graph_check`'s file listing can see a commit as
+  parentless on CI, `schedule_check` reads the first date in a decision row (VT-12).
+
 ## 0.16.0
 
 The competency layer — the framework had supervisors and an iron rulebook but no
