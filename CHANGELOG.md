@@ -11,6 +11,127 @@ does not match `package.json`.
 
 ---
 
+## 0.18.0 — 2026-09-10
+
+Twelve new competencies — seven for DEV, two for QA, two for BA, one for PM — taking
+the doctrine from 19 to 31, and giving the BA and PM lanes their first craft files.
+From a field study of `nilbuild/developer-roadmap`: curriculum topics read in the
+authors' own order across roadmaps covering frontend, mobile, QA and backend, with the
+hard facts verified against primary sources rather than the roadmap's own summaries.
+
+- **`dev-frontend-craft`** (T2, routed on `label:ui`/`path:app/`/`term:component`): the
+  browser as a document platform used as an app platform — component states before
+  code, server/client boundary, cascade layers over specificity, virtualization,
+  minor-unit money. Specificity and cascade rules from MDN; WCAG thresholds verified
+  verbatim against the `w3c/wcag` source; the JS semantics claims verified by execution.
+- **`dev-mobile-craft`** (T2, routed on `label:mobile`/`term:lifecycle`): the OS owns
+  your process. Rotation and OS-kill are **two** events, not one — `onDestroy` runs on
+  the first and not the second, and a ViewModel survives the first but not the second.
+  Secure stores, three permission branches, remote kill switch before the feature.
+  Lifecycle order verified against developer.android.com, ARC against docs.swift.org.
+- **`dev-content-pipelines`** (T3, routed on `label:content`/`term:corpus`): repositories
+  whose asset is data. Count the corpus before reading the code, replay the round trip
+  over the whole corpus, and make the detection predicate and the extraction expression
+  the same expression. Derived from fourteen measured defects in the studied repo.
+- **`qa-accessibility-verification`** (V2, routed on `label:ui`/`term:dialog`): the
+  checks no role curriculum assigns. The `android` roadmap has **zero** accessibility
+  topic nodes; `react` and `vue` have no accessibility chapter while `angular` does.
+  Keyboard pass first, real screen reader, max font — and cite the criterion at the
+  right level: 2.5.8 is **24×24 CSS px at AA**, satisfiable by spacing; 44×44 is 2.5.5
+  at AAA.
+- **`qa-combinatorial-design`** (V2, routed on `label:matrix`/`term:combination`): the
+  case count, defended. Pairwise by default, 4-way to 6-way as the ceiling, both quoted
+  verbatim from NIST; decision tables; tier choice from Fowler's push-down laws;
+  measure your own flake rate. The widely-repeated "93% of NASA failures were 2-way"
+  and "pairwise finds ~80%" figures were checked in NIST primary sources and **could
+  not be confirmed**, so nothing in the file rests on them.
+
+
+### Backend — four gaps that were measurable, not assumed
+
+Before these files, a grep across all 24 competencies returned **zero** hits for
+`isolation level`, `deadlock`, `race condition`, `n+1`, `tracing`, `metric`,
+`background job`, `cron`, `rate limit` and `circuit breaker`. `dev-data-modeling`
+owned the schema and `dev-error-handling` owned the single failure, so what was
+missing was everything about **runtime behaviour under concurrency and load**.
+
+- **`dev-concurrency-and-transactions`** (T3, routed on `label:payment`/`term:transaction`):
+  name the isolation level or inherit its anomalies. PostgreSQL defaults to **Read
+  Committed**, which permits nonrepeatable reads, phantom reads, serialization
+  anomalies and lost updates in complex operations; its Repeatable Read is *stronger*
+  than the SQL standard and leaves only serialization anomalies, at the price of
+  `could not serialize access` errors the application **must** retry. Uniqueness is a
+  constraint, never a check-then-insert. Isolation table and error semantics verified
+  verbatim against the PostgreSQL documentation.
+- **`dev-async-work`** (T3, routed on `label:queue`/`term:webhook`): at-least-once is
+  the default, so an idempotency key backed by a unique constraint is not optional.
+  Send ids, not state. Bounded retries with backoff **and jitter**, a dead-letter queue
+  somebody alerts on, a timeout on every outbound call, circuit breaker plus throttle,
+  and scheduled jobs that survive being run twice during a rolling deploy.
+- **`dev-query-performance`** (T2, routed on `label:slow`/`term:pagination`): count the
+  queries before timing them, because the usual cause is N+1 rather than a slow query.
+  Read the plan before touching the schema; keyset pagination for anything deep; decide
+  cache invalidation in the same change as the cache, and put the tenant in the key.
+- **`dev-observability`** (T3, routed on `label:incident`/`term:tracing`): metrics
+  answer "how much", traces answer "where", logs answer "what happened in this one
+  case", and none substitutes for another. Correlation id across the queue boundary,
+  low-cardinality labels, alerts on symptoms with a duration and a first action.
+
+### What the gates prove, and what they do not
+
+`competency_check` proves all **28** files carry the five required frontmatter fields,
+the six required sections, routing tokens the lane can match, and a body inside the
+1,100-word budget — it caught a description of mine that narrated a procedure and a
+word count over budget, and both were fixed. Every one of the nine is **conditionally
+routed**, so the `always` context budget is unchanged: DEV stays at 3,897 words and QA
+at 6,367. What the gate does not prove is that any of them changes an output; the
+before/after evaluation design ships with the study and the behavioural run has not
+been done.
+
+### BA and PM — the lanes that had no craft files at all
+
+The step vocabulary lives in the **workflows**, not the role docs: `/ba` runs B0–B5 and
+`/pm` runs P0–P4, so `loads` has an honest value for both. Both lanes already own the
+*procedure* — `/ba` requires Given/When/Then and "INVEST or split", `/pm` defines
+mechanically when an item is UNBLOCKED — and neither says how a senior actually does it.
+
+- **`ba-acceptance-criteria`** (B2): one behaviour per criterion, declarative rather
+  than imperative, a concrete typed value in every criterion, an observable outcome, a
+  refusal for every rule, a number and a measurement point for every non-functional
+  criterion, a cited source instead of an invented rule. Complements
+  `qa-requirement-smells`, which **detects** an untestable criterion — this one writes
+  a testable one. Measured gap: `given/when/then`, `user story`, `traceab`,
+  `non-functional` and `out of scope` were in **zero** competencies.
+- **`ba-story-slicing`** (B2): cut vertically, never into "backend story" and "frontend
+  story". The test for a valid slice is the sentence "after this ships, a user can …";
+  split by workflow step, by rule, by data shape or by role; narrow the **input**, not
+  the layers; a spike is time-boxed and answers a question.
+- **`pm-prioritisation`** (P1): finishing beats starting. Sweep the nearly-done before
+  choosing anything new, order strictly with no ties, rank by cost of delay per unit of
+  effort, cap work in flight below the number of people, never start a fifth thing to
+  compensate for a blocker, escalate on elapsed time with a stated consequence, and
+  report "nothing unblocked" as a real result.
+
+**These three cost context, unlike the other nine.** All twelve pass the gate, but the
+nine DEV/QA files are conditionally routed and added **zero** to the `always` budget,
+while these three are `always` — deliberately, because writing criteria, slicing and
+picking work are the acts those lanes exist to perform, and routing them conditionally
+would mean sometimes omitting the craft for the lane's whole job. The cost is real and
+new: BA goes from 0 to **2,155 words** (≈2,909 tokens) and PM from 0 to **1,076 words**
+(≈1,452 tokens) on every session of those lanes.
+
+### Roles still without competencies
+
+Four of eight remain empty: `design`, `devops`, `sa`, `specialists`. Each is blocked on
+the same thing — **no lane-step vocabulary**. `devops.md`, `design.md` and
+`specialists.md` have no numbered steps and no workflow; `sa.md`'s only capital-letter
+token is `C4`, the diagram model, not a step. `competency_check` does **not** validate
+the value of `loads`, so a made-up step would pass the gate while guaranteeing the file
+is never loaded — a green that lies. Naming those steps is a decision for the owner,
+not something to invent.
+
+---
+
 ## 0.17.1 — 2026-09-10
 
 The README describes what 0.17.0 ships — with pictures — and says out loud what the gates
