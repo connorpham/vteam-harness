@@ -118,13 +118,30 @@ def check_text(text: str, key: str, adopted: date, root: Path | None,
                     if not (root / path).exists():
                         warns.append(f"line {n}: path {path} no longer exists — "
                                      f"verify, or accept if deliberate cleanup")
-            cited = {m.group(1).upper() for m in
-                     re.finditer(r"\b([QDA]\d+)\b", (row.get("result") or "") + " " + (row.get("link") or ""))}
+            blob = " ".join(str(row.get(f) or "") for f in ("item", "result", "link"))
+            cited = {m.group(1).upper() for m in re.finditer(r"\b([QDA]\d+)\b", blob)}
             unknown = sorted(c for c in cited if c not in known_decisions)
             if unknown and known_decisions:
-                errs.append(f"line {n}: cites {', '.join(unknown)}, which the decision queue "
-                            f"does not hold — a row justified by a decision that was never "
-                            f"written is a row justified by nothing")
+                # A row about ANOTHER project legitimately cites that project's queue: this
+                # repo's ledger records field-trial work whose decisions live in the trial
+                # repo. The tell is in the row itself — it names a ticket key that is not
+                # this project's. Flagged as a warning there, because the citation cannot be
+                # resolved from here and silence would be worse than a soft note.
+                # ANY foreign key, not the first key found: a row's Item almost always
+                # starts with this project's own key, so `search` would never see the
+                # other project mentioned later in the same row.
+                keys = {m.group(1).upper() for m in re.finditer(r"\b([A-Z][A-Z0-9]{1,9})-\d+\b", blob)}
+                foreign_keys = sorted(keys - {key.upper()})
+                foreign_key = bool(foreign_keys)
+                msg = (f"line {n}: cites {', '.join(unknown)}, which this repo's decision queue "
+                       f"does not hold")
+                if foreign_key:
+                    warns.append(msg + f" — the row also names {', '.join(foreign_keys)}, so the "
+                                       f"decision probably lives in that project's queue; "
+                                       f"unresolvable from here")
+                else:
+                    errs.append(msg + " — a row justified by a decision that was never written "
+                                      "is a row justified by nothing")
         if row["kind"] == "done" and row["tok_k"] is None:
             if d >= adopted:
                 errs.append(f"line {n}: missing or malformed `tok ≈ N[k]` — token "

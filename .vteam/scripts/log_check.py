@@ -42,9 +42,28 @@ from ctx import Ctx  # noqa: E402
 DATE_PAT = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:/\d{2})?$")
 
 
+def decision_keys(root: Path | None, pm_dir: str = "docs/pm") -> set[str]:
+    """The Q/D/A row keys the decision queue actually holds.
+
+    A row can cite a decision to justify itself — "blocked: Q5 unanswered", "→ D13".
+    Nothing checked that the cited row exists, and the failure is silent in the worst
+    way: on 2026-09-10 a script writing a new D-row raised on a percent sign, the row
+    was never written, and the commit plus the ledger entry both pointed at it anyway.
+    The ledger looked complete and cited nothing.
+    """
+    if root is None:
+        return set()
+    f = root / pm_dir / "decisions.md"
+    if not f.is_file():
+        return set()
+    return {m.group(1).upper() for m in
+            re.finditer(r"^\|\s*([QDA]\d+)\s*\|", f.read_text(encoding="utf-8", errors="replace"), re.M)}
+
+
 def check_text(text: str, key: str, adopted: date, root: Path | None,
                team_size: int = 1) -> tuple[list, list]:
     errs, warns = [], []
+    known_decisions = decision_keys(root)
     shape, prev_date = None, None
     # project.key is config-supplied text, not a regex — escape it (audit M15;
     # review_check and stale_verdict_check already do)
@@ -99,6 +118,30 @@ def check_text(text: str, key: str, adopted: date, root: Path | None,
                     if not (root / path).exists():
                         warns.append(f"line {n}: path {path} no longer exists — "
                                      f"verify, or accept if deliberate cleanup")
+            blob = " ".join(str(row.get(f) or "") for f in ("item", "result", "link"))
+            cited = {m.group(1).upper() for m in re.finditer(r"\b([QDA]\d+)\b", blob)}
+            unknown = sorted(c for c in cited if c not in known_decisions)
+            if unknown and known_decisions:
+                # A row about ANOTHER project legitimately cites that project's queue: this
+                # repo's ledger records field-trial work whose decisions live in the trial
+                # repo. The tell is in the row itself — it names a ticket key that is not
+                # this project's. Flagged as a warning there, because the citation cannot be
+                # resolved from here and silence would be worse than a soft note.
+                # ANY foreign key, not the first key found: a row's Item almost always
+                # starts with this project's own key, so `search` would never see the
+                # other project mentioned later in the same row.
+                keys = {m.group(1).upper() for m in re.finditer(r"\b([A-Z][A-Z0-9]{1,9})-\d+\b", blob)}
+                foreign_keys = sorted(keys - {key.upper()})
+                foreign_key = bool(foreign_keys)
+                msg = (f"line {n}: cites {', '.join(unknown)}, which this repo's decision queue "
+                       f"does not hold")
+                if foreign_key:
+                    warns.append(msg + f" — the row also names {', '.join(foreign_keys)}, so the "
+                                       f"decision probably lives in that project's queue; "
+                                       f"unresolvable from here")
+                else:
+                    errs.append(msg + " — a row justified by a decision that was never written "
+                                      "is a row justified by nothing")
         if row["kind"] == "done" and row["tok_k"] is None:
             if d >= adopted:
                 errs.append(f"line {n}: missing or malformed `tok ≈ N[k]` — token "
