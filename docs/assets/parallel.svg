@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="960" height="500" role="img" aria-label="Parallel DEV mode: the PM runs N developer agents at once, each in its own git worktree on a disjoint code scope, coordinating over the Orca Run mailbox (dispatch, heartbeats, ask and reply, handoff rows, worker_done) with a text-relay fallback. Coding is parallel; integration is serial — the PM merges one branch, re-runs the gate, merges the next. parallel_check refuses two in-flight branches sharing a file, coord_check refuses a chat handoff that never became real scope, review_check refuses a push without its dossier, graph_check attributes commits only by a leading ticket key. Bookkeeping folders are shared by design and never count as scope.">
+  <style>
+    .ink{fill:#1C1F22}.muted{fill:#5A6065}.card{fill:#FFFFFF;stroke:#C9CBC4}
+    .line{stroke:#9BA1A7}.intake{fill:#EFF3F8;stroke:#3C6E9F}.intakex{fill:#2C5B8A}
+    .lane{fill:#FFFFFF;stroke:#C9CBC4}.orch{fill:#F5EDDA;stroke:#9A6A00}.orchx{fill:#7A5400}
+    .gatex{fill:#C03B2B}.tool{fill:#F4F4F1;stroke:#C9CBC4}.gate{fill:#FBEFEC;stroke:#C03B2B}
+    @media (prefers-color-scheme: dark){
+      .ink{fill:#E8E6E1}.muted{fill:#9BA1A7}.card{fill:#1D2024;stroke:#3A3E43}
+      .line{stroke:#6B7278}.intake{fill:#1B2733;stroke:#6FA3D4}.intakex{fill:#8FBEE8}
+      .lane{fill:#1D2024;stroke:#3A3E43}.orch{fill:#33301E;stroke:#D9A94B}.orchx{fill:#E0BE6A}
+      .gatex{fill:#E4604F}.tool{fill:#22252A;stroke:#3A3E43}.gate{fill:#2A1F1D;stroke:#E4604F}
+    }
+    text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  </style>
+  <defs>
+    <marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9BA1A7"/>
+    </marker>
+    <marker id="t2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9BA1A7"/>
+    </marker>
+  </defs>
+
+  <text x="24" y="32" class="ink" font-size="17" font-weight="700">Parallel DEV — N workers in their own worktrees, one PM hand on the merge</text>
+  <text x="24" y="53" class="muted" font-size="12.5">Coding runs in parallel on disjoint scopes; integration stays serial. The red labels are the gates that refuse the shortcut.</text>
+
+  <!-- PM -->
+  <rect x="24" y="84" width="212" height="152" rx="8" class="orch" stroke-width="1.5"/>
+  <text x="40" y="108" class="orchx mono" font-size="13" font-weight="700">/team · PM</text>
+  <text x="40" y="126" class="muted" font-size="10.5">team.parallel: 2</text>
+  <text x="40" y="147" class="ink" font-size="10.5">picks items whose CODE-SCOPE</text>
+  <text x="40" y="161" class="ink" font-size="10.5">are pairwise disjoint · briefs</text>
+  <text x="40" y="175" class="ink" font-size="10.5">each worker · relays handoffs ·</text>
+  <text x="40" y="189" class="ink" font-size="10.5">answers blocking questions ·</text>
+  <text x="40" y="203" class="ink" font-size="10.5">owns the ledger and every merge</text>
+  <text x="40" y="224" class="muted" font-size="10">a worker never merges</text>
+
+  <!-- bus -->
+  <rect x="284" y="84" width="200" height="152" rx="8" class="intake" stroke-width="1.5"/>
+  <text x="300" y="108" class="intakex mono" font-size="13" font-weight="700">Orca Run mailbox</text>
+  <text x="300" y="126" class="muted" font-size="10.5">orca_team.sh open-run · wait</text>
+  <text x="300" y="147" class="ink" font-size="10.5">dispatch → heartbeat (phase)</text>
+  <text x="300" y="161" class="ink" font-size="10.5">ask / reply with options</text>
+  <text x="300" y="175" class="ink" font-size="10.5">handoff row · worker_done</text>
+  <text x="300" y="198" class="muted" font-size="10">no bus? the PM relays the same</text>
+  <text x="300" y="211" class="muted" font-size="10">messages as text — never silent</text>
+
+  <line x1="238" y1="160" x2="282" y2="160" class="line" stroke-width="1.5" marker-end="url(#t)" marker-start="url(#t2)"/>
+
+  <!-- workers -->
+  <rect x="532" y="84" width="404" height="72" rx="8" class="lane" stroke-width="1.5"/>
+  <text x="548" y="105" class="ink mono" font-size="12.5" font-weight="700">DEV A</text>
+  <text x="600" y="105" class="muted mono" font-size="10.5">worktree tb-3 · feat/TB-3/media-list · port 3458</text>
+  <text x="548" y="125" class="ink" font-size="10.5">CODE-SCOPE features/media/** · tasksheet committed at T1</text>
+  <text x="548" y="141" class="ink" font-size="10.5">R1+R2 → dossier committed → gate GREEN → push → worker_done</text>
+
+  <rect x="532" y="164" width="404" height="72" rx="8" class="lane" stroke-width="1.5"/>
+  <text x="548" y="185" class="ink mono" font-size="12.5" font-weight="700">DEV B</text>
+  <text x="600" y="185" class="muted mono" font-size="10.5">worktree tb-5 · feat/TB-5/system-log · port 3459</text>
+  <text x="548" y="205" class="ink" font-size="10.5">CODE-SCOPE features/system-log/** · own app port, own fixtures</text>
+  <text x="548" y="221" class="ink" font-size="10.5">shares nothing on disk with A except the bookkeeping folders</text>
+
+  <line x1="486" y1="120" x2="530" y2="120" class="line" stroke-width="1.5" marker-end="url(#t)" marker-start="url(#t2)"/>
+  <line x1="486" y1="200" x2="530" y2="200" class="line" stroke-width="1.5" marker-end="url(#t)" marker-start="url(#t2)"/>
+
+  <!-- handoff between workers -->
+  <text x="548" y="260" class="ink" font-size="10.5">A needs a contract B owns → a <tspan font-weight="700">handoff row</tspan> in docs/pm/coordination.md,</text>
+  <text x="548" y="274" class="ink" font-size="10.5">both CODE-SCOPEs updated, gate re-run. <tspan class="gatex mono" font-weight="700">coord_check</tspan>: a handoff</text>
+  <text x="548" y="288" class="ink" font-size="10.5">that stayed conversation is red; so is a round past team.coord_budget.</text>
+
+  <!-- integration row -->
+  <text x="24" y="270" class="ink" font-size="13" font-weight="700">Integration — serial, by the PM,</text>
+  <text x="24" y="288" class="ink" font-size="13" font-weight="700">three separate commands</text>
+
+  <rect x="24" y="312" width="150" height="54" rx="8" class="card" stroke-width="1.5"/>
+  <text x="40" y="334" class="ink" font-size="11" font-weight="700">merge A (--no-ff)</text>
+  <text x="40" y="350" class="muted" font-size="10">PRE sha noted first</text>
+  <line x1="174" y1="339" x2="206" y2="339" class="line" stroke-width="1.5" marker-end="url(#t)"/>
+  <rect x="208" y="312" width="150" height="54" rx="8" class="gate" stroke-width="1.5"/>
+  <text x="224" y="334" class="gatex mono" font-size="11" font-weight="700">gate.sh</text>
+  <text x="224" y="350" class="muted" font-size="10">red → reset to PRE</text>
+  <line x1="358" y1="339" x2="390" y2="339" class="line" stroke-width="1.5" marker-end="url(#t)"/>
+  <rect x="392" y="312" width="150" height="54" rx="8" class="card" stroke-width="1.5"/>
+  <text x="408" y="334" class="ink" font-size="11" font-weight="700">merge B</text>
+  <text x="408" y="350" class="muted" font-size="10">after A went green</text>
+  <line x1="542" y1="339" x2="574" y2="339" class="line" stroke-width="1.5" marker-end="url(#t)"/>
+  <rect x="576" y="312" width="150" height="54" rx="8" class="gate" stroke-width="1.5"/>
+  <text x="592" y="334" class="gatex mono" font-size="11" font-weight="700">gate.sh</text>
+  <text x="592" y="350" class="muted" font-size="10">push only when clean</text>
+  <line x1="726" y1="339" x2="758" y2="339" class="line" stroke-width="1.5" marker-end="url(#t)"/>
+  <rect x="760" y="312" width="176" height="54" rx="8" class="tool" stroke-width="1.5"/>
+  <text x="776" y="334" class="ink mono" font-size="11" font-weight="700">/qa per ticket</text>
+  <text x="776" y="350" class="muted" font-size="10">verdict pinned to the sha</text>
+
+  <!-- gates strip -->
+  <text x="24" y="404" class="gatex mono" font-size="11" font-weight="700">parallel_check</text>
+  <text x="128" y="404" class="ink" font-size="10">two in-flight branches sharing a file, a count past team.parallel, a branch with no committed scope → red. Sibling scopes are read from git, not disk.</text>
+  <text x="24" y="424" class="gatex mono" font-size="11" font-weight="700">review_check</text>
+  <text x="128" y="424" class="ink" font-size="10">a worker's push with no committed R1/R2 dossier is refused by the fence inside its own worktree.</text>
+  <text x="24" y="444" class="gatex mono" font-size="11" font-weight="700">graph_check</text>
+  <text x="128" y="444" class="ink" font-size="10">a commit belongs to a ticket only by a LEADING key (feat(TB-5): …, [TB-5]); a prose mention never widens a scope; a merged branch is landed, not in flight.</text>
+  <text x="24" y="474" class="muted" font-size="10.5">Shared by design, never scope: docs/pm, evd/, docs/qa. Proven on a live run — two opus workers, four tickets, one sprint — before it shipped.</text>
+</svg>
