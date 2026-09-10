@@ -53,34 +53,6 @@ and you never log an error twice.
 - **Timeouts on every outbound call.** *Otherwise:* one slow dependency holds
   every worker.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "I'll catch everything so the page doesn't crash." | The page shows stale data and the bug goes unreported for a quarter. |
-| "Logging here too is harmless." | Triplicate errors bury the real one and inflate the bill. |
-| "A default value is safer than throwing." | A silent default is a wrong answer delivered with confidence. |
-| "Retries make it more reliable." | Retries of a non-idempotent write make it *more* wrong, faster. |
-
-## Red flags
-
-- `catch` block whose body is a comment, a `console.log`, or `return null`.
-- An error message with no identifier in it.
-- `try` wrapping fifty lines.
-- A retry loop with no maximum.
-- A user sees the words "undefined", "null", or a stack frame.
-
-## Example
-
-```ts
-// edge: parse once, typed
-const cmd = parseTopUp(req.body);            // throws ValidationError → 422 by the handler
-// core: expected failure as data
-const result = await wallet.topUp(cmd);      // Result<Receipt, InsufficientFunds | LimitExceeded>
-if (!result.ok) return problem(422, result.error);
-// unexpected: let it throw; the request handler logs ONCE with requestId and returns 500
-```
-
 ## Reviewer lens
 
 - Find every `catch`; what does each one do with the error? Any that swallow?
@@ -93,3 +65,5 @@ if (!result.ok) return problem(422, result.error);
 nodebestpractices §2 Error Handling (operational vs programmer errors, central
 handler, no swallow) · wshobson/agents `error-handling-patterns` (exceptions vs
 Result, cleanup, pitfalls) · OWASP Error Handling & Logging cheat sheets.
+
+Rationalizations, red flags and a worked example live in `reference/dev-error-handling.md` — opened when needed, never loaded by default.

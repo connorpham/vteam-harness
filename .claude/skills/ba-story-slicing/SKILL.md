@@ -57,34 +57,6 @@ path over a wide, elegant, unusable one.
 - **Stop splitting when a slice can no longer be demonstrated.** *Otherwise:* you have
   traded one oversized story for six meaningless ones.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The API has to come first." | Then narrow the input and ship one endpoint with the screen that uses it. |
-| "It's one feature, it can't be split." | Name one rule, one role or one format you could ship without. There always is one. |
-| "Splitting adds overhead." | So does discovering on day nine that the story was two weeks. |
-| "We'll do errors in a follow-up." | Then the rule is not shipped, only the happy half of it. |
-
-## Red flags
-
-- Titles like "Build the admin panel", "Implement reporting", "Migrate the API".
-- A pair of stories named "… (backend)" and "… (frontend)".
-- A story whose criteria cover three roles or four states.
-- A slice with no refusal criterion; a spike with no time box or question.
-- A "foundation" or "setup" story with no user-visible outcome.
-- A dependency recorded in one direction only.
-
-## Example
-
-"Members can manage their subscription" — a whole screen, a week or more. Wrong split:
-"subscription API" plus "subscription UI" — neither can be shown. Right split, each
-usable alone: **(1)** a member on a paid plan can **see** their current plan and next
-billing date (narrowest complete path, one plan type); **(2)** a member can **cancel**,
-with the refusal for an already-cancelled plan; **(3)** a member can **switch** plans,
-monthly to annual only; **(4)** annual to monthly, which carries the pro-rata rule and
-waits on decision Q-9. Slice 1 ships in a day and proves the data shape the rest needs.
-
 ## Reviewer lens
 
 - For each slice: what can a user do after it ships? Read the sentence aloud.
@@ -103,3 +75,5 @@ to cut; this file supplies the cut. Measured gap in this doctrine before it:
 `user story`, `vertical slice`, `definition of ready` and `out of scope` appeared in
 **zero** competencies. Complements `ba-acceptance-criteria` (the criteria inside a
 slice) and `dev-codebase-design` (where the resulting code lives).
+
+Rationalizations, red flags and a worked example live in `reference/ba-story-slicing.md` — opened when needed, never loaded by default.

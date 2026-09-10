@@ -58,29 +58,6 @@ with, not next to code that merely looks similar.
 - **Accept dependencies, return results.** *Otherwise:* every test needs a
   live gateway, a real clock, and a database.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "We'll need this abstraction later." | Then add it later, with the second caller in hand and a real shape. |
-| "It's cleaner as a separate service." | Separate is not clean; a seam with one adapter is decoration. |
-| "I'll export the internals just for the test." | Then the internals are the interface and every refactor breaks the test. |
-
-## Red flags
-
-- A new file whose only job is to call one other function.
-- `utils.ts` gained a function this ticket; which feature owns it?
-- An interface with more methods than the implementation has branches.
-- `import` from a sibling feature.
-
-## Example
-
-Ticket: "apply member tier discount at checkout". Shallow: `DiscountHelper`
-with `getTier()`, `getRate()`, `applyRate()`, `formatDiscount()` used from the
-checkout page. Deep: `priceOrder(order, tierPolicy): PricedOrder` in
-`features/pricing/`; the page calls one function, the test passes a fake
-`tierPolicy`, and the tier lookup lives behind the seam.
-
 ## Reviewer lens
 
 - Apply the deletion test to each new module in the diff; what disappears?
@@ -93,3 +70,5 @@ mattpocock/skills `codebase-design` (deep modules, seams, deletion test) ·
 Ousterhout, *A Philosophy of Software Design* · Feathers, *Working Effectively
 with Legacy Code* (seams) · alan2207/bulletproof-react (feature folders,
 `import/no-restricted-paths`).
+
+Rationalizations, red flags and a worked example live in `reference/dev-codebase-design.md` — opened when needed, never loaded by default.

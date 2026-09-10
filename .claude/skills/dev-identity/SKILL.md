@@ -62,22 +62,6 @@ conflict, the gate wins, then the spec, then the schema, then the ticket.
   question mark, not into the code as a default. *Otherwise:* the assumption
   ships and becomes a bug with your name on it.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "It's a small change, I don't need the task-sheet." | Small changes ship most regressions; the sheet takes four minutes. |
-| "I'll clean this up in a follow-up." | There is no follow-up ticket. Either it belongs here or it belongs in a side finding. |
-| "The spec obviously means X." | Obvious to you is a guess to the gate. Ask. |
-| "Tests slow me down on this one." | You are about to spend that time twice in review. |
-
-## Red flags — stop and re-read this file
-
-- You are typing a field, enum or route name without the schema open.
-- The diff touches a file the task-sheet did not list.
-- You wrote "should", "probably" or "seems to" about behavior you can run.
-- You are explaining why a failing check is acceptable.
-
 ## Reviewer lens
 
 - Does every named identifier in the diff exist in the schema/router/spec? Pick three and check.
@@ -88,3 +72,5 @@ conflict, the gate wins, then the spec, then the schema, then the ticket.
 
 Google eng-practices (small CLs, reviewer standard) · Karpathy's LLM-coding
 pitfalls via the `guidelines` workflow · nodebestpractices (TL;DR/Otherwise form).
+
+Rationalizations, red flags and a worked example live in `reference/dev-identity.md` — opened when needed, never loaded by default.

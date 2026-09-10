@@ -60,20 +60,17 @@ state it can enter is drawn, nor call it fast without a number.
   the styling.** *Otherwise:* a greyed-out field still posts.
 - **Keep secrets out of anything reaching the client, props included.**
   *Otherwise:* view-source is your breach report.
+- **An indicator made only of `box-shadow` does not exist in forced-colours mode.**
+  Chrome paints no shadow there, so pair every `ring` with an `outline` the system can
+  colour, and never let a caller add `outline-none` over it — in Tailwind v4 that class
+  poisons the custom property the width utility reads, so class order cannot save you.
+  *Otherwise:* focus is invisible to the users who most need it.
 - **Never `sleep` in a test or a UI — wait on a condition.** *Otherwise:* you have
   built a flake generator.
 - **Name the trade-off in the PR when you add a tool, and measure before optimizing.**
   *Otherwise:* the next person adds the competing tool, and a week goes to a
   memoization that changed nothing.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The designer only gave me the default state." | Then the design is incomplete. Ask, or enumerate the states and show them. |
-| "Accessibility is a later ticket." | Contrast, labels, focus and target size cost minutes now and a rewrite later. |
-| "`any` unblocks the build." | It moves the error from your terminal to the user's browser. |
-| "e2e covers it." | e2e is the slowest, flakiest tier. Push the assertion to the cheapest tier that holds it. |
 
 ## Red flags
 
@@ -104,6 +101,10 @@ past a few hundred rows, hold the amount in minor units, give the table its own
 - Any performance claim: where is the number?
 
 ## Sources
+
+- `../qa/reference/forced-colors.md` — why the shadow disappears, the
+  `outline-none` vs `outline-hidden` difference, and how to measure it.
+- `reference/dev-frontend-craft.md` — the rationalizations, opened in a review round.
 
 Field study of `nilbuild/developer-roadmap` @ `74a645b` — 1,363 frontend topics read in
 the authors' own order; component state requirements verbatim from its `design-system`

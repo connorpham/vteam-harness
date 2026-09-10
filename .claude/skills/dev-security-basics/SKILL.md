@@ -55,33 +55,6 @@ framework's and configure it correctly.
 - **Error responses are generic; details go to the log with an id.**
   *Otherwise:* the attacker gets a stack trace with table names.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The UI doesn't show that button to non-admins." | The API does not know about the UI. |
-| "IDs are UUIDs, nobody can guess them." | They leak in URLs, logs and referers; ownership still needs a check. |
-| "It's an internal tool." | Internal tools have the fewest reviews and the most privileges. |
-| "The ORM protects against injection." | Only when you use its query API — `$queryRaw` with a template string does not. |
-
-## Red flags
-
-- `params.id` used in a query without an owner/tenant condition.
-- A route with no auth middleware, or `authorize` applied to "most" routes.
-- String interpolation inside SQL, shell, or HTML.
-- A secret-looking literal in code or a test fixture.
-- `catch` returning the raw error message to the client.
-
-## Example
-
-```ts
-// BAD: any authenticated user reads any order
-const order = await db.order.findUnique({ where: { id: params.id } });
-// GOOD: scoped to the caller; 404 hides existence
-const order = await db.order.findFirst({ where: { id: params.id, customerId: user.id } });
-if (!order) return problem(404);
-```
-
 ## Reviewer lens
 
 - For each new/changed handler: where is authentication, and where is the per-resource authorization?
@@ -96,3 +69,5 @@ Prevention, Password Storage, Secrets Management, Mass Assignment, Logging,
 Session Management, File Upload) · github/awesome-copilot
 `security-and-owasp` (anti-pattern catalog with detection patterns) ·
 nodebestpractices §6 Security.
+
+Rationalizations, red flags and a worked example live in `reference/dev-security-basics.md` — opened when needed, never loaded by default.

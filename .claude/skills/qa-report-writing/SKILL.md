@@ -58,22 +58,6 @@ Appendix (technical). The verdict word in the reader's terms, then the ladder.
   stay English for the gate. *Otherwise:* the team reads a foreign language to
   learn their own result.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The evidence folder speaks for itself." | Only if every file is named and the verdict shot is boxed. Otherwise it is a pile of screens. |
-| "I'll note what I skipped if asked." | Unstated gaps are read as coverage; the gap becomes production's problem. |
-| "PASS needs no evidence." | A PASS is worth the folder behind it. An unboxed full-page shot proves the address, not the product. |
-| "The developer will understand the stack trace." | The product owner deciding whether to ship will not. Write for them. |
-
-## Red flags
-
-- A verdict stated in code terms ("null pointer in totals").
-- A claim in the report with no file named behind it.
-- Screenshots named `01.png`, `02.png`; a full-page shot with nothing boxed.
-- No "what I could not check" section on a real verification.
-
 ## Reviewer lens
 
 - Read only the five lines: do you know what was asked, what was found, and the risk?
@@ -85,3 +69,5 @@ Appendix (technical). The verdict word in the reader's terms, then the ladder.
 connorpham/ai-qa `report-writing.md`, `evidence.md` (the five lines, section
 shapes, the stranger test, boxed verdict shot) · vteam `evd_check.py` /
 `evd_ui_check.py` (the machine floor this writes to).
+
+Rationalizations, red flags and a worked example live in `reference/qa-report-writing.md` — opened when needed, never loaded by default.

@@ -60,22 +60,6 @@ chance to fail.
   another lane owns.** *Otherwise:* the verifier becomes an author grading
   their own work.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The dev's report says it passed, I'll spot-check." | The report is the claim under test. Spot-checking a claim verifies the claim exists. |
-| "I read the handler — it clearly does this." | The code tells you where to look. Only a run tells you what happens. |
-| "There's no spec, so I can't test this." | You can: consistency oracles. You just cannot call it a defect — call it a difference with an owner. |
-| "It's obviously a bug." | Obvious is an opinion until a citation, a floor outcome, or an oracle backs it. |
-
-## Red flags
-
-- An EXPECTED you cannot cite and cannot tie to a floor outcome or named oracle.
-- A verdict written before the browser opened.
-- The words "should work", "looks right", "same as before" in your notes.
-- You are staging a code change.
-
 ## Reviewer lens
 
 - For each PASS: which evidence file, pinned to which commit and time? Open one and check it shows what its name claims.
@@ -87,3 +71,5 @@ chance to fail.
 connorpham/ai-qa `roles-qa.md`, `severity.md` (the ladder, origin, the third
 outcome) · Bach & Bolton, Rapid Software Testing (oracle problem, methodical
 doubt) · vteam `raci.md` §3 (QC vs QA).
+
+Rationalizations, red flags and a worked example live in `reference/qa-identity.md` — opened when needed, never loaded by default.

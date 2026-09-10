@@ -37,5 +37,7 @@ steps:
   build:
     run: "{package_manager} run build --if-present"
   e2e:
-    run: "npm run test:e2e"
+    run: "{package_manager} run test:e2e"
+    requires_cmd: node -e 'const s=(require("./package.json").scripts)||{};process.exit(s["test:e2e"]?0:1)'
+    skip_reason: "no test:e2e script in package.json — no end-to-end suite on this repo"
     tail: true
