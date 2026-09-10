@@ -15,8 +15,15 @@ Checks {paths.team}/competencies/<role>/*.md:
      that summarizes the workflow gets followed INSTEAD of the file), role,
      loads (a lane step), applies (routing tokens).
   2. `applies` grammar: `always` | `label:<x>` | `path:<prefix>` |
-     `profile:<name>` | `term:<word>` — anything else is a typo the lane will
-     silently never match.
+     `profile:<name>` | `term:<word>` | `type:<IssueType>` — anything else is a
+     typo the lane will silently never match.
+     `type:` matches the ticket's own `type:` field (Bug, Story, Task, Spike…).
+     It exists because `term:` matches a ticket's whole prose, so a single common
+     English word routes a whole competency into a lane's context: measured on the
+     field trial, a CSS focus-ring ticket loaded `dev-mobile-craft` on the word
+     "permission", and two Bug tickets loaded `dev-debugging` on the word "bug"
+     appearing in a sentence rather than on being bugs. `type:` is the structural
+     truth the ticket already states, so it cannot be triggered by prose.
   3. Required sections: Identity · When this applies · Decide · Rules ·
      Reviewer lens · Sources. Missing "Reviewer lens" = craft nobody can check.
   4. Body ≤ MAX_WORDS — a competency that needs more moves the bulk to a
@@ -42,7 +49,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 MAX_WORDS = 1100
 REQUIRED_SECTIONS = ["Identity", "When this applies", "Decide", "Rules", "Reviewer lens", "Sources"]
 REQUIRED_META = ["name", "description", "role", "loads", "applies"]
-APPLIES = re.compile(r"^(always|label:[\w-]+|path:[\w./-]+|profile:[\w-]+|term:[\w-]+)$")
+APPLIES = re.compile(r"^(always|label:[\w-]+|path:[\w./-]+|profile:[\w-]+|term:[\w-]+|type:[A-Za-z][\w -]*)$")
 # A description that narrates the procedure ("first X, then Y → Z") is the
 # failure mode superpowers measured: agents follow the summary and skip the body.
 PROCEDURAL = re.compile(r"(→|\bthen\b|\bstep \d|\bfirst,|\bfinally\b)", re.I)
@@ -88,7 +95,8 @@ def check_file(path_name: str, text: str, role: str) -> list[str]:
         errs.append(f"{path_name}: description > 1024 chars")
     for tok in [t.strip() for t in meta.get("applies", "").split(",") if t.strip()]:
         if not APPLIES.match(tok):
-            errs.append(f"{path_name}: applies token {tok!r} is not always|label:|path:|profile:|term:")
+            errs.append(f"{path_name}: applies token {tok!r} is not "
+                        f"always|label:|path:|profile:|term:|type:")
     heads = {h.strip() for h in re.findall(r"^##\s+(.+)$", body, re.M)}
     for sec in REQUIRED_SECTIONS:
         if not any(h == sec or h.startswith(sec + " ") or h.startswith(sec + " —") for h in heads):

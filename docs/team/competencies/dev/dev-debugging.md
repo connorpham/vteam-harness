@@ -3,7 +3,7 @@ name: dev-debugging
 description: "Use when a test, gate, build or user report says something is broken and the cause is not yet proven — especially under time pressure, when the fix 'looks obvious', or after a second attempt has already failed."
 role: dev
 loads: T3
-applies: label:bug, label:reopen, term:bug, term:regression, term:flaky
+applies: type:Bug, label:bug, label:reopen, term:regression, term:flaky
 ---
 
 # Debugging — no fix without a reproduced root cause

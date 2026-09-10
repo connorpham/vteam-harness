@@ -3,7 +3,7 @@ name: dev-observability
 description: "Use when a change ships something you will have to debug from the outside — a new endpoint, worker, integration or migration — and when the only answer to 'is it working?' is a screenshot. Also when an incident is being investigated and the logs do not say enough, and when an alert fires that nobody can act on."
 role: dev
 loads: T3
-applies: label:incident, label:observability, term:logging, term:metric, term:tracing, term:alert, term:incident, term:monitoring
+applies: label:incident, label:observability, term:metric, term:tracing, term:alert, term:monitoring
 ---
 
 

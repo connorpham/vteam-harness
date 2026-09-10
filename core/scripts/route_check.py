@@ -56,7 +56,7 @@ def load_competencies():
     return out
 
 
-STRUCTURAL = ("title", "labels", "summary", "criteria")
+STRUCTURAL = ("title", "labels", "summary", "criteria", "type")
 
 
 def ticket_fields(text):
@@ -103,6 +103,10 @@ def route(fields, comps, role):
         for tok in c["applies"]:
             if tok.startswith("label:") and tok[6:] in fields["labels"]:
                 hits.append((tok, ["labels"]))
+            elif tok.startswith("type:"):
+                want = tok[5:].strip().lower()
+                if (fields.get("type") or "").strip().lower() == want:
+                    hits.append((tok, ["type"]))
             elif tok.startswith("term:"):
                 w = where(tok[5:], fields)
                 if w:
