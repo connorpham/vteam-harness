@@ -410,12 +410,97 @@ def attach_all(evd: Path, ticket: str) -> int:
     return 0
 
 
+def sweep(evidence_root: Path, backlog: Path, verbs: list[str], strict_statuses=("done",)) -> int:
+    """Check every pack that carries a verdict, without being told which ticket.
+
+    Why this exists: `/qa` names `evd_check` a dozen times and the gate never ran it,
+    so a pack could ship a REPORT.md claiming ten test cases with zero case folders —
+    which is exactly what happened on TB-8 in the field trial, and it took a
+    challenger agent to notice. A gate that only runs when someone remembers to type
+    it is not a gate.
+
+    The expected case count is taken FROM THE REPORT ITSELF (the distinct `TC_<n>`
+    it cites), so a report cannot claim more cases than the folder holds. Packs whose
+    ticket is `Done` are errors — a closed claim must be complete. Packs still in
+    review are reported as warnings, because they may legitimately be half-written.
+    """
+    if not evidence_root.is_dir():
+        print(f"⚠️  evd_check --sweep: no evidence directory at {evidence_root} — nothing to check")
+        return 0
+
+    def status_of(key: str) -> str:
+        f = backlog / f"{key}.md"
+        if not f.is_file():
+            return "(no ticket)"
+        m = re.search(r"^[-*]?\s*status\s*:\s*(.+)$", read(f), re.M | re.I)
+        return (m.group(1).strip() if m else "(no status)")
+
+    packs = sorted(d for d in evidence_root.iterdir()
+                   if d.is_dir() and (d / "REPORT.md").is_file())
+    if not packs:
+        print(f"✅ evd_check --sweep: no pack under {evidence_root} carries a REPORT.md yet")
+        return 0
+
+    bad, warned, ok = [], [], []
+    for pack in packs:
+        st = status_of(pack.name)
+        cited = {int(n) for n in re.findall(r"\bTC[_-](\d+)", read(pack / "REPORT.md"))}
+        errs, warns = check_tree(pack, len(cited), verbs)
+        # Same v1/v2 line the per-ticket path draws (see `v2 =` in check_tree): a pack
+        # with no KIND: anywhere predates this standard, so it is reported and not
+        # failed. Retro-fitting a test plan onto a verification nobody can re-run would
+        # be fabricating evidence, which is worse than an old pack being incomplete.
+        legacy = not any("KIND:" in read(t / "manifest.md").upper()
+                         for t in pack.glob("TC_*") if t.is_dir())
+        line = f"{pack.name} [{st}]" + (" (legacy pack — pre-dates the KIND standard)" if legacy else "")
+        if not errs:
+            ok.append(line)
+            continue
+        entry = (line, errs)
+        closed = st.strip().lower() in strict_statuses
+        (bad if (closed and not legacy) else warned).append(entry)
+
+    for line in ok:
+        print(f"✅ {line}: meets the evidence standard")
+    for line, errs in warned:
+        why = "the ticket is still open" if "legacy pack" not in line else "the pack pre-dates this standard"
+        print(f"⚠️  {line}: {len(errs)} problem(s) — reported, not failed, because {why}")
+        for e in errs[:4]:
+            print(f"     - {e}")
+        if len(errs) > 4:
+            print(f"     … and {len(errs) - 4} more")
+    for line, errs in bad:
+        print(f"❌ {line}: {len(errs)} problem(s), and the ticket is closed")
+        for e in errs:
+            print(f"     - {e}")
+    if bad:
+        print(f"evd_check --sweep: {len(bad)} closed ticket(s) carry a pack that does not "
+              f"meet the standard. A verdict is a claim; the pack is the claim's proof.")
+        return 1
+    print(f"✅ evd_check --sweep: {len(ok)} pack(s) green, {len(warned)} reported without failing")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--evd", required=True)
+    ap.add_argument("--evd")
     ap.add_argument("--expect-tcs", type=int, default=0)
     ap.add_argument("--attach", metavar="TICKET")
+    ap.add_argument("--sweep", action="store_true",
+                    help="check every pack that has a REPORT.md; expected case count is read from "
+                         "each report's own TC_<n> citations. Closed tickets are errors, open ones warnings.")
+    ap.add_argument("--backlog", default=None, help="backlog directory (default: from config paths)")
     args = ap.parse_args()
+    if args.sweep:
+        from ctx import Ctx
+        from vocab import vocab
+        c = Ctx()
+        verbs = vocab(c).get("write_verbs", [])
+        ev = Path(args.evd) if args.evd else c.root / c.cfg("paths.evidence", "evd")
+        bl = Path(args.backlog) if args.backlog else c.root / c.cfg("paths.backlog", "docs/backlog")
+        sys.exit(sweep(ev, bl, verbs))
+    if not args.evd:
+        ap.error("--evd is required unless --sweep is passed")
     evd = Path(args.evd)
     if args.attach:
         rc = attach_all(evd, args.attach)

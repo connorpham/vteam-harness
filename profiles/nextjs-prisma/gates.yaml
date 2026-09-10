@@ -9,6 +9,17 @@ steps:
     run: "bash .vteam/scripts/docs_shrink_check.sh"
   ledger:
     run: "python3 .vteam/scripts/log_check.py"
+  evd:
+    # `/qa` names evd_check a dozen times and the gate never ran it, so a pack could ship a
+    # REPORT.md claiming ten test cases with zero case folders — which happened in the field
+    # trial and took a challenger agent to notice. Sweep mode reads the expected count from
+    # each report's own TC citations, errors only on CLOSED tickets, and treats packs older
+    # than the KIND standard as warnings. `requires` is a literal path because gate.py only
+    # substitutes {package_manager} and {project.key}; a repo that renames its evidence
+    # directory gets a declared skip rather than a false red.
+    run: "python3 .vteam/scripts/evd_check.py --sweep"
+    requires: "evd"
+    skip_reason: "no evd/ directory — no verdict has been recorded on this repo"
   graph:
     run: "python3 .vteam/scripts/graph_check.py"
   verbatim:
