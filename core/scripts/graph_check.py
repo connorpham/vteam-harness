@@ -129,8 +129,39 @@ def read_backlog(c: Ctx) -> dict[str, dict]:
         out[f.stem.upper()] = {
             "status_category": issue["status_category"],
             "blocked_by": [k.upper() for k in issue["links"]["blocked_by"]],
+            # the raw file, so a closure can be checked for the decision it cites
+            "text": f.read_text(encoding="utf-8", errors="replace"),
         }
     return out
+
+
+def read_decisions(c: Ctx) -> dict[str, str]:
+    """key → status text, from the decision queue (`Q3`, `D11`, `A2`…).
+
+    Two real states had no way to be written down before this. A ticket can be
+    **blocked by a decision** rather than by another ticket (TB-9 waiting on "is high
+    contrast a supported target?"), and a ticket can be **closed by a decision instead
+    of a verdict** — a won't-fix is an owner's call, and QA never verified it. Both were
+    being expressed in prose because `blocked-by` only took a ticket key and any
+    terminal status demanded a QA REPORT.md. Prose is invisible to a gate, which is how
+    a blocked ticket looks startable and a won't-fix looks like a lane closing outside
+    its rights.
+    """
+    f = c.root / str(c.cfg("paths.pm", "docs/pm")) / "decisions.md"
+    if not f.is_file():
+        return {}
+    out = {}
+    for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+        m = re.match(r"^\|\s*([QDA]\d+)\s*\|", line)
+        if m:
+            out[m.group(1).upper()] = line
+    return out
+
+
+def decision_settled(row: str) -> bool:
+    """A decision counts as settled only when it is DECIDED — provisional and open do
+    not release anything. `✅ DECIDED` is the vocabulary decisions.md declares."""
+    return "DECIDED" in row.upper()
 
 
 def find_cycles(edges: dict[str, list[str]]) -> list[list[str]]:
@@ -154,14 +185,26 @@ def find_cycles(edges: dict[str, list[str]]) -> list[list[str]]:
     return cycles
 
 
-def check_graph(tickets: dict[str, dict], evd_dir: Path) -> list[str]:
+def check_graph(tickets: dict[str, dict], evd_dir: Path,
+                decisions: dict[str, str] | None = None,
+                pm_dir: str = "docs/pm") -> list[str]:
+    decisions = decisions or {}
+    ticket_text = {k: v.get("text", "") for k, v in tickets.items()}
+    blocked_on_decision: list[tuple[str, str]] = []
     errs = []
     edges = {k: v["blocked_by"] for k, v in tickets.items()}
     for k, targets in sorted(edges.items()):
         for t in targets:
-            if t not in tickets:
-                errs.append(f"{k}: blocked-by {t} which does not exist — a dangling "
-                            f"edge blocks {k} forever (fix the key or drop the link)")
+            if t in tickets:
+                continue
+            if t in decisions:
+                # a decision edge is legitimate; it releases when the row says DECIDED
+                if not decision_settled(decisions[t]):
+                    blocked_on_decision.append((k, t))
+                continue
+            errs.append(f"{k}: blocked-by {t} which is neither a ticket nor a row in the "
+                        f"decision queue — a dangling edge blocks {k} forever (fix the key, "
+                        f"add the decision, or drop the link)")
     for cyc in find_cycles(edges):
         errs.append("dependency cycle: " + " → ".join(cyc) +
                     " — a cycle is a deadlock; no lane can ever start these")
@@ -170,9 +213,25 @@ def check_graph(tickets: dict[str, dict], evd_dir: Path) -> list[str]:
             continue
         report = evd_dir / k / "REPORT.md"
         if not report.is_file():
+            # A ticket may be terminal WITHOUT a verdict when an owner decided not to do
+            # it. That is not a lane closing outside its rights — it is the one case where
+            # there is nothing for QA to verify. It must cite a SETTLED decision, so the
+            # closure still rests on a written, dated record rather than on a status change.
+            cited = [d for d in decisions
+                     if re.search(rf"\b{d}\b", ticket_text.get(k, ""), re.I)]
+            settled = [d for d in cited if decision_settled(decisions[d])]
+            if settled:
+                continue
+            if cited:
+                errs.append(f"{k}: terminal with no REPORT.md, and the decision(s) it cites "
+                            f"({', '.join(cited)}) are not DECIDED yet — a ticket cannot be "
+                            f"closed by a question")
+                continue
             errs.append(f"{k}: judged done with NO {report.relative_to(evd_dir.parent)} "
                         f"— only QA closes (raci §2), and QA's act IS the verdict "
-                        f"(MAST 1.2: a lane closed outside its rights)")
+                        f"(MAST 1.2: a lane closed outside its rights). If it was closed "
+                        f"without being built, cite the DECIDED row in {pm_dir}"
+                        f"/decisions.md that says so.")
             continue
         h1 = next((ln for ln in report.read_text(encoding="utf-8", errors="replace")
                    .splitlines() if ln.startswith("# ")), "")
@@ -181,6 +240,9 @@ def check_graph(tickets: dict[str, dict], evd_dir: Path) -> list[str]:
             errs.append(f"{k}: done but the verdict in REPORT.md's H1 is "
                         f"{(m.group(1) if m else 'MISSING')!r}, not PASS — "
                         f"closure does not match the evidence (MAST 1.2)")
+    for k, d in sorted(blocked_on_decision):
+        print(f"   ⏸  {k} is blocked by decision {d}, which is not DECIDED yet — "
+              f"the edge is real, so this is a state, not a fault")
     return errs
 
 
@@ -264,7 +326,8 @@ def main() -> int:
 
     if provider == "markdown":
         tickets = read_backlog(c)
-        errs += check_graph(tickets, evd_dir)
+        errs += check_graph(tickets, evd_dir, read_decisions(c),
+                            str(c.cfg('paths.pm', 'docs/pm')))
         keys = sorted(tickets)
     else:
         notes.append(f"tracker={provider}: blocked-by edges and statuses live in "
@@ -401,11 +464,37 @@ def _selftest():
         r = run_gate(root)
         assert r.returncode == 0, f"clean graph should pass:\n{r.stdout}{r.stderr}"
 
-        # m1: dangling edge
+        # m1: dangling edge — neither a ticket nor a decision
         ticket(root, "PROJ-3", "To Do", blocked_by="GHOST-9")
         r = run_gate(root)
-        assert r.returncode == 1 and "does not exist" in r.stdout, r.stdout
+        assert r.returncode == 1 and "neither a ticket nor a row in the decision queue" in r.stdout, r.stdout
         (root / "docs" / "backlog" / "PROJ-3.md").unlink()
+
+        # m1b: an edge onto a DECISION is legitimate, and an unsettled one is a state
+        dec = root / "docs" / "pm" / "decisions.md"
+        dec.parent.mkdir(parents=True, exist_ok=True)
+        dec.write_text("| Q1 | is this supported? | none | 🔴 OPEN | 2026-02-01 |\n"
+                       "| Q2 | do we ship it? | none | ✅ DECIDED 2026-01-05 — yes | — |\n",
+                       encoding="utf-8")
+        ticket(root, "PROJ-7", "To Do", blocked_by="Q1")
+        r = run_gate(root)
+        assert r.returncode == 0, f"an edge onto an OPEN decision is a state, not a fault:\n{r.stdout}"
+        assert "blocked by decision Q1" in r.stdout, r.stdout
+        (root / "docs" / "backlog" / "PROJ-7.md").unlink()
+
+        # m1c: terminal with no REPORT.md but citing a DECIDED row — a won't-fix, allowed
+        ticket(root, "PROJ-8", "Done")
+        t8 = root / "docs" / "backlog" / "PROJ-8.md"
+        t8.write_text(t8.read_text(encoding="utf-8") +
+                      "\n## Closed won't-fix (decision Q2)\n", encoding="utf-8")
+        r = run_gate(root)
+        assert r.returncode == 0, f"a won't-fix citing a DECIDED row must pass:\n{r.stdout}"
+
+        # m1d: the same closure citing an UNSETTLED decision must red
+        t8.write_text(t8.read_text(encoding="utf-8").replace("Q2", "Q1"), encoding="utf-8")
+        r = run_gate(root)
+        assert r.returncode == 1 and "cannot be closed by a question" in r.stdout, r.stdout
+        t8.unlink()
 
         # m2: cycle
         ticket(root, "PROJ-4", "To Do", blocked_by="PROJ-5")
@@ -514,7 +603,7 @@ def _selftest():
         assert r.returncode == 1 and "MAST 1.3" in r.stdout, \
             f"ledger checks must run even with a remote tracker:\n{r.stdout}"
 
-    print("graph_check selftest: OK (coherent graph green + 7 reds: dangling, "
+    print("graph_check selftest: OK (coherent graph green + 9 reds + 2 new greens: dangling, "
           "cycle, done-sans-verdict, done-with-FAIL, identical repeat, loop "
           "budget, out-of-scope commit — + loud skips: undeclared scope, "
           "remote tracker — + attribution, 17 positive / 12 negative: leading key "
