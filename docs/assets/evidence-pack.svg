@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" width="960" height="620" role="img" aria-label="The evidence pack one QA run leaves behind, built for a stranger: a root manifest with a COVERAGE decision and a generated index; a REPORT pinned to a commit and a clock; a Given/When/Then report with no code-speak; a six-sheet Excel workbook to ISO/IEC/IEEE 29119-3 that never invents a value; a debate file with the verifier's card and a fresh challenger's card; and one folder per case named for what it proves, holding a manifest with TITLE, KIND, EXPECTED, ACTUAL and RESULT plus screenshots with an exact-fit box and the caption below. Four gates keep it honest: evd_check, evd_index --check, xlsx_export --strict and bdd_report_check. Shape gates keep the record disciplined; truth comes from the commit pin, the re-runnable measurement and the challenger.">
+  <style>
+    .ink{fill:#1C1F22}.muted{fill:#5A6065}.card{fill:#FFFFFF;stroke:#C9CBC4}
+    .line{stroke:#9BA1A7}.intake{fill:#EFF3F8;stroke:#3C6E9F}.intakex{fill:#2C5B8A}
+    .orch{fill:#F5EDDA;stroke:#9A6A00}.orchx{fill:#7A5400}
+    .gatex{fill:#C03B2B}.tool{fill:#F4F4F1;stroke:#C9CBC4}.gate{fill:#FBEFEC;stroke:#C03B2B}
+    .box{fill:none;stroke:#C03B2B}.bar{fill:#FFFFFF;stroke:#C9CBC4}
+    @media (prefers-color-scheme: dark){
+      .ink{fill:#E8E6E1}.muted{fill:#9BA1A7}.card{fill:#1D2024;stroke:#3A3E43}
+      .line{stroke:#6B7278}.intake{fill:#1B2733;stroke:#6FA3D4}.intakex{fill:#8FBEE8}
+      .orch{fill:#33301E;stroke:#D9A94B}.orchx{fill:#E0BE6A}
+      .gatex{fill:#E4604F}.tool{fill:#22252A;stroke:#3A3E43}.gate{fill:#2A1F1D;stroke:#E4604F}
+      .box{stroke:#E4604F}.bar{fill:#1D2024;stroke:#3A3E43}
+    }
+    text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+    .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  </style>
+
+  <text x="24" y="32" class="ink" font-size="17" font-weight="700">The evidence pack — built for a stranger, kept honest by four gates and a challenger</text>
+  <text x="24" y="53" class="muted" font-size="12.5">What one /qa run leaves in evd/&lt;TICKET&gt;/. Every field named here is demanded by a script, not by a style guide.</text>
+
+  <!-- folder tree, full width -->
+  <rect x="24" y="72" width="912" height="272" rx="8" class="card" stroke-width="1.5"/>
+  <text x="40" y="96" class="ink mono" font-size="12" font-weight="700">evd/TB-4/</text>
+  <text x="56" y="116" class="ink mono" font-size="11">manifest.md</text>
+  <text x="470" y="116" class="muted" font-size="10.5">COVERAGE: security ✓ a11y ✓ — decided, not implied · index by evd_index</text>
+  <text x="56" y="134" class="ink mono" font-size="11">REPORT.md</text>
+  <text x="470" y="134" class="muted" font-size="10.5">COMMIT: 16b5576 · VERIFIED-AT · ORACLE: spec §§ · verdict readable in two minutes</text>
+  <text x="56" y="152" class="ink mono" font-size="11">REPORT.bdd.md</text>
+  <text x="470" y="152" class="muted" font-size="10.5">Given / When / Then — an observable Then; no file paths, SQL or routes in the body</text>
+  <text x="56" y="170" class="ink mono" font-size="11">TB-4_testcases.xlsx</text>
+  <text x="470" y="170" class="muted" font-size="10.5">6 sheets — Summary · Test Cases · Defects · Traceability · Evidence · Images</text>
+  <text x="56" y="188" class="ink mono" font-size="11">debate.md</text>
+  <text x="470" y="188" class="muted" font-size="10.5">card 1 the verifier · card 2 a fresh challenger on another model · dissent kept</text>
+  <text x="56" y="212" class="ink mono" font-size="11">TC_2_a_second_contact_with_the_teams_address_is_refused/</text>
+  <text x="72" y="230" class="ink mono" font-size="11">manifest.md</text>
+  <text x="470" y="230" class="muted" font-size="10.5">TITLE · KIND: acceptance · AS/ENTRY/AFTER/BACK · EXPECTED · ACTUAL · RESULT</text>
+  <text x="72" y="248" class="ink mono" font-size="11">01_form_filled.png</text>
+  <text x="470" y="248" class="muted" font-size="10.5">named for what it shows</text>
+  <text x="72" y="266" class="ink mono" font-size="11">02_refusal_boxed.png</text>
+  <text x="470" y="266" class="muted" font-size="10.5">exact-fit box on the verdict region, caption burned in below</text>
+  <text x="56" y="290" class="ink mono" font-size="11">TC_5_each_field_is_refused_one_step_past_its_limit/</text>
+  <text x="470" y="290" class="muted" font-size="10.5">KIND: boundary — one step past each limit; the pack must hold one</text>
+  <text x="56" y="308" class="ink mono" font-size="11">TC_8_twelve_simultaneous_saves_create_exactly_one_contact/</text>
+  <text x="470" y="308" class="muted" font-size="10.5">KIND: acceptance, NON-UI — a DB constraint proved by a race, with db_verify.md</text>
+  <text x="56" y="326" class="ink mono" font-size="11">TC_10_the_media_list_survives_the_new_contact/</text>
+  <text x="470" y="326" class="muted" font-size="10.5">KIND: whole-screen — the pack must hold one</text>
+
+  <!-- boxed screenshot mock -->
+  <rect x="24" y="362" width="440" height="170" rx="8" class="tool" stroke-width="1.5"/>
+  <text x="40" y="384" class="ink" font-size="11" font-weight="700">02_refusal_boxed.png — what the box looks like</text>
+  <rect x="40" y="396" width="408" height="18" rx="3" class="bar" stroke-width="1"/>
+  <rect x="40" y="420" width="408" height="18" rx="3" class="bar" stroke-width="1"/>
+  <rect x="40" y="444" width="330" height="18" rx="3" class="bar" stroke-width="1"/>
+  <rect x="36" y="440" width="338" height="26" rx="3" class="box" stroke-width="2"/>
+  <text x="48" y="457" class="ink" font-size="9.5">This e-mail already belongs to a contact of Aozora Creative Agency</text>
+  <text x="40" y="488" class="gatex" font-size="10.5" font-weight="700">▲ The refusal names the team that already holds the address (spec §4.3)</text>
+  <text x="40" y="506" class="muted" font-size="10">caption below the image, never on it — pixel coordinates stay measurable;</text>
+  <text x="40" y="520" class="muted" font-size="10">the box is 4 px around the region, never inflated to look important.</text>
+
+  <!-- gates -->
+  <rect x="488" y="362" width="448" height="170" rx="8" class="gate" stroke-width="1.5"/>
+  <text x="504" y="384" class="gatex mono" font-size="12" font-weight="700">evd_check</text>
+  <text x="504" y="400" class="ink" font-size="10.5">no TITLE/KIND, a judgement-word EXPECTED, a URL-only ENTRY, no boxed png,</text>
+  <text x="504" y="414" class="ink" font-size="10.5">a claim no file backs → red</text>
+  <text x="504" y="436" class="gatex mono" font-size="12" font-weight="700">evd_index --check</text>
+  <text x="640" y="436" class="ink" font-size="10.5">an index older than its cases → red</text>
+  <text x="504" y="458" class="gatex mono" font-size="12" font-weight="700">xlsx_export --strict</text>
+  <text x="662" y="458" class="ink" font-size="10.5">an undeclared value is named, never invented</text>
+  <text x="504" y="480" class="gatex mono" font-size="12" font-weight="700">bdd_report_check</text>
+  <text x="640" y="480" class="ink" font-size="10.5">a Then that says nothing observable → red</text>
+  <text x="504" y="504" class="orchx" font-size="10.5" font-weight="700">+ the challenger</text>
+  <text x="504" y="520" class="ink" font-size="10.5">rebuilds the measurement with its own tools; both cards are kept</text>
+
+  <!-- honesty footer -->
+  <rect x="24" y="550" width="912" height="58" rx="8" class="intake" stroke-width="1.5"/>
+  <text x="40" y="570" class="intakex" font-size="11.5" font-weight="700">What the gates can and cannot prove</text>
+  <text x="40" y="586" class="ink" font-size="10.5">Shape gates keep the record disciplined — every case has a kind, a claim and a file. Truth comes from three other things: the verdict is pinned to a commit</text>
+  <text x="40" y="600" class="ink" font-size="10.5">and expires when the code moves, every number is a re-runnable measurement, and a challenger with empty context tries to falsify it before the ticket closes.</text>
+</svg>

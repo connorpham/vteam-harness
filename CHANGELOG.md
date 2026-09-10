@@ -11,6 +11,32 @@ does not match `package.json`.
 
 ---
 
+## 0.17.1 — 2026-09-10
+
+The README describes what 0.17.0 ships — with pictures — and says out loud what the gates
+cannot prove.
+
+- **Parallel DEV has a section and a diagram** (`docs/assets/parallel.svg`): the PM, the
+  Orca Run mailbox, two workers in their own worktrees, the serial three-command merge, and
+  the four gates that refuse the shortcut. The `/team` paragraph no longer says "one coding
+  item at a time, by design" — that is the default, not the ceiling — and `team.svg` says so
+  too. `team.parallel` / `team.coord_budget` appear in the sample config and the knob list;
+  Orca is listed as an optional requirement with its text-relay fallback.
+- **The evidence pack has a section and a diagram** (`docs/assets/evidence-pack.svg`): the
+  folder a stranger opens — case folders named for what they prove, `TITLE`/`KIND`,
+  `COVERAGE`, the generated index, the exact-fit box with its caption below, the six-sheet
+  workbook, the Given/When/Then report, the debate file — and the four scripts that hold
+  it. One paragraph states what shape gates can and cannot prove, and names the three
+  things truth actually rests on (the commit pin, the re-runnable measurement, the
+  challenger) with what the challengers caught on the field run.
+- **Known limits gained two honest rows:** parallel DEV is young (one live run; worker
+  tokens measured by hand; a login expiry idles every agent silently — `VT-12`), and the
+  `nextjs-prisma` profile assumes the app at the repo root (`VT-11`).
+- **Status** records the field trial behind 0.17.0; **Security** no longer implies every
+  version carries provenance — it tells you how to check (`dist.attestations`) and that a
+  hand-published version has none. 0.17.0 itself was published by hand.
+- No code change. Suite 164 → 164; the README's three guarded numbers are unchanged.
+
 ## 0.17.0 — 2026-09-09
 
 Parallel DEV with real coordination, and a QA output layer a person can read. Field-tested

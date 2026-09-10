@@ -9,7 +9,7 @@
 
 **Proof-of-done for AI agents.** Your agent can't say *done* anymore — it has to prove it.
 
-vteam installs a virtual software team into your repository — a PM, a BA, an architect, a developer and a QA — together with **18 machine gates that exit non-zero** when work is claimed but not proven. It runs on Claude Code, Cursor, Windsurf, Codex and Copilot, and it was extracted from a harness that ran a real project autonomously: 37+ merged PRs, 113+ confirmed review findings, 24/7 scheduled sessions, one human owner spending ~15 minutes a day. Every rule exists because something specific broke without it.
+vteam installs a virtual software team into your repository — a PM, a BA, an architect, a developer and a QA — together with **18 machine gates that exit non-zero** when work is claimed but not proven. It can run [several developers at once](#parallel-dev-in-worktrees-teamparallel), each in its own git worktree, and still merge with one hand. It runs on Claude Code, Cursor, Windsurf, Codex and Copilot, and it was extracted from a harness that ran a real project autonomously: 37+ merged PRs, 113+ confirmed review findings, 24/7 scheduled sessions, one human owner spending ~15 minutes a day. Every rule exists because something specific broke without it.
 
 ### Five things nothing else here does
 
@@ -29,7 +29,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 - [Requirements](#requirements)
 - [The problem it solves](#the-problem-it-solves)
 - [The five laws](#the-five-laws)
-- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [specialists](#the-specialists-7-deep-skill-agents-the-lanes-can-hire) · [watchable sessions](#watchable-dev-and-qa-sessions) · [competencies](#competencies-what-each-role-actually-knows) · [gates](#gates-18-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [evidence](#what-a-verdict-has-to-carry) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
+- [What ships](#what-ships): [workflows](#workflows-9-rendered-for-your-tool) · [parallel DEV](#parallel-dev-in-worktrees-teamparallel) · [specialists](#the-specialists-7-deep-skill-agents-the-lanes-can-hire) · [watchable sessions](#watchable-dev-and-qa-sessions) · [competencies](#competencies-what-each-role-actually-knows) · [gates](#gates-18-checks-that-exit-non-zero) · [graph](#the-graph) · [board](#the-board) · [code map](#the-code-map-cpg-lite) · [cross-model review](#cross-model-review) · [evidence](#what-a-verdict-has-to-carry) · [the evidence pack](#the-evidence-pack-a-stranger-can-read) · [paper trail](#the-paper-trail) · [model routing & cost](#model-routing-and-cost-control) · [24/7](#running-it-247-on-a-subscription)
 - [Configuration](#configuration)
 - [Command reference](#command-reference)
 - [What you get out of it](#what-you-get-out-of-it)
@@ -135,6 +135,7 @@ error: failed to push some refs to 'origin'
 | **Python 3** | 15 of the 18 gates are Python | `doctor` diagnoses it and stops — it never crashes on it |
 | **bash** | 3 gates, the pre-push fence, the session hook | on Windows use WSL or Git Bash |
 | **Pillow** (`pip install pillow`) | the two screenshot-evidence gates analyse pixels | those gates report *"CANNOT CHECK — Pillow missing"* and go red; they never quietly pass |
+| **Orca** (optional, Claude Code) | the live mailbox [parallel DEV agents](#parallel-dev-in-worktrees-teamparallel) coordinate on | `orca_team.sh status` says so and the PM relays the same messages as text — slower, never silent |
 
 The npm package itself has **zero dependencies** — nothing is downloaded at install time beyond the package, and there are no install scripts.
 
@@ -171,7 +172,7 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 ### Workflows (9, rendered for YOUR tool)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/team.svg" alt="The nine workflows and how work moves: /plan and /docs build the oracle; /pm dispatches one coding item at a time; /ba shards specs into tickets; /dev implements and gets reviewed by two fresh agents; /qa verifies from the spec. dor_check guards the BA-to-DEV hand-off, review_check guards the push, evd_check guards Done. /verify and guidelines are shared tools any lane calls." width="100%">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/team.svg" alt="The nine workflows and how work moves: /plan and /docs build the oracle; /pm dispatches one coding item at a time, or N in parallel worktrees with team.parallel; /ba shards specs into tickets; /dev implements and gets reviewed by two fresh agents; /qa verifies from the spec. dor_check guards the BA-to-DEV hand-off, review_check guards the push, evd_check guards Done. /verify and guidelines are shared tools any lane calls." width="100%">
 </p>
 
 Each lane is one command in your agent tool. What matters is not the persona — it is **what each one leaves behind in your repo**, and **which gate refuses the hand-off** when it isn't there.
@@ -196,15 +197,31 @@ Each lane is one command in your agent tool. What matters is not the persona —
 *Writes:* the branch, the committed review dossier, a 7-part plain-language report on the ticket · *Gated by:* the push fence — **code with no committed dossier does not leave the machine.**
 
 **`/qa` — independent verification.** Derives what to expect **from the spec, never from the ticket prose or the dev's claim**; designs 2–5 test cases; runs them in a real browser as a real user; collects annotated evidence; cross-checks every claim in the ticket against a file that proves it; gets a fresh challenger to try to falsify the verdict; writes a report a non-programmer understands in two minutes.
-*Writes:* `evd/<TICKET>/` — see [what a verdict has to carry](#what-a-verdict-has-to-carry) · *Never touches product code.* And the folder it leaves behind is built for a stranger: every case folder is named for what it proves (`TC_2_a_zero_quantity_is_refused`), every case carries a `TITLE:` and a `KIND:` (the pack must hold a *boundary* and a *whole-screen* case), an `EXPECTED:` that is only a judgement word ("works") is refused, the root manifest states the `COVERAGE:` decision for security and accessibility, `evd_index.py` writes an index so the folder introduces itself, `annotate.py` boxes the exact region with the caption burned in below, and `xlsx_export.py` turns the whole pack into a six-sheet workbook laid out to ISO/IEC/IEEE 29119-3 that never invents a value (NOT DECLARED, never a guess) — the artefact a manager actually opens. Ported from the owner's standalone [ai-qa](https://github.com/connorpham/ai-qa).
+*Writes:* `evd/<TICKET>/` — see [what a verdict has to carry](#what-a-verdict-has-to-carry) and [the evidence pack](#the-evidence-pack-a-stranger-can-read) it leaves behind, down to a six-sheet Excel workbook and an optional Given/When/Then report held to `bdd_report_check` · *Never touches product code.*
 
 #### Running it, and staying honest
 
-**`/team` — a full workday on top of `/pm`.** Clears your decision queue first, then works every unblocked item — dev tickets sequentially (one coding item at a time, by design), BA drafts and architecture records in parallel background lanes, QA between dev tasks — until the only thing left needs *you*. Ends with a one-page desk report.
+**`/team` — a full workday on top of `/pm`.** Clears your decision queue first, then works every unblocked item — dev tickets one at a time by default, or up to `team.parallel` at once in [separate git worktrees on disjoint code scopes](#parallel-dev-in-worktrees-teamparallel); BA drafts and architecture records in background lanes; QA between dev tasks — until the only thing left needs *you*. Ends with a one-page desk report that opens with a number a script computed (`schedule_check`), not an opinion about being on time.
 
 **`/verify` — the gate, on demand.** Lint → types → unit → build → reality checks → integration → e2e, cheapest-first. A skipped step must declare why; a silent skip is a failure. On a repo with no test suite it prints `GREEN (WEAK — no test suite ran)` instead of a green that lies.
 
 **`guidelines` — the method, not a role.** Behavioural defaults that prevent classic LLM coding mistakes: think before writing, surgical diffs, red-first tests.
+
+### Parallel DEV in worktrees (`team.parallel`)
+
+One developer agent at a time is the safe default and the most-tested shape. Set `team.parallel: 2` (or more) and `/team` runs that many developers at once — **coding in parallel, integration serial**, and the gates, not the agents, decide whether the two can coexist.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/parallel.svg" alt="Parallel DEV mode: the PM runs N developer agents at once, each in its own git worktree on a disjoint code scope, coordinating over the Orca Run mailbox (dispatch, heartbeats, ask and reply, handoff rows, worker_done) with a text-relay fallback. Coding is parallel; integration is serial — the PM merges one branch, re-runs the gate, merges the next. parallel_check refuses two in-flight branches sharing a file, coord_check refuses a chat handoff that never became real scope, review_check refuses a push without its dossier, graph_check attributes commits only by a leading ticket key. Bookkeeping folders are shared by design and never count as scope." width="100%">
+</p>
+
+**How a parallel day runs.** The PM picks up to N unblocked items whose declared `CODE-SCOPE` are pairwise disjoint, starts one `/dev` agent per item in **its own git worktree** — own branch, own app port, the same review pipeline — and merges the finished branches **one at a time**, re-running the full gate between merges. A worker never merges; the ledger and every merge stay the PM's single hand. An item that would share a file with a running agent is not blocked, it is simply *next*.
+
+**Coordination that leaves artifacts.** Parallel agents do need to talk — one owns the API document the other must extend. They talk over a **named transport**: on Claude Code, the Orca orchestration Run mailbox (`orca_team.sh open-run / wait`) carries dispatch, heartbeats with a phase, blocking questions with options, handoff rows and `worker_done`; where no bus exists, the PM relays the same messages as text, never a half-working chat. A handoff is not done when it is said: it becomes a row in `docs/pm/coordination.md` and **both** `CODE-SCOPE`s change — `coord_check` reds a handoff that stayed conversation, and `team.coord_budget` (default 3) caps the rounds before the PM steps in.
+
+**What the gates know about worktrees.** The first live parallel run broke five gate assumptions in one afternoon, all the same mistake — a single working tree. 0.17.0 ships the fixes: `parallel_check` and `coord_check` read a sibling's tasksheet from git (`git show <branch>:<path>`), not from a disk that does not hold it, and name an uncommitted one instead of reading it as empty; the bookkeeping homes (`docs/pm`, `evd/`, `docs/qa`) are shared by design and never count as edit territory; a **landed** branch is told from an in-flight one topologically, squash-merge included; and `graph_check` attributes a commit to a ticket only by a **leading** key (`feat(TB-5): …`, `[TB-5]`), so a prose mention can never widen a scope. `orca_team.sh trust <path>` pre-accepts the agent's trust dialog for a brand-new worktree, which used to eat the injected brief.
+
+**What it cost, honestly.** On that run — two `opus` workers, four tickets, four QA verdicts in one sprint — a login expiry idled every agent at once and nothing warned; worker token usage had to be measured by hand from session logs; and the worktree-blind gates had to be patched live before they were ported. Those are tickets (`VT-12`), and they are why the [Known limits](#known-limits) call parallel mode young.
 
 ### The specialists (7 deep-skill agents the lanes can hire)
 
@@ -297,6 +314,23 @@ A "PASS" is worth exactly as much as the folder behind it. This is that folder �
 
 **Evidence a stranger can read.** Screenshots are named for what they show (`01_orders_list.png`, not `01.png`). The step that carried the verdict gets a **red box with a caption** — required on every UI case, not just failures, because an unannotated full-page shot makes the reader guess which pixels mattered. And the verdict itself pins two anchors: the `COMMIT:` it examined and the `VERIFIED-AT:` clock — so it can expire.
 
+### The evidence pack a stranger can read
+
+A verdict is one file. The pack around it is what a manager, an auditor or the next QA actually opens — so the whole folder is built for someone who was not in the session, and four scripts keep it that way.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/evidence-pack.svg" alt="The evidence pack one QA run leaves behind, built for a stranger: a root manifest with a COVERAGE decision and a generated index; a REPORT pinned to a commit and a clock; a Given/When/Then report with no code-speak; a six-sheet Excel workbook to ISO/IEC/IEEE 29119-3 that never invents a value; a debate file with the verifier's card and a fresh challenger's card; and one folder per case named for what it proves, holding a manifest with TITLE, KIND, EXPECTED, ACTUAL and RESULT plus screenshots with an exact-fit box and the caption below. Four gates keep it honest: evd_check, evd_index --check, xlsx_export --strict and bdd_report_check. Shape gates keep the record disciplined; truth comes from the commit pin, the re-runnable measurement and the challenger." width="100%">
+</p>
+
+- **Every case folder is named for what it proves** (`TC_2_a_second_contact_with_the_teams_address_is_refused`), and its manifest carries a `TITLE:`, a `KIND:` (`acceptance · boundary · whole-screen · write-readback · exploratory · security` — the pack must hold a *boundary* and a *whole-screen* case), a concrete `EXPECTED:` and `ACTUAL:` (a judgement word such as "works" is refused) and one `RESULT:`. The root manifest states the `COVERAGE:` decision for security and accessibility — decided, not implied.
+- **The folder introduces itself.** `evd_index.py` regenerates an index block from the case manifests; `--check` goes red when the index is older than the cases.
+- **The box fits.** `annotate.py` draws a 4-px exact-fit box around the region that carried the verdict and burns the caption in **below** the image, so pixel coordinates stay measurable and nothing is inflated to look important.
+- **The workbook a manager opens.** `xlsx_export.py` writes `<TICKET>_testcases.xlsx` — Summary, Test Cases, Defects, Traceability, Evidence, Images, laid out to ISO/IEC/IEEE 29119-3 — from the same vocabulary the gate uses. It never invents a value: an undeclared field reads `NOT DECLARED`, and `--strict` exits 1 naming it.
+- **A report in two registers.** `REPORT.md` for a reader with two minutes; optionally `REPORT.bdd.md` in Given/When/Then, where `bdd_report_check` reds a `Then` that says nothing observable and any code-speak in the human body.
+- **The argument is kept.** `debate.md` holds the verifier's card and a **fresh challenger's** card — a second agent with empty context, routed to another model, that tries to falsify the verdict with its own tools. Dissent is recorded, not smoothed over.
+
+**What the gates can and cannot prove — stated once.** Shape gates keep the record disciplined: every case has a kind, a claim and a file behind it. They do not know whether the claim is true. Truth comes from three other things in this design: the verdict is pinned to a commit and **expires when the code moves**; every number is a re-runnable measurement (the pixel-diff script sits beside the screenshot it judged); and the challenger tries to break the verdict before the ticket may close. On the field run behind 0.17.0 the challengers caught a wrong commit pin, a missing "button disabled while submitting" case and a forced-colors regression the fix had introduced — none of which a regex would have seen. This layer is ported from the owner's standalone [ai-qa](https://github.com/connorpham/ai-qa).
+
 ### The graph
 
 The dependency graph of your project already exists — scattered across `- blocked-by:` lines, the sprint plan, the ledger and the evidence tree. `npx vteam-harness graph` computes what nobody reads together: a **READY table** (tickets whose every blocker is provably Done, with sprint and cost), a **BLOCKED table** (who waits on whom), and the findings a human eye misses — edges pointing at tickets that don't exist, cycles where two tickets block each other forever, Done tickets with no PASS in their evidence. Every panel names the file it was read from. It is read-only and **always exits 0** — the graph is a mirror; the gate that fails the build on the same findings is `graph_check.py`, and the two are held together by a conformance selftest. `--json` for a stable, diffable dump pinned to the commit; `--dot | dot -Tsvg > graph.svg` to see it.
@@ -363,6 +397,8 @@ team:
   size: 1                                                 # >1 makes the ledger's Actor column a GATE
   hours_per_day: 8                                        # plan costs accept "1.5d" or "12h"
   loop_budget_per_day: 4                                  # >N dispatches of one item in a day = thrash
+  parallel: 1                                             # >1: N DEV agents at once, each in its own worktree on a disjoint scope
+  coord_budget: 3                                         # peer handoff rounds before the PM steps in
 specs:
   sources: []                                             # the ORIGINAL docs shards are checked against
 review:
@@ -384,6 +420,7 @@ Knobs worth setting deliberately:
 - **`app:` (start / url / health / open_files / headed)** — the runnable app the dev/QA lanes drive. With it set, env bring-up is a quotable proof (`app_check.sh` → `APP: UP`), QA journeys open a **real Chrome window** through `browser.mjs` (scripts kept as re-runnable evidence), and `/dev` opens the files it edits in your editor (`open_files.sh`, Cursor/VS Code auto-detected). Empty on repos with no web app; `headed: never` keeps unattended shifts windowless without dropping a single screenshot.
 - **`team.size`** — set it to your real headcount. Above 1, the ledger's `Actor` column becomes mandatory (a gate, not a convention) and reporting splits per person.
 - **`team.hours_per_day` / `team.loop_budget_per_day`** — a workday in hours (so estimates can be written `12h`), and the per-item daily dispatch ceiling above which `graph_check` calls thrash what it is.
+- **`team.parallel` / `team.coord_budget`** — how many DEV agents `/team` may run at once (each in its own worktree on a disjoint `CODE-SCOPE`, enforced by `parallel_check`) and how many peer-handoff rounds `coord_check` allows before the PM must step in. Leave `parallel` at 1 until your tickets carry real, disjoint scopes — the gate will tell you when they don't.
 
 Supported surfaces: **agent tools** Claude Code (native skills and subagents), Cursor, Windsurf, Codex and Copilot (the last two with a documented sequential-review fallback where subagents don't exist); **trackers** Jira (ADF flattening, attachment read-back, link-direction verification), GitHub Issues (`PROJ-123` ⇄ issue `#123`, labels carry the status machine) or a markdown backlog that needs no external service at all; **design source** Figma (fidelity measured against the design's own node data, because measuring code with code is self-grading) or none.
 
@@ -598,6 +635,8 @@ Stated plainly, because a framework about honest reporting should be honest abou
 - **There is no `uninstall` command yet.** Removing vteam today means deleting `vteam.config.yaml`, `.vteam/`, the rendered tool directories, `.githooks/pre-push`, and resetting `core.hooksPath`.
 - **The CI snippet it writes is GitHub Actions.** On other platforms call `bash .vteam/scripts/gate.sh` from your own pipeline — the gates themselves are platform-agnostic.
 - **One human owner plus agents is the most-tested shape.** `team.size > 1` now has real machinery — the mandatory Actor column, per-person reporting, conflict-free ledger merges, and a claim TTL that is a config knob (`team.claim_ttl_hours`) read by `vteam resume` — but the WIP limit is still doctrine prose the agents follow, not a gate; treat >1 as young.
+- **Parallel DEV is young too.** Proven on one live run (two workers, four tickets, one sprint). The live transport is Orca on Claude Code; elsewhere the PM relays by text. Worker token usage is not collected automatically yet — `worker_done` carries none and `usage --sync` matches sessions by repo path, so a worktree's sessions are invisible — and a Claude login expiry idles every agent silently. Tracked as `VT-12`; until then measure worker tokens from the session logs and check the login has more than a day left before an unattended run.
+- **The `nextjs-prisma` profile assumes the app at the repo root.** On a pnpm/Turborepo monorepo (app under `apps/*`, schema under `packages/*`) `init` picks the `node` profile unless told otherwise, and `typegen`, `types`, `prisma-generate` and `token-check` need a hand-patched manifest. Tracked as `VT-11`; the patched manifest that ran green is the reference.
 - **Trackers are markdown, Jira and GitHub Issues.** Linear and Trello are not implemented.
 - **The graph's edges come from `blocked-by` only.** `plan.yaml` has no `dependencies` field yet, so sprint-level ordering is not part of the graph — `vteam graph` computes the ready set from ticket blockers, not from a critical path.
 - **An external review card proves its shape, not its author.** `graph_check`/`review_check` hold a card written by Codex to the same bar as one written by Claude, but no gate cross-checks the `MODEL:` stamp against your config — provenance rests on the committed trail, as it does for every card.
@@ -607,7 +646,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **164 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **164 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates. And 0.17.0 was **field-tested before it shipped**: a full `/team` day on a pnpm/Turborepo Next 15 + Prisma monorepo — BA shards, mockups, two parallel workers, four tickets merged, four QA verdicts with challengers — and every gap that day found is a ticket in this repo (`VT-11`, `VT-12`), not a footnote.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 
@@ -631,7 +670,7 @@ tests/       the end-to-end suite behind every claim above
 
 ## Security
 
-The same law as everything else here: a security claim without a machine check is a hope. **Zero runtime dependencies** (`npm ls --all` — empty tree), no network calls beyond the preflight pings you configure, a dashboard that is read-only *by construction*, a secret scan that **fails closed**, and releases published from CI with **npm provenance** (Sigstore) so the tarball is cryptographically tied to its commit. OpenSSF Scorecard re-grades the repo weekly (badge above), CodeQL scans every push. Reporting a vulnerability: [SECURITY.md](https://github.com/connorpham/vteam-harness/blob/main/SECURITY.md). The full posture, control by control, each with the command that verifies it: [docs/security/](https://github.com/connorpham/vteam-harness/blob/main/docs/security/README.md).
+The same law as everything else here: a security claim without a machine check is a hope. **Zero runtime dependencies** (`npm ls --all` — empty tree), no network calls beyond the preflight pings you configure, a dashboard that is read-only *by construction*, a secret scan that **fails closed**, and a release workflow that publishes from CI with **npm provenance** (Sigstore) so the tarball is cryptographically tied to its commit — check any version with `npm view vteam-harness@<version> dist.attestations`; a version published by hand carries none, and the changelog says which. OpenSSF Scorecard re-grades the repo weekly (badge above), CodeQL scans every push. Reporting a vulnerability: [SECURITY.md](https://github.com/connorpham/vteam-harness/blob/main/SECURITY.md). The full posture, control by control, each with the command that verifies it: [docs/security/](https://github.com/connorpham/vteam-harness/blob/main/docs/security/README.md).
 
 ## License
 

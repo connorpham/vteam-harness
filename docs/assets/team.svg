@@ -82,7 +82,7 @@
   <path d="M294,286 L294,186" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#t)"/>
   <path d="M340,286 Q340,240 520,240 Q567,240 567,186" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#t)"/>
   <path d="M370,290 Q370,214 700,214 Q797,214 797,186" class="line" stroke-width="1.2" stroke-dasharray="4 3" fill="none" marker-end="url(#t)"/>
-  <text x="560" y="262" class="muted" font-size="10" text-anchor="middle">/pm dispatches — one coding item at a time</text>
+  <text x="560" y="262" class="muted" font-size="10" text-anchor="middle">/pm dispatches — one coding item at a time, or N in worktrees (team.parallel)</text>
 
   <!-- shared tools -->
   <rect x="492" y="330" width="180" height="46" rx="8" class="tool" stroke-width="1.5"/>
