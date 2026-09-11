@@ -32,6 +32,30 @@ export class ManifestGuard {
     this.old = loadManifest(root); // null on pre-manifest installs
     this.files = {};               // the manifest being built this run
     this.conflicts = [];           // rel paths preserved as <rel>.new
+    this.owned = [];               // rel paths this repo has DECLARED it owns
+    // A repo may deliberately fork a framework file — a monorepo profile the stock
+    // one will never match, a hook with local rules. Without a way to say so, every
+    // update parks another `.new` on it forever: reviewed, deleted, and back within
+    // the hour. Worse, the parked file is where upstream improvements land, so a fork
+    // silently stops receiving them. `owned` in the manifest ends the chore and keeps
+    // the signal: update reports, once, that upstream moved under a file you own.
+    const decl = this.old?.owned;
+    // Validated, because a reviewer got a bare string character-split into a bogus
+    // array AND written back over the user's hand-edit. A malformed declaration is
+    // reported and IGNORED; it is never silently rewritten.
+    this.ownedInvalid = null;
+    this.ownedPartial = null;
+    if (decl === undefined || decl === null) {
+      this.ownedDecl = new Set();
+    } else if (Array.isArray(decl) && decl.every((x) => typeof x === "string")) {
+      this.ownedDecl = new Set(decl.filter((x) => x && !x.includes("..")));
+      const dropped = decl.filter((x) => !x || x.includes(".."));
+      if (dropped.length) this.ownedPartial = `${dropped.length} owned entr${dropped.length === 1 ? "y" : "ies"} ignored (empty, or containing "..")`;
+    } else {
+      this.ownedDecl = new Set();
+      this.ownedInvalid = `\`owned\` must be a list of path strings, got ${Array.isArray(decl) ? "a list with non-strings" : typeof decl}`;
+    }
+    this.ownedMatched = new Set();
   }
 
   _abs(rel) { return path.join(this.root, ...rel.split("/")); }
@@ -60,6 +84,12 @@ export class ManifestGuard {
   sync(rel, content, mode) {
     const abs = this._abs(rel);
     const newHash = sha256(content);
+    // Record the match FIRST. `ownedMatched` decides whether update warns "this owned
+    // path matched no framework file", and it used to be set only inside the owned
+    // branch — which sits below the two fast paths. So every owned path that was
+    // currently in sync got told it matched nothing, in the most ordinary steady state
+    // there is, and right after the hand-merge the feature exists for.
+    if (this.ownedDecl.has(rel)) this.ownedMatched.add(rel);
     if (!fs.existsSync(abs)) {              // new framework file
       this._put(rel, content, mode);
       this.files[rel] = newHash;
@@ -69,6 +99,22 @@ export class ManifestGuard {
     if (curHash === newHash) {              // already current
       this.files[rel] = newHash;
       return "current";
+    }
+    // Declared as owned by this repo: do not clobber AND do not park. Report that
+    // upstream moved — the signal without the file to delete every time.
+    //
+    // This sits ABOVE the refresh branch on purpose. A reviewer found it below, where
+    // the guarantee silently lapsed the moment a fork happened to be byte-identical to
+    // the package — which is exactly what happens right after someone merges upstream
+    // by hand. The declaration must hold whether or not the file has diverged yet.
+    if (this.ownedDecl.has(rel)) {
+      // Reached only when the file HAS diverged — the equality case returned above —
+      // so this is unconditionally "upstream moved under a file you own".
+      this.owned.push(rel);
+      // The recorded hash is the FRAMEWORK's last-known one, never the user's bytes.
+      // That is what keeps the guard from later mistaking a fork for framework content.
+      this.files[rel] = this.old?.files?.[rel] ?? newHash;
+      return "owned";
     }
     if (this.old?.files?.[rel] === curHash) { // user-unmodified → safe to refresh
       this._put(rel, content, mode);
@@ -99,9 +145,19 @@ export class ManifestGuard {
   }
 
   save(version) {
+    // The ownership declaration is the REPO's, not the run's, so it is carried
+    // forward as written. Both flags guard it: splitting the "malformed" message in
+    // review round 2 moved the partial case off the flag this used to read, and a
+    // list with one `..` entry got rewritten — the user's hand-written lines deleted
+    // silently, and only once, because the warning cannot fire again after the entry
+    // is gone. A `..` is far likelier to be a typo for a path they meant to own.
+    const ownedOut = (this.ownedInvalid || this.ownedPartial)
+      ? (this.old?.owned ?? [])
+      : [...this.ownedDecl];
     const sorted = Object.fromEntries(Object.entries(this.files).sort(([a], [b]) => a.localeCompare(b)));
-    this._put(MANIFEST_REL, JSON.stringify({ version, files: sorted }, null, 2) + "\n");
+    this._put(MANIFEST_REL, JSON.stringify({ owned: ownedOut, version, files: sorted }, null, 2) + "\n");
   }
+
 }
 
 /** Build junk that must never be copied into an install or recorded in the

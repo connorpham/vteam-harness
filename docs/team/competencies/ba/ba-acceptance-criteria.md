@@ -47,6 +47,12 @@ cannot imagine failing is decoration, and you delete it rather than ship it.
   the value, and they will pick the one that works.
 - **Assert only what is observable from outside.** *Otherwise:* verification needs to
   read the code, and the oracle becomes the implementation.
+- **Ask of every criterion: if this check passed and the behaviour were still broken,
+  what would that look like?** If you can describe it, the criterion measures a proxy —
+  a class name, a flag, a grep, a log line — not the behaviour. Concrete, bounded and
+  machine-checkable are not enough; a field ticket shipped a criterion that was all
+  three, and a build satisfying it rendered identically to the broken one. *Otherwise:*
+  the team earns a green check and the user keeps the defect.
 - **Write the refusal for every rule you write.** *Otherwise:* the boundary is
   untested and the first bad input reaches the database.
 - **Give every non-functional criterion a number, a unit and a measurement point.**
@@ -59,32 +65,6 @@ cannot imagine failing is decoration, and you delete it rather than ship it.
   business rule.
 - **Read each criterion back as a test: what would I do, what would I see?**
   *Otherwise:* you ship a sentence nobody can execute.
-
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The dev knows what I mean." | The tester does not, and neither will you in three weeks. |
-| "It's obviously in scope." | Then write it down; obvious things are what teams argue about. |
-| "The spec doesn't say, so I used the sensible rule." | You just authored a requirement nobody approved. |
-
-## Red flags
-
-- "correctly", "properly", "as expected", "handles", "fast", "user-friendly".
-- A `Then` containing "and", or a criterion listing several outcomes.
-- A criterion naming a button or screen; a rule with no rejected value and no message.
-- A non-functional criterion with no number or no load.
-- Any criterion with no spec reference on a story whose spec exists.
-
-## Example
-
-Weak: "The system handles invalid orders correctly." Nothing there can fail.
-Strong, split into two: **(1)** *Given* a member with an empty cart, *When* they submit
-the order, *Then* the order is refused and the response says "Add at least one item"
-— spec §4.2. **(2)** *Given* a member whose cart total is 0 ₫ with one free item,
-*When* they submit, *Then* the order is accepted with `total = 0 ₫` — spec §4.2, and
-this is the boundary that must behave the other way. Out of scope: partial refunds
-(no decision yet, Q-14).
 
 ## Reviewer lens
 
@@ -105,3 +85,5 @@ before this file: `given/when/then`, `user story`, `traceab`, `non-functional` a
 `out of scope` appeared in **zero** competencies. The `/ba` lane already requires
 Given/When/Then and cites ISO 29148; this file supplies the craft it assumes.
 Complements `qa-requirement-smells`, which **detects** an untestable criterion.
+
+Rationalizations, red flags and a worked example live in `reference/ba-acceptance-criteria.md` — opened when needed, never loaded by default.

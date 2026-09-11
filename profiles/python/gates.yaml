@@ -7,12 +7,53 @@ steps:
     run: "bash .vteam/scripts/docs_shrink_check.sh"
   ledger:
     run: "python3 .vteam/scripts/log_check.py"
+  schedule:
+    # Advisory by design. A stale sprint plan or an overdue decision is a fact about the
+    # PROJECT, not a defect in the change being gated — blocking a commit on it teaches
+    # people to bypass the gate, which is worse than the condition. It still runs and
+    # still prints, and GREEN is never printed bare while it is failing.
+    run: "python3 .vteam/scripts/schedule_check.py"
+    requires: "docs/pm/plan.yaml"
+    skip_reason: "no docs/pm/plan.yaml — this repo has no sprint plan to be on or off"
+    advisory: true
+  evd:
+    # `/qa` names evd_check a dozen times and the gate never ran it, so a pack could ship a
+    # REPORT.md claiming ten test cases with zero case folders — which happened in the field
+    # trial and took a challenger agent to notice. Sweep mode reads the expected count from
+    # each report's own TC citations, errors only on CLOSED tickets, and treats packs older
+    run: "python3 .vteam/scripts/evd_check.py --sweep"
+    # No `requires:` — the checker resolves its root from paths.evidence, which this
+    #   file cannot substitute, and a literal "evd" would declare a FALSE skip on any
+    #   repo that configures another path. The sweep already prints and returns 0 when
+    #   its configured root is missing, so the guard bought nothing.
+  evd-ui:
+    # `/dev` names this checker five times and no gate ran it — the same hole VT-17
+    # closed for the QA layer. Hard, because UI evidence is about the change being
+    # gated, not about the project. Packs that never adopted the NN_<description>.png
+    # layout are REPORTED, not failed, so a repo is not reddened for its history.
+    run: "python3 .vteam/scripts/evd_ui_check.py --sweep"
+    # No `requires:`. The checker resolves its root from paths.evidence, which gate.py
+    # cannot substitute, so a literal "evd" declares a FALSE skip on any repo that
+    # configures another evidence path — the declared-but-wrong skip this driver forbids.
+    # Both sweeps already print and return 0 when their configured root is missing.
+    requires_cmd: python3 -c "import PIL"
+    skip_reason: "Pillow is not installed — the image checks cannot run; a declared skip beats a red nobody can act on"
   graph:
     run: "python3 .vteam/scripts/graph_check.py"
   verbatim:
     run: "python3 .vteam/scripts/verbatim_gate.py"
   competencies:
     run: "python3 .vteam/scripts/competency_check.py"
+  doctrine-source:
+    # VT-19 shipped a doctrine change whose INDEX was never regenerated AT THE SOURCE,
+    # and a consuming repo's gate went RED the moment it ran `vteam update`: the
+    # competency file arrived fresh, the INDEX arrived stale. The reason is that
+    # `--write-index` writes {paths.team} — the DEPLOYED mirror — so in the framework
+    # repo it can never reach core/doctrine, which is the copy that actually ships.
+    # `requires` keeps this step out of consumer repos, which have no core/doctrine.
+    run: "python3 .vteam/scripts/competency_check.py --root core/doctrine/competencies"
+    requires: "core/doctrine/competencies"
+    skip_reason: "no core/doctrine — this repo consumes the doctrine, it does not publish it"
   parallel:
     run: "python3 .vteam/scripts/parallel_check.py"
   coord:

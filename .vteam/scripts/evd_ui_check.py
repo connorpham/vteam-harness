@@ -38,6 +38,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 NAME_PAT = re.compile(r"^\d{2}_[\w-]+\.png$")
 SPECIAL = {"design_vs_app.png"}
+
+
+def is_legacy_pack(dev: Path) -> bool:
+    """Has this pack never been judged by this checker at all?
+
+    ONE definition, called by both the sweep and the selftest. An earlier round had
+    the rule in the sweep and a hand-copy of it in the test; the copy was the
+    pre-fix version, so the test passed identically whether the fix was present or
+    reverted — coverage in the summary line and none in fact.
+
+    Legacy means evidence of the OLD layout, never the absence of a required
+    artefact: keying it on "no manifest.md" alone let a reviewer flip a failing pack
+    to a warning by deleting one file. A pack qualifies when it has no image named
+    the way this checker wants AND no manifest — a state it cannot reach without
+    renaming every image back.
+    """
+    top = list(dev.glob("*.png"))
+    nested = [q for q in dev.rglob("*.png") if q.parent != dev]
+    if not top and not nested:
+        return False                       # not a UI pack at all
+    if not top:
+        return True                        # images only in subfolders
+    named = [q for q in top if NAME_PAT.match(q.name)]
+    return not named and not (dev / "manifest.md").is_file()
 NOT_MEASURED = "NOT MEASURED"
 
 
@@ -138,12 +162,104 @@ def main() -> int:
     from vocab import vocab
     c = Ctx()
     ap = argparse.ArgumentParser()
-    ap.add_argument("ticket")
+    ap.add_argument("ticket", nargs="?")
+    ap.add_argument("--sweep", action="store_true",
+                    help="check every dev evidence pack whose ticket is closed; the per-ticket "
+                         "flags do not apply. Open tickets are reported, not failed.")
     ap.add_argument("--bug", action="store_true")
     ap.add_argument("--oracle", action="store_true",
                     help="declare a design oracle exists even without design/ or fidelity.json")
     ap.add_argument("--attach", action="store_true")
     args = ap.parse_args()
+
+    if args.sweep:
+        # `/dev` names this checker five times and no gate ran it, so a UI pack could
+        # ship incomplete and nothing said so — the same hole VT-17 closed for the QA
+        # layer. Sweep applies the same policy: a CLOSED ticket's pack must meet the
+        # standard, an open one is reported. `--bug` and `--oracle` are per-ticket
+        # declarations a sweep cannot make, so a pack that needs one is reported rather
+        # than failed, and says which flag it would need.
+        import tracker as trk
+        t = trk.load(c)
+        evd_root = c.path("evidence")
+        verbs = vocab(c).get("hedge_phrases", [])
+        if not evd_root.is_dir():
+            print(f"✅ evd_ui_check --sweep: no evidence directory at {evd_root}")
+            return 0
+        bad, warned, ok = [], [], []
+        for dev_dir in sorted(evd_root.glob("*/dev")):
+            key = dev_dir.parent.name
+            try:
+                status = (t.get_issue(key) or {}).get("status", "")
+            except Exception:
+                status = ""
+            top = list(dev_dir.glob("*.png"))
+            nested = [q for q in dev_dir.rglob("*.png") if q.parent != dev_dir]
+            if not top and not nested:
+                continue                      # not a UI pack — nothing for this checker to own
+            # A pack with no manifest.md has never been judged by this checker at all —
+            # the layout it wants did not exist when the pack was written. The first
+            # version only recognised the "images live in subfolders" shape, so the far
+            # commoner legacy shape (images at dev/ under old names) walked into a hard
+            # red on a repo whose only sin is having history. A reviewer reproduced that
+            # on a fresh adoption.
+            # Legacy is keyed on evidence of the OLD layout, never on the absence of an
+            # artefact this checker requires. The first attempt keyed it on "no
+            # manifest.md", and a reviewer flipped a closed ticket's failing pack to a
+            # warning by DELETING that file — the required artefact became the passport
+            # past every other rule. A pack is pre-standard when NO image follows the
+            # NN_<description>.png naming AND there is no manifest: it cannot shed its
+            # way into that state without also renaming every image back.
+            if is_legacy_pack(dev_dir):
+                warned.append((f"{key} [{status or '?'}]",
+                               [f"{len(top)} image(s) at dev/ and no manifest.md"],
+                               "the pack has no manifest.md, so it pre-dates this checker's "
+                               "layout entirely — reported so it is visible, not failed"))
+                continue
+            if not top:
+                # A pack with images only in subfolders never adopted this layout, which
+                # wants the CURATED frames at dev/ named NN_<what-it-shows>.png. Failing
+                # it would red a repo for its history — the same trap schedule_check
+                # would be. Reported so it is visible, and the count says how much is
+                # down there unjudged.
+                warned.append((f"{key} [{status or '?'}]",
+                               [f"{len(nested)} image(s) live in subfolders and none at dev/"],
+                               "the pack predates the NN_<description>.png layout, so nothing "
+                               "in it has ever been judged by this checker"))
+                continue
+            # NO per-ticket-flag downgrade here, deliberately. An earlier round added one
+            # and a reviewer walked `DEVIATION: WRONG — the button is 40px off` past a
+            # closed ticket with it: the errors it matched ("design oracle", "fidelity")
+            # only fire when the oracle IS on disk and the measurement fails, which is the
+            # opposite of "a declaration the sweep could not make". The `--bug` half could
+            # never fire at all — those errors live behind `if bug:`. Round-1 behaviour,
+            # which failed such a pack, was right.
+            errs = check_dev_dir(dev_dir, verbs, False, False)
+            line = f"{key} [{status or 'unknown'}]"
+            if not errs:
+                ok.append(line)
+            elif str(status).strip().lower() in ("done", "closed", "resolved"):
+                bad.append((line, errs))
+            else:
+                warned.append((line, errs, "the ticket is not closed"))
+        for l in ok:
+            print(f"✅ {l}: DEV evidence meets the standard")
+        for l, errs, why in warned:
+            print(f"⚠️  {l}: {len(errs)} problem(s) — reported, not failed, because {why}")
+            for e in errs[:3]:
+                print(f"     - {e}")
+        for l, errs in bad:
+            print(f"❌ {l}: {len(errs)} problem(s), and the ticket is closed")
+            for e in errs:
+                print(f"     - {e}")
+        if bad:
+            print("evd_ui_check --sweep: a closed ticket's UI evidence does not meet the standard")
+            return 1
+        print(f"✅ evd_ui_check --sweep: {len(ok)} pack(s) green, {len(warned)} reported without failing")
+        return 0
+
+    if not args.ticket:
+        ap.error("a ticket is required unless --sweep is passed")
     ticket = args.ticket.upper()
     dev = c.path("evidence") / ticket / "dev"
 
@@ -208,7 +324,32 @@ def _selftest():
         assert any("before_" in e for e in errs), "--bug without before_ should red"
         errs = check_dev_dir(dev, [], False, True)
         assert any("design_vs_app" in e for e in errs), "oracle without design_vs_app should red"
-    print("evd_ui_check selftest: OK (fixture green + 4 mutations red)")
+    # --sweep's legacy policy, asserted against the FUNCTION THE GATE CALLS. The
+    # third fixture is the one that separates the shipped rule from the one it
+    # replaced: a properly-named image with no manifest is NOT legacy, and under the
+    # earlier predicate it was.
+    with tempfile.TemporaryDirectory() as _td:
+        _r = Path(_td)
+        def _pack(key, sub, name):
+            d = _r / key / "dev" / sub if sub else _r / key / "dev"
+            d.mkdir(parents=True, exist_ok=True)
+            (d / name).write_bytes(b"x")
+            return _r / key / "dev"
+        assert is_legacy_pack(_pack("L-1", "raw", "shot.png")), \
+            "images only in subfolders must be legacy"
+        assert is_legacy_pack(_pack("L-2", "", "final.png")), \
+            "an unnamed image with no manifest must be legacy"
+        d3 = _pack("L-3", "", "01_the_list.png")
+        assert not is_legacy_pack(d3), \
+            "a properly-named image with no manifest must NOT be legacy — deleting the " \
+            "manifest cannot be an exemption from every other rule"
+        (d3 / "manifest.md").write_text("x")
+        assert not is_legacy_pack(d3), "a pack with a manifest is never legacy"
+        assert not is_legacy_pack(_pack("L-4", "", "notes.txt").parent / "dev"), \
+            "a pack with no images at all is not this checker's business"
+
+    print("evd_ui_check selftest: OK (fixture green + 4 mutations red + --sweep legacy: "
+          "subfolder-only and top-level-without-manifest are both reported, not failed)")
 
 
 if __name__ == "__main__":

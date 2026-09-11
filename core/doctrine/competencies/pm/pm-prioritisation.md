@@ -61,35 +61,6 @@ question is always "what is the cost of this waiting another day?"
 - **Report "nothing unblocked" as a real result.** *Otherwise:* filler work becomes
   the plan.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "Everything is high priority." | Then nothing is, and the team is choosing for you. |
-| "We'll parallelise to go faster." | Parallel work in excess of people is slower; only finishing is faster. |
-| "We're blocked, so let's start something else." | Now you have two unfinished things and the same blocker. |
-| "It's urgent." | Compared to what? Name what it displaces. |
-
-## Red flags
-
-- More items in progress than people on the team.
-- Several items sitting at "almost done" across consecutive cycles.
-- Every item labelled high or urgent.
-- A blocker with no owner, no date, or no stated consequence.
-- A decision request longer than a paragraph, or with no recommendation.
-- An urgent insertion with nothing named as displaced.
-
-## Example
-
-Four things are ready and one is blocked on pricing. Weak: start a fifth item so the
-report looks full. Strong: first ship the ticket waiting on one review — a delivery today. Then order the
-rest by cost of delay over effort: the signup bug (every new user hits it, half a day)
-before the export format (one customer asked, two days) before the admin filter (nobody
-asked, one day). The blocked item stays blocked, and its question goes to the decision
-queue as: *"Annual plans, pro-rata on downgrade — (a) credit the difference, (b) no
-credit. Recommend (a), matches both competitors checked. (b) needs a support macro.
-Blocks slice 4; sixth day waiting."*
-
 ## Reviewer lens
 
 - Was the nearly-done work swept before anything new was started?
@@ -109,3 +80,5 @@ Measured gap in this doctrine before this file: `wip limit` and `stakeholder` ap
 in **zero** competencies, `prioriti` and `escalat` in one each. The lane's own
 principles name low WIP and "unblock before adding"; this file supplies the judgement
 those principles assume.
+
+Rationalizations, red flags and a worked example live in `reference/pm-prioritisation.md` — opened when needed, never loaded by default.

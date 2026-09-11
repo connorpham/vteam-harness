@@ -92,6 +92,17 @@ stop without it.
 
 ## B2 — SHARD THE SPEC (if not yet sharded) + DECOMPOSE INTO STORIES
 
+**Load the competencies this lane runs on, before writing a single story** — from
+`docs/team/competencies/ba/INDEX.md` (read the index, not the tree): every row whose
+`Applies` says `always`, plus every row a token matches on the feature in front of you.
+Both `always` rows are load-bearing here — `ba-story-slicing` governs the decomposition
+you are about to do, and `ba-acceptance-criteria` governs every `Then` you are about to
+write, including the question that criterion must survive: *if this check passed and the
+behaviour were still broken, what would that look like?* Name the loaded list in the
+story's **Competencies:** line. *Until 2026-09-11 this lane never mentioned competencies
+at all, so both files were written, gated, deployed — and never read by the lane that
+needs them.*
+
 - **Shard**: one file per feature in `docs/specs/<feature>.md` holding the
   requirements VERBATIM (no interpretation), section-numbered, plus one row in
   `docs/specs/INDEX.md` (feature | file | scope). This is the citable oracle
@@ -181,6 +192,13 @@ which pre-mortem is absent or toothless (leads to no patched AC and no "accepted
 because…")? which gap question misses one of the 3 conditions? Card per
 `review-standard.md` (APPROVE carries the tried-to-break list — the 2-card quota
 is not an excuse to invent findings).
+**Paste the `## Reviewer lens` block of every competency this lane loaded** (the
+`Competencies:` line on the story) into the challenger's prompt, and require it to work
+each item one by one — an item ignored without saying why sends the card back. This is
+the same rule `/qa` V6 runs on. Until 2026-09-11 every competency in this framework was
+*required* to carry a `Reviewer lens` and this lane consulted none of them: the sections
+were written, gated and unread.
+
 **QC lens (shift-left — early testing is cheaper):** for the draft's riskiest
 story, the challenger must SKETCH ONE TC in its card (account + steps + expected
 per the AC) — an AC no TC can be sketched from mechanically is a failed AC,

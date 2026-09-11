@@ -71,21 +71,6 @@ role seeing another's data violates all eight; report as a defect.
 - **RCRCRC to choose what to regress**: Recent, Core, Risky,
   Configuration-sensitive, Repaired, Chronic.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "No spec, so I can't report anything." | HICCUPPS gives eight oracles; a named inconsistency with an owner is a real result. |
-| "Exploratory means poke around randomly." | It means one named heuristic, timeboxed, recorded — findings and blanks alike. |
-| "I looked at the screen, it's consistent." | With which of the eight? Name it, or you looked at one. |
-
-## Red flags
-
-- "The spec doesn't cover this" written as a reason to skip, not to switch oracle.
-- An exploratory case with no HEURISTIC name and no timebox.
-- A value verified only on the screen where it was typed.
-- A regression pack that regresses everything or nothing, ranked by neither.
-
 ## Reviewer lens
 
 - For any silent-spec finding: which oracle, both disagreeing things named, owner attached?
@@ -97,3 +82,5 @@ role seeing another's data violates all eight; report as a defect.
 connorpham/ai-qa `heuristics.md` — the full HICCUPPS/SFDIPOT/tours/RCRCRC tables
 at `reference/heuristics.md` · Bach, Heuristic Test Strategy Model · Hendrickson,
 *Explore It!*
+
+Rationalizations, red flags and a worked example live in `reference/qa-heuristics.md` — opened when needed, never loaded by default.

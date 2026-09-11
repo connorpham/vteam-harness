@@ -58,22 +58,6 @@ The highlights per type, from the reference tables:
   thousand — cited, or a decision request.** *Otherwise:* you are legislating
   locale policy from the test chair.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "Nobody types emoji in a name field." | Every phone keyboard offers it before the letter E. |
-| "The framework validates that." | The framework validates what it was configured to validate. That is the question. |
-| "I'll paste the whole table into the plan." | Sweeping is not choosing — thirty untargeted values crowd out the three aimed ones. |
-| "That value is unrealistic." | It was copied from a real support ticket. They all were. |
-
-## Red flags
-
-- A boundary case whose input the spec accepts.
-- A pack where every typed value is ASCII, positive, and in the developer's locale.
-- A money ticket with no rounding case; a date ticket with no boundary-day case.
-- The same coupon/action never tried twice anywhere.
-
 ## Reviewer lens
 
 - Which three values were chosen, and from which rows? Was any chosen for convenience?
@@ -86,3 +70,5 @@ connorpham/ai-qa `hostile-inputs.md` — full tables mirrored at
 `reference/hostile-inputs.md` (kept verbatim; this file is the method for
 choosing from them) · Ministry of Testing Test Heuristics Cheat Sheet (data
 type attacks).
+
+Rationalizations, red flags and a worked example live in `reference/qa-hostile-inputs.md` — opened when needed, never loaded by default.

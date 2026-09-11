@@ -136,10 +136,13 @@ appendix; it commits with the V7.4 dossier so the link outlives the session):
 ## V2 — DESIGN THE VERIFICATION (before touching a browser)
 
 **Load the competencies this verification needs** — from
-`docs/team/competencies/qa/INDEX.md` (read the index, not the tree): the
-`always` rows (`qa-test-design`, `qa-user-mindset`, `qa-case-writing`,
-`qa-hostile-inputs`, `qa-heuristics`) shape the pack; the token rows load when
-the ticket matches — `qa-security-probes` on any auth/roles/money/PII/upload
+`docs/team/competencies/qa/INDEX.md` (read the index, not the tree): **every
+row whose `Applies` reads `always`, each opened at the step its `Loads at` column
+names** — read them off the index, do not work from a list memorised here: this
+sentence used to enumerate them and had drifted both ways, naming two rows that are no
+longer `always` and missing three that are. `qa-report-writing` loads at V5 for that
+reason: it is needed when the report is written, not when the pack is designed. The
+token rows load when the ticket matches — `qa-security-probes` on any auth/roles/money/PII/upload
 ticket (`label:`/`term:` match). Record the loaded list in the verify-sheet
 under **Competencies:**. Their reference tables (full hostile-input, heuristic,
 security and checklist catalogues) live under `competencies/qa/reference/` —

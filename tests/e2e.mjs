@@ -196,6 +196,42 @@ console.log("5. update honors the manifest");
   check("user-modified doctrine kept", fs.readFileSync(opsFile, "utf8") === opsBefore);
   check("new version parked as ops.md.new", fs.existsSync(`${opsFile}.new`), r.stdout);
   check("update reported the conflict", /ops\.md/.test(r.stdout), r.stdout);
+
+    // `owned`: a path this repo declares is never clobbered AND never parked — the
+    // recurring `.new` chore was the whole reason for the field. Reviewed finding:
+    // the first version only honoured the declaration once a file had diverged.
+    const mfPath = path.join(repo, ".vteam", "manifest.json");
+    const mf = JSON.parse(fs.readFileSync(mfPath, "utf8"));
+    mf.owned = ["docs/team/ops.md"];
+    fs.writeFileSync(mfPath, JSON.stringify(mf, null, 2) + "\n");
+    fs.rmSync(`${opsFile}.new`, { force: true });
+    const r2 = vteam(repo, "update");
+    check("owned: update still exits 0", r2.status === 0, r2.stdout + r2.stderr);
+    check("owned: the local file is kept", fs.readFileSync(opsFile, "utf8") === opsBefore);
+    check("owned: nothing is parked", !fs.existsSync(`${opsFile}.new`), r2.stdout);
+    check("owned: update says upstream moved", /OWNS/.test(r2.stdout), r2.stdout);
+
+    // the IN-SYNC case: a declared-owned path that has not forked yet must not be
+    // told it "matched no framework file". A reviewer found that warning firing in
+    // the most ordinary steady state there is — and right after the hand merge the
+    // whole feature exists for.
+    const synced = path.join(repo, ".vteam", "profiles");
+    const anyOwned = fs.existsSync(synced) ? "docs/team/raci.md" : "docs/team/raci.md";
+    const mfS = JSON.parse(fs.readFileSync(mfPath, "utf8"));
+    mfS.owned = [anyOwned];
+    fs.writeFileSync(mfPath, JSON.stringify(mfS, null, 2) + "\n");
+    const r4 = vteam(repo, "update");
+    check("owned: an in-sync owned path is not called unmatched",
+          !/matched no framework file/.test(r4.stdout), r4.stdout);
+
+    // a malformed declaration is reported and IGNORED — never rewritten over the user
+    const mf2 = JSON.parse(fs.readFileSync(mfPath, "utf8"));
+    mf2.owned = "docs/team/ops.md";            // a string, not a list
+    fs.writeFileSync(mfPath, JSON.stringify(mf2, null, 2) + "\n");
+    const r3 = vteam(repo, "update");
+    check("owned: a malformed declaration is reported", /must be a list/.test(r3.stdout), r3.stdout);
+    check("owned: the malformed declaration is left alone",
+          JSON.parse(fs.readFileSync(mfPath, "utf8")).owned === "docs/team/ops.md");
 }
 
 // ── 6. invalid input writes NOTHING ──────────────────────────────────────────

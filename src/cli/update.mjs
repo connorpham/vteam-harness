@@ -102,6 +102,23 @@ export async function update(_flags) {
   }
 
   guard.save(pkgVersion());
+  if (guard.ownedPartial) {
+    console.log(`\n⚠ .vteam/manifest.json: ${guard.ownedPartial} — the rest of the declaration was honoured.`);
+  }
+  if (guard.ownedInvalid) {
+    console.log(`\n⚠ .vteam/manifest.json: ${guard.ownedInvalid} — the declaration was ignored this run and left untouched on disk.`);
+  }
+  const unmatched = [...guard.ownedDecl].filter((o) => !guard.ownedMatched.has(o));
+  if (unmatched.length) {
+    console.log(`\n⚠ ${unmatched.length} path(s) declared \`owned\` matched no framework file — a typo, a directory, or a file this framework does not ship:`);
+    for (const u of unmatched) console.log(`  ${u}`);
+  }
+  if (guard.owned.length) {
+    console.log(`\n📌 ${guard.owned.length} file(s) this repo OWNS moved upstream — kept yours, nothing parked:`);
+    for (const o of guard.owned) console.log(`  ${o}`);
+    console.log("  Declared in .vteam/manifest.json → owned. Merge by hand when you want the change;");
+    console.log("  remove it from `owned` to go back to receiving the framework's version.");
+  }
   if (guard.conflicts.length) {
     console.log(`\n⚠ ${guard.conflicts.length} file(s) differ from what the framework last wrote — kept YOURS, new version parked beside it:`);
     for (const c of guard.conflicts) console.log(`  ${c}  →  ${c}.new`);

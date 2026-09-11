@@ -42,9 +42,28 @@ from ctx import Ctx  # noqa: E402
 DATE_PAT = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:/\d{2})?$")
 
 
-def check_text(text: str, key: str, adopted: date, root: Path | None,
+def decision_keys(root: Path | None, pm_dir: str = "docs/pm") -> set[str]:
+    """The Q/D/A row keys the decision queue actually holds.
+
+    A row can cite a decision to justify itself — "blocked: Q5 unanswered", "→ D13".
+    Nothing checked that the cited row exists, and the failure is silent in the worst
+    way: on 2026-09-10 a script writing a new D-row raised on a percent sign, the row
+    was never written, and the commit plus the ledger entry both pointed at it anyway.
+    The ledger looked complete and cited nothing.
+    """
+    if root is None:
+        return set()
+    f = root / pm_dir / "decisions.md"
+    if not f.is_file():
+        return set()
+    return {m.group(1).upper() for m in
+            re.finditer(r"^\|\s*([QDA]\d+)\s*\|", f.read_text(encoding="utf-8", errors="replace"), re.M)}
+
+
+def check_text(text: str, key: str, adopted: date, root: Path | None, pm_dir: str = "docs/pm",
                team_size: int = 1) -> tuple[list, list]:
     errs, warns = [], []
+    known_decisions = decision_keys(root, pm_dir)
     shape, prev_date = None, None
     # project.key is config-supplied text, not a regex — escape it (audit M15;
     # review_check and stale_verdict_check already do)
@@ -99,6 +118,36 @@ def check_text(text: str, key: str, adopted: date, root: Path | None,
                     if not (root / path).exists():
                         warns.append(f"line {n}: path {path} no longer exists — "
                                      f"verify, or accept if deliberate cleanup")
+            blob = " ".join(str(row.get(f) or "") for f in ("item", "result", "link"))
+            cited = {m.group(1).upper() for m in re.finditer(r"\b([QDA]\d+)\b", blob)}
+            unknown = sorted(c for c in cited if c not in known_decisions)
+            if unknown and known_decisions:
+                # A row about ANOTHER project legitimately cites that project's queue: this
+                # repo's ledger records field-trial work whose decisions live in the trial
+                # repo. The tell is in the row itself — it names a ticket key that is not
+                # this project's. Flagged as a warning there, because the citation cannot be
+                # resolved from here and silence would be worse than a soft note.
+                # ANY foreign key, not the first key found: a row's Item almost always
+                # starts with this project's own key, so `search` would never see the
+                # other project mentioned later in the same row.
+                # A FOREIGN TICKET KEY, not "any uppercase word before a hyphen and
+                # digits" — the first version was silenced by UTF-8, SHA-256, RFC-9457
+                # and PR-63, any one of which could hide a genuinely missing decision.
+                # Letters only, at least two, and not a known non-ticket prefix.
+                NOT_KEYS = {"UTF", "SHA", "MD", "RFC", "ISO", "PR", "CVE", "HTTP", "WCAG", "ADR", "TC"}
+                keys = {m.group(1).upper() for m in re.finditer(r"\b([A-Z]{2,10})-\d+\b", blob)
+                        if m.group(1).upper() not in NOT_KEYS}
+                foreign_keys = sorted(keys - {key.upper()})
+                foreign_key = bool(foreign_keys)
+                msg = (f"line {n}: cites {', '.join(unknown)}, which this repo's decision queue "
+                       f"does not hold")
+                if foreign_key:
+                    warns.append(msg + f" — the row also names {', '.join(foreign_keys)}, so the "
+                                       f"decision probably lives in that project's queue; "
+                                       f"unresolvable from here")
+                else:
+                    errs.append(msg + " — a row justified by a decision that was never written "
+                                      "is a row justified by nothing")
         if row["kind"] == "done" and row["tok_k"] is None:
             if d >= adopted:
                 errs.append(f"line {n}: missing or malformed `tok ≈ N[k]` — token "
@@ -121,8 +170,14 @@ def main() -> int:
         team_size = int(raw_size)
     except (TypeError, ValueError):
         sys.exit(f"log_check: team.size {raw_size!r} is not an integer")
-    errs, warns = check_text(log.read_text(encoding="utf-8"),
-                             str(c.cfg("project.key")), adopted, c.root, team_size)
+    errs, warns = check_text(
+        log.read_text(encoding="utf-8"),
+        str(c.cfg("project.key")),
+        adopted,
+        c.root,
+        pm_dir=str(c.cfg("paths.pm", "docs/pm")),
+        team_size=team_size,
+    )
     for w in warns:
         print(f"⚠️  {w}")
     if errs:
@@ -183,8 +238,30 @@ def _selftest():
                       "| 2026-01-03 | QA | PROJ-1 | blocked: Q2 open | PROJ-1 |"),
         "PROJ", adopted, None, team_size=2)
     assert any("5 columns under a 6-column header" in e for e in errs), errs
+    # the decision-citation rule: a row of THIS repo citing an absent D reds; a row
+    # about another project warns; and a version number must not silence either
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        troot = Path(td); (troot / "docs" / "pm").mkdir(parents=True)
+        (troot / "docs" / "pm" / "decisions.md").write_text(
+            "| Q1 | x | none | ✅ DECIDED 2026-01-05 | — |\n", encoding="utf-8")
+        HEAD = "| Date | Lane | Item | Result | Link |\n|---|---|---|---|---|\n"
+        def cite(row):
+            return check_text(HEAD + row + "\n", "PROJ", adopted, troot, team_size=1)
+        e, w = cite("| 2026-01-02 | dev | PROJ-4 routing | done · tok ≈ 9k | evd/PROJ-4/ · → D99 |")
+        assert any("decision queue" in x for x in e), f"an absent D must red: {e}"
+        e, w = cite("| 2026-01-02 | dev | PROJ-4 per Q1 | done · tok ≈ 9k | evd/PROJ-4/ |")
+        assert not any("decision queue" in x for x in e), f"a present decision must pass: {e}"
+        e, w = cite("| 2026-01-02 | dev | VT-18 from the TB-9 trial | done · tok ≈ 9k | evd/x/ · TB-9 needs Q8 |")
+        assert not any("decision queue" in x for x in e) and any("decision queue" in x for x in w), \
+            f"a foreign ticket key must WARN, not red: {e} / {w}"
+        e, w = cite("| 2026-01-02 | dev | PROJ-4 encoding=UTF-8 | done · tok ≈ 9k | evd/x/ · → D99 |")
+        assert any("decision queue" in x for x in e), \
+            f"UTF-8 must not read as a foreign project key and silence the rule: {e} / {w}"
+
     print("log_check selftest: OK (green fixtures 5+6 col + 8 mutations red "
-          "+ actor: legacy-red-at-size>1, empty-actor red, header-mismatch red)")
+          "+ actor: legacy-red-at-size>1, empty-actor red, header-mismatch red "
+          "+ decision citations: absent reds, present passes, foreign key warns, UTF-8 does not silence)")
 
 
 if __name__ == "__main__":

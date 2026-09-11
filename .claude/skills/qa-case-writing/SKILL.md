@@ -59,21 +59,6 @@ is too thin; if the title does not say *which behaviour*, it is a label.
   the gate reads the keys, people read the values. *Otherwise:* the team needs
   English to know what their own total reads.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The screenshot shows everything." | In six months the screenshot shows a screen; the line says what mattered on it. |
-| "Writing exact values is slow." | Arguing about an unreproducible FAIL is slower. |
-| "The title is just a filename." | The title is the report row, the commit message, the sentence a manager quotes. |
-
-## Red flags
-
-- A title starting with "Test", "Check", "Verify".
-- STEPS containing "verify that…" or "a valid value".
-- EXPECTED without a citation; ACTUAL that says `failed`.
-- Two different names for the same screen in one record.
-
 ## Reviewer lens
 
 - Run the fifteen-second test on two cases, cold. What could you not tell?
@@ -85,3 +70,5 @@ is too thin; if the title does not say *which behaviour*, it is a label.
 connorpham/ai-qa `case-writing.md` (the fifteen-second test, the field
 standards, the banned words, before/after example) · goldbergyoni testing
 (3-part naming) · vteam `evd_check.py` journey fields (AS/ENTRY/AFTER/BACK).
+
+Rationalizations, red flags and a worked example live in `reference/qa-case-writing.md` — opened when needed, never loaded by default.

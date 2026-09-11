@@ -3,7 +3,7 @@ name: qa-user-mindset
 description: "Use when designing or running any UI verification — when every case in the pack could have been written by someone who has never watched a real person use software, and when a PASS came from typing perfect values in perfect order."
 role: qa
 loads: V2
-applies: always
+applies: label:ui, label:frontend, label:mobile, label:design, path:app/, path:components/, path:src/components/, term:screen, term:page, term:form, term:button, term:modal, term:dialog, term:ux
 ---
 
 # The user's mind — test as the person this is for
@@ -63,22 +63,6 @@ you take and what you look at afterwards:
   the spec is silent — never a reason to file a defect. *Otherwise:* taste
   becomes law and the report stops being trusted.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "Double-click is user error." | It is the single most expensive defect class in commerce: two payments. |
-| "Nobody leaves a form open overnight." | Everyone does. The session expiry path IS a main path. |
-| "Autofill is the browser's problem." | The values landed in your fields. The wrong-field email is your bug report. |
-| "I'll test the persona stuff if time remains." | It is not extra cases — it is one move inside the steps you already run. |
-
-## Red flags
-
-- Every STEPS line uses the mouse, in the intended order, with typed-perfect values.
-- AFTER says only "toast appeared".
-- No case presses Back, refreshes, or opens a second tab.
-- The manifest has no PERSONA and no OBSERVATIONS anywhere in the pack.
-
 ## Reviewer lens
 
 - Pick two cases: name the real-user move in each. If none, the pack is scripts.
@@ -90,3 +74,5 @@ you take and what you look at afterwards:
 connorpham/ai-qa `user-mindset.md` (personas, the moves table, the four
 questions) · Ministry of Testing heuristics (interruptions) · vteam qa doctrine
 "you are a person, not a route".
+
+Rationalizations, red flags and a worked example live in `reference/qa-user-mindset.md` — opened when needed, never loaded by default.

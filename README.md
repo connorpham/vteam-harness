@@ -43,7 +43,7 @@ vteam installs a virtual software team into your repository — a PM, a BA, an a
 ```bash
 npx vteam-harness audit    # 1. grade this repo 0-100. No install, no writes, no network.
 npx vteam-harness init     # 2. install the team + the gates
-npx vteam-harness doctor   # 3. prove the install: every selftest (32 today) + provider preflight
+npx vteam-harness doctor   # 3. prove the install: every selftest (33 today) + provider preflight
 ```
 
 Then open your agent tool and run `/team` to start a workday, or `/dev PROJ-12` for one ticket.
@@ -159,7 +159,7 @@ vteam does not ask an agent to be more careful. It makes *done* a machine's verd
 
 | Law | What it means in practice |
 |---|---|
-| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (32 today). An always-green check gets fixed or deleted. |
+| **A gate that has never been red does not exist** | Every checking gate ships a `--selftest` mutation proof: feed it a violating input, watch it fail. `doctor` discovers every selftest-bearing check and runs them all (33 today). An always-green check gets fixed or deleted. |
 | **Evidence that only lives in the session isn't evidence** | Screenshots, review cards, verdicts, decisions — everything durable lands in a committed file or the tracker, and every outward write is **read back** to confirm it landed. |
 | **A verdict is valid only for the code it examined** | Each QA verdict pins two anchors: `COMMIT:` for the code and `VERIFIED-AT:` for the clock. When the code moves, the verdict expires and the ticket returns to the queue. A verdict that can't be anchored is red — *"cannot verify"* and *"verified clean"* are different answers. |
 | **Autonomy is a ladder, not a switch** | `off` → `assisted` → `full`. Quality gates never relax at any level; only *wait-for-human* gates flip, with a labelled, reversible paper trail. Real money, legal, credentials and data deletion are never auto-decided. |
@@ -431,7 +431,7 @@ Supported surfaces: **agent tools** Claude Code (native skills and subagents), C
 Eight commands, one journey. Gates exit 1; the two mirrors (`board`, `graph`) always exit 0; nothing calls a network except the preflight pings you configured. Every transcript below is captured from a real run — most of them from **this repository**, which installs vteam into itself and keeps its own ledger and evidence (`evd/VT-1/`).
 
 <picture>
-  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 32 selftests. Daily: the agent tool runs the workday, 18 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
+  <img src="https://raw.githubusercontent.com/connorpham/vteam-harness/main/docs/assets/commands.svg" alt="Every vteam command end to end: audit grades with no install, init writes config, gates, skills and fence, doctor proves the install with 33 selftests. Daily: the agent tool runs the workday, 18 gates can refuse with exit 1, everything lands in committed files; board and graph mirror those files and never fail the build. resume derives where a dead session stopped; usage measures who ran which model at what cost; update refreshes framework files by manifest hash." width="100%">
 </picture>
 
 | Command | What it does |
@@ -479,7 +479,7 @@ vteam installed. Next steps:
 
 ### `doctor` — prove the install
 
-Reads everything init wrote and **runs the proof**: python present, config parses in all three parser languages, every manifest hash intact (files someone edited are *named*, not counted), hooks wired, then all 32 discovered selftests — each one feeds its gate a violating fixture and demands RED — then pings the tracker, git remote and hosting CLI for real. From this repository:
+Reads everything init wrote and **runs the proof**: python present, config parses in all three parser languages, every manifest hash intact (files someone edited are *named*, not counted), hooks wired, then all 33 discovered selftests — each one feeds its gate a violating fixture and demands RED — then pings the tracker, git remote and hosting CLI for real. From this repository:
 
 ```console
 $ npx vteam-harness doctor
@@ -490,7 +490,7 @@ $ npx vteam-harness doctor
 ✅ core.hooksPath = .githooks
 ✅ code_paths alive (src/, core/, bin/)
 ✅ model-routing snapshot fresh (2026-08-17)
-✅ gate selftests green (32 discovered checks prove they can red)
+✅ gate selftests green (33 discovered checks prove they can red)
 ── preflight ──
 ✅ Tracker: backlog dir docs/backlog (2 tickets)
 ✅ Design: no design source configured
@@ -580,7 +580,7 @@ Daily (date × source × model):
 
 Sessions (last 4 of 4):
   2026-08-21 04:44  claude claude-haiku-4-5-20251001     0m ·    1msg · out    102 · feat/scale-round
-  2026-08-21 04:43  claude claude-fable-5                0m ·    1msg · out    171 · feat/scale-round
+  2026-08-21 04:43  claude claude-fable-5                0m ·    1msg · out    172 · feat/scale-round
   …
 Ledger cross-check: claimed tok ≈ 1390k · measured in+out 804k
   ✅ every done day has a session, every heavy day has a ledger row
@@ -646,7 +646,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **164 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates. And 0.17.0 was **field-tested before it shipped**: a full `/team` day on a pnpm/Turborepo Next 15 + Prisma monorepo — BA shards, mockups, two parallel workers, four tickets merged, four QA verdicts with challengers — and every gap that day found is a ticket in this repo (`VT-11`, `VT-12`), not a footnote.
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **172 checks** (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 15-fixture parser-conformance suite and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates. And 0.17.0 was **field-tested before it shipped**: a full `/team` day on a pnpm/Turborepo Next 15 + Prisma monorepo — BA shards, mockups, two parallel workers, four tickets merged, four QA verdicts with challengers — and every gap that day found is a ticket in this repo (`VT-11`, `VT-12`), not a footnote.
 
 Published on npm as **`vteam-harness`** (the name `vteam` was blocked for similarity); the command is still `vteam`. Pre-1.0 — expect sharp edges, and see [Known limits](#known-limits) above.
 

@@ -15,8 +15,15 @@ Checks {paths.team}/competencies/<role>/*.md:
      that summarizes the workflow gets followed INSTEAD of the file), role,
      loads (a lane step), applies (routing tokens).
   2. `applies` grammar: `always` | `label:<x>` | `path:<prefix>` |
-     `profile:<name>` | `term:<word>` — anything else is a typo the lane will
-     silently never match.
+     `profile:<name>` | `term:<word>` | `type:<IssueType>` — anything else is a
+     typo the lane will silently never match.
+     `type:` matches the ticket's own `type:` field (Bug, Story, Task, Spike…).
+     It exists because `term:` matches a ticket's whole prose, so a single common
+     English word routes a whole competency into a lane's context: measured on the
+     field trial, a CSS focus-ring ticket loaded `dev-mobile-craft` on the word
+     "permission", and two Bug tickets loaded `dev-debugging` on the word "bug"
+     appearing in a sentence rather than on being bugs. `type:` is the structural
+     truth the ticket already states, so it cannot be triggered by prose.
   3. Required sections: Identity · When this applies · Decide · Rules ·
      Reviewer lens · Sources. Missing "Reviewer lens" = craft nobody can check.
   4. Body ≤ MAX_WORDS — a competency that needs more moves the bulk to a
@@ -41,8 +48,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 MAX_WORDS = 1100
 REQUIRED_SECTIONS = ["Identity", "When this applies", "Decide", "Rules", "Reviewer lens", "Sources"]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 REQUIRED_META = ["name", "description", "role", "loads", "applies"]
-APPLIES = re.compile(r"^(always|label:[\w-]+|path:[\w./-]+|profile:[\w-]+|term:[\w-]+)$")
+APPLIES = re.compile(r"^(always|label:[\w-]+|path:[\w./-]+|profile:[\w-]+|term:[\w-]+|type:[A-Za-z][\w -]*)$")
 # A description that narrates the procedure ("first X, then Y → Z") is the
 # failure mode superpowers measured: agents follow the summary and skip the body.
 PROCEDURAL = re.compile(r"(→|\bthen\b|\bstep \d|\bfirst,|\bfinally\b)", re.I)
@@ -88,7 +96,8 @@ def check_file(path_name: str, text: str, role: str) -> list[str]:
         errs.append(f"{path_name}: description > 1024 chars")
     for tok in [t.strip() for t in meta.get("applies", "").split(",") if t.strip()]:
         if not APPLIES.match(tok):
-            errs.append(f"{path_name}: applies token {tok!r} is not always|label:|path:|profile:|term:")
+            errs.append(f"{path_name}: applies token {tok!r} is not "
+                        f"always|label:|path:|profile:|term:|type:")
     heads = {h.strip() for h in re.findall(r"^##\s+(.+)$", body, re.M)}
     for sec in REQUIRED_SECTIONS:
         if not any(h == sec or h.startswith(sec + " ") or h.startswith(sec + " —") for h in heads):
@@ -111,6 +120,28 @@ def index_text(role: str, files: list[tuple[str, dict[str, str]]]) -> str:
             + "\n".join(rows) + "\n")
 
 
+def workflow_steps(root: Path, role: str) -> tuple[list[str], bool] | None:
+    """(steps, does the lane load competencies at all) for a role's workflow.
+
+    Returns None when the workflow cannot be found — a consumer repo may hold it at
+    `.claude/skills/<lane>/SKILL.md`, the framework repo at `core/workflows/<lane>.md`,
+    and a layout with neither must not be failed for a file it never had.
+
+    Why this check exists: three competencies shipped in v0.18.0 declaring
+    `applies: always` — two BA, one PM — and their lanes' workflows did not contain the
+    word "competency" anywhere. They were written, gated, indexed and deployed, and the
+    lane that needed them never read one line. Nothing noticed for a day because every
+    check verified the file and none verified the chain.
+    """
+    for cand in (root / "core" / "workflows" / f"{role}.md",
+                 root / ".claude" / "skills" / role / "SKILL.md"):
+        if cand.is_file():
+            text = cand.read_text(encoding="utf-8", errors="replace")
+            steps = re.findall(r"^## ([A-Z][0-9]+[a-z]?) —", text, re.M)
+            return steps, ("competenc" in text.lower())
+    return None
+
+
 def check_dir(root: Path, write_index: bool) -> list[str]:
     errs: list[str] = []
     if not root.is_dir():
@@ -130,6 +161,19 @@ def check_dir(root: Path, write_index: bool) -> list[str]:
         if not files:
             errs.append(f"{role}/: no competency files")
             continue
+        wf = workflow_steps(REPO_ROOT, role)
+        if wf is not None:
+            steps, lane_loads = wf
+            if not lane_loads:
+                errs.append(f"{role}/: the /{role} workflow never mentions competencies, so none "
+                            f"of its {len(files)} file(s) is ever read by the lane — a competency "
+                            f"the lane cannot reach is decoration")
+            for fname, meta in files:
+                ld = (meta.get("loads") or "").strip()
+                if steps and ld not in steps:
+                    errs.append(f"{role}/{fname}: loads {ld!r}, which is not a step in the "
+                                f"/{role} workflow (it has {', '.join(steps)}) — the row will "
+                                f"never be opened at a step that does not exist")
         want = index_text(role, files)
         idx = rd / "INDEX.md"
         if write_index:
@@ -214,6 +258,40 @@ somewhere
         errs = check_dir(root, False)
         assert any("stale" in e for e in errs), errs
     assert check_dir(Path("/nonexistent/competencies"), False)[0].startswith("/nonexistent")
+    # the CHAIN rules: a lane that never mentions competencies, and a loads value
+    # naming no step in that lane's workflow. Both shipped three unreachable
+    # competencies before anyone noticed.
+    with tempfile.TemporaryDirectory() as td:
+        r = Path(td)
+        (r / "core" / "workflows").mkdir(parents=True)
+        (r / "docs" / "team" / "competencies" / "dev").mkdir(parents=True)
+        (r / "core" / "workflows" / "dev.md").write_text(
+            "# /dev\n\n## T0 — a\n\n## T2 — b\n\nLoad the competencies this ticket needs.\n",
+            encoding="utf-8")
+        body = good.replace("loads: T2", "loads: T2")
+        (r / "docs" / "team" / "competencies" / "dev" / "dev-thing.md").write_text(body, encoding="utf-8")
+        import competency_check as _cc
+        old_root = _cc.REPO_ROOT
+        try:
+            _cc.REPO_ROOT = r
+            errs = _cc.check_dir(r / "docs" / "team" / "competencies", True)
+            assert not any("never mentions competencies" in e for e in errs), errs
+            # loads a step the workflow does not have
+            (r / "docs" / "team" / "competencies" / "dev" / "dev-thing.md").write_text(
+                body.replace("loads: T2", "loads: T9"), encoding="utf-8")
+            errs = _cc.check_dir(r / "docs" / "team" / "competencies", True)
+            assert any("is not a step in the /dev workflow" in e for e in errs), \
+                f"a loads naming no step must red: {errs}"
+            # a lane that never mentions competencies at all
+            (r / "docs" / "team" / "competencies" / "dev" / "dev-thing.md").write_text(body, encoding="utf-8")
+            (r / "core" / "workflows" / "dev.md").write_text(
+                "# /dev\n\n## T0 — a\n\n## T2 — b\n", encoding="utf-8")
+            errs = _cc.check_dir(r / "docs" / "team" / "competencies", True)
+            assert any("never mentions competencies" in e for e in errs), \
+                f"an unreachable lane must red: {errs}"
+        finally:
+            _cc.REPO_ROOT = old_root
+
     print("competency_check selftest: OK (valid file green + 7 mutations red + index missing/stale red)")
 
 

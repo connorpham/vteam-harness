@@ -64,24 +64,16 @@ the verification's first finding, not its failure.
   Blocking ambiguity → that case is `BLOCKED (decision needed)` with the
   question quoted; non-blocking → note and proceed. *Otherwise:* questions
   trickle out one at a time and each costs a day of latency.
+- **A criterion can pass all three lines and still test the wrong thing.** Ask it:
+  *if this check passed and the behaviour were still broken, what would that look
+  like?* An answerable question means the criterion measures a proxy — a source-code
+  search, a flag, a class name — and satisfying it proves nothing about the user's
+  experience. Verify the behaviour anyway and file the criterion as a finding against
+  the requirement, origin BA stage. *Otherwise:* you sign off a green check over a
+  live defect, and the criterion survives to do it again.
 - **Questions are about the text, never the writer.** "This sentence reads two
   ways — which is meant?" gets an answer; "this ticket is vague" gets a defence.
   *Otherwise:* the next ticket hides its gaps better.
-
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "Everyone knows what 'valid email' means." | The product, the RFC and the login form disagree three ways. Which rule, written where? |
-| "I'll test the clear parts first and ask later." | The unclear part decides the boundary case — you are testing around the requirement. |
-| "Asking makes me look slow." | The ambiguity found after testing costs the day AND the retest, and looks slower. |
-
-## Red flags
-
-- Your verify sheet has zero questions on a ticket of any real size.
-- An EXPECTED that paraphrases the ticket's own vague word ("shows an
-  appropriate error").
-- You inferred a rule from the code and wrote it as the expected value.
 
 ## Reviewer lens
 
@@ -97,3 +89,5 @@ the verification's first finding, not its failure.
 connorpham/ai-qa `requirement-smells.md` (the word table, the missing halves,
 the three-line test) · Gause & Weinberg, *Exploring Requirements* · vteam BA
 doctrine (3-condition gap questions).
+
+Rationalizations, red flags and a worked example live in `reference/qa-requirement-smells.md` — opened when needed, never loaded by default.

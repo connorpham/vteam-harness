@@ -64,23 +64,6 @@ The shapes that earn a place:
   (`qa-user-mindset`) — Enter instead of Save, double-click, Back after,
   refresh, paste. *Otherwise:* the pack proves the route, not the product.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "More cases = more coverage." | Ten valid emails test one thing ten times. Coverage is classes and consequences, not count. |
-| "The dev already tested the boundary." | The dev's tests are part of the claim. Yours are the check on it. |
-| "Exploratory is unstructured, skip it." | It is one named heuristic with a timebox and a written record — the only slot that can find the unknown unknown. |
-| "This ticket doesn't touch money." | It touches the order form. Follow the total anyway; that is one case. |
-
-## Red flags
-
-- Five cases, five valid inputs.
-- A "boundary" case whose input the spec accepts.
-- A lifecycle ticket with no illegal-transition case.
-- A pack for an auth/roles/money ticket with no ⑥.
-- No case reads data back after a write.
-
 ## Reviewer lens
 
 - Map each case to its shape ①–⑥; which shapes are missing, and does the ticket's consequence order justify that?
@@ -93,3 +76,5 @@ The shapes that earn a place:
 connorpham/ai-qa `test-design.md` (consequence order, the six shapes, both
 equivalence traps) · BMAD TEA risk-based testing (probability × impact →
 depth) · Kaner/Bach/Pettichord, *Lessons Learned in Software Testing*.
+
+Rationalizations, red flags and a worked example live in `reference/qa-test-design.md` — opened when needed, never loaded by default.

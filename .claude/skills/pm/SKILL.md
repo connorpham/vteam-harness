@@ -124,6 +124,19 @@ and keeps the beat:
 
 ## P1 — PICK THE WORK
 
+**Before the order is final, read back the `## Reviewer lens` of every competency you
+loaded and answer each item on today's actual board.** This lane spawns no challenger for
+the ordering — nobody else will ask these — so the lens is the only check the pick gets.
+Record the answers in one line each in the desk report at P4; a lens item you cannot
+answer is a pick you cannot defend.
+
+**Load the competencies this lane runs on, before ordering anything** — from
+`docs/team/competencies/pm/INDEX.md` (read the index, not the tree): every `always`
+row, plus any row a token matches on today's board. `pm-prioritisation` is `always` and
+governs the ordering this step exists to do — picking by what shouts loudest is the
+failure it is written against. *Until 2026-09-11 this lane never mentioned competencies,
+so that file was never read by the step that declares it.*
+
 An item is **UNBLOCKED** when all 7 hold: (a) no 🔴 OPEN question/action blocks
 it; (b) if it's a UI ticket, its **design oracle** exists — a real design link on
 the ticket (missing → dispatch the DESIGN lane first; the dev ticket queues right
@@ -259,6 +272,20 @@ fallback below (design APIs are read-only — the machine cannot create frames):
    WINS over the mockup; QA compares against it from then on.
 
 ## P-DECIDE — unblocking (the heart of the workflow)
+
+> **Closing a ticket the team decided NOT to do.** A won't-fix has no QA verdict to close
+> it, so it closes on the decision instead — and the decision has to be in a field, not in
+> prose. Write `- closed-by: <Qn|Dn>` in the ticket header, naming a row that already reads
+> `✅ DECIDED` in `docs/pm/decisions.md`. `graph_check` reds a terminal ticket that cites
+> nothing, cites a key the queue does not hold, or cites a question still open — *"a ticket
+> cannot be closed by a question"*. A sentence mentioning the decision does not close it:
+> "we will revisit this in Q2" used to, which is why the field exists.
+
+> Named, not numbered, and that is deliberate: this section plus `The SA lane` and
+> `The DESIGN lane` occupy the sequence slot between P2 and P4. `/pm` has no `P3`
+> for that reason, not by omission (decision D10). A competency for the SA or
+> DESIGN sub-lane declares `role: pm` and `loads: P2`, the step that dispatches them.
+
 
 1. Filter the decision queue: overdue first, then nearest deadline. **Expected-
    value exception:** a question whose recorded savings/risk is **≥2 person-days**

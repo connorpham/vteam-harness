@@ -15,6 +15,9 @@ Manifest step shape (vteam YAML subset):
                                      # nonzero exit → declared skip (same law as requires)
         skip_reason: "no package.json — not a Node project"
         tail: false                  # optional: only runs when the tail arg (e.g. e2e) is passed
+        advisory: true                 # optional, BOOLEAN: the step RUNS and PRINTS, but a
+                                       # nonzero exit is named on the closing banner instead
+                                       # of stopping the gate
 Rules the driver enforces:
   · A step with no `run` is a MANIFEST error (red), not a skip.
   · A step whose `requires` file is absent is skipped LOUDLY with its declared
@@ -25,6 +28,15 @@ Rules the driver enforces:
     RED, exactly like `requires`. Use it where file existence can't tell the
     truth (e.g. "is package.json's scripts.test a real suite?").
   · `tail: true` steps run only when their tail name is passed (gate.py e2e).
+    · `advisory: true` is for a check whose failure is a FACT ABOUT THE PROJECT, not a
+      defect in the change being gated — a stale sprint plan, an overdue decision.
+      Blocking a commit on those teaches people to bypass the gate, which is worse than
+      the condition. It is NOT the silent skip this driver exists to prevent: the step
+      runs, its output prints, and GREEN is never bare — every banner, both WEAK ones
+      included, names the advisories that failed. The value must be a real boolean; a
+      quoted string is truthy and a typo would quietly take a hard step out of the
+      blocking path. Read the TRUST BOUNDARY note below first: `advisory:` is a one-line
+      additive edit with a large blast radius.
   · `{package_manager}` / `{project.key}` in a `run` or `requires_cmd` are
     substituted from config (stack.package_manager, project.key) — manifests
     stay stack-agnostic.
@@ -83,6 +95,7 @@ def main() -> int:
         print(f"GATE: RED at manifest — profile {profile!r} declares no steps")
         return 1
     ran, skipped = [], []
+    advisory_failed = []
     for name, spec in steps.items():
         if not isinstance(spec, dict) or not spec.get("run"):
             print(f"GATE: RED at {name} — manifest step has no `run` (a step that "
@@ -122,21 +135,44 @@ def main() -> int:
         # BOUNDARY in the module docstring); the only shell exec in the framework.
         r = subprocess.run(cmd, shell=True, cwd=c.root)
         if r.returncode != 0:
+            adv = spec.get("advisory")
+            if adv is not None and not isinstance(adv, bool):
+                print(f"GATE: RED at {name} — `advisory` must be a YAML boolean, got "
+                      f"{adv!r}. A quoted string is truthy, so a typo would silently take "
+                      f"this step out of the blocking path.")
+                return 1
+            if adv:
+                advisory_failed.append(name)
+                ran.append(name)
+                continue
             print(f"GATE: RED at {name}")
             return 1
         ran.append(name)
     for name, why in skipped:
         print(f"⚠️  skipped {name}: {why}")
+    for name in advisory_failed:
+        print(f"🟡 advisory {name}: FAILED — reported, not blocking; the condition is "
+              f"about the project, not about this change")
     # Bookkeeping steps guard the ledgers, not the code. A green where ONLY they
     # ran is honest but weak — say so, loudly (field-trial finding #19: a Go repo
     # on the generic profile read as plain GREEN with zero verification run).
     # lockfile guards the dependency ledger, not behavior — it counts as
     # bookkeeping too (audit L5).
-    BOOKKEEPING = {"docs-shrink", "ledger", "verbatim", "lockfile", "graph", "competencies", "parallel", "coord", "bdd-report"}
+    # The four steps added in VT-17/VT-21 guard EVIDENCE and PROJECT STATE, never code
+    # behaviour, so they belong here: a reviewer showed that omitting them silently
+    # upgraded the strongest WEAK banner — a repo with zero code verification started
+    # reading as an ordinary green just because `evd` had run.
+    # Built BEFORE the banner branches: a GREEN line that omits a failing advisory is
+    # a GREEN line that lies, and the first version built this string inside one arm.
+    tail_note = (f" — {len(advisory_failed)} ADVISORY FAILED: "
+                 f"{', '.join(advisory_failed)}" if advisory_failed else "")
+    BOOKKEEPING = {"docs-shrink", "ledger", "verbatim", "lockfile", "graph", "competencies",
+                   "parallel", "coord", "bdd-report", "evd", "evd-ui", "schedule",
+                   "doctrine-source"}
     skipped_names = {s for s, _ in skipped}
     if all(s in BOOKKEEPING for s in ran):
         print(f"GATE: GREEN (WEAK — only bookkeeping steps ran, ZERO verification "
-              f"of the code; {len(skipped)} declared skips). Declare test/build "
+              f"of the code; {len(skipped)} declared skips){tail_note}. Declare test/build "
               f"entrypoints or switch to a stack profile that runs them.")
     elif skipped_names & {"unit", "test"}:
         # other real steps ran, but the SUITE didn't — a green that verified no
@@ -144,9 +180,10 @@ def main() -> int:
         # tests get an honest weak green, not a fake full one)
         print(f"GATE: GREEN (WEAK — no test suite ran; this repo has no automated "
               f"verification of behavior. {len(ran)} steps ran, "
-              f"{len(skipped)} declared skips)")
+              f"{len(skipped)} declared skips){tail_note}")
     else:
-        print(f"GATE: GREEN ({len(ran)} steps ran, {len(skipped)} declared skips)")
+        print(f"GATE: GREEN ({len(ran)} steps ran, {len(skipped)} declared skips)"
+              f"{tail_note}")
     return 0
 
 
@@ -232,6 +269,54 @@ def _selftest():
             and "probe says the tool is absent" in r.stdout, r.stdout
         assert "never" not in r.stdout, "a skipped step still ran"
 
+        # advisory must be a real boolean — a quoted string is truthy and would take a
+        # hard step out of the blocking path on a typo
+        root = setup("steps:\n  unit:\n    run: \"exit 1\"\n    advisory: \"false\"\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 1 and "must be a YAML boolean" in r.stdout, r.stdout
+
+        # an advisory failure must NOT upgrade a weak green: bookkeeping-only stays weak,
+        # and the banner still names the advisory
+        root = setup("steps:\n  ledger:\n    run: \"echo l\"\n"
+                     "  schedule:\n    run: \"exit 1\"\n    advisory: true\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert "WEAK" in r.stdout and "ADVISORY FAILED: schedule" in r.stdout, \
+            f"a weak green must stay weak AND name the advisory:\n{r.stdout}"
+
+        # a hard red AFTER an advisory failure still stops the run
+        root = setup("steps:\n  health:\n    run: \"exit 1\"\n    advisory: true\n"
+                     "  hard:\n    run: \"exit 1\"\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 1 and "RED at hard" in r.stdout, r.stdout
+
+        # advisory: the step RUNS, PRINTS, does not block — and GREEN is never bare
+        root = setup("steps:\n  real:\n    run: \"echo real-ran\"\n"
+                     "  health:\n    run: \"echo health-noise; exit 3\"\n"
+                     "    advisory: true\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 0, f"an advisory failure must not block:\n{r.stdout}"
+        assert "health-noise" in r.stdout, f"an advisory step must still PRINT:\n{r.stdout}"
+        assert "ADVISORY FAILED: health" in r.stdout, \
+            f"GREEN must never be bare while an advisory failed:\n{r.stdout}"
+
+        # advisory that PASSES leaves no banner
+        root = setup("steps:\n  health:\n    run: \"echo fine\"\n    advisory: true\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 0 and "ADVISORY FAILED" not in r.stdout, r.stdout
+
+        # advisory does NOT weaken a hard step: a red before it still stops the run
+        root = setup("steps:\n  hard:\n    run: \"exit 1\"\n"
+                     "  health:\n    run: \"echo never\"\n    advisory: true\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 1 and "RED at hard" in r.stdout, r.stdout
+        assert "never" not in r.stdout, "a step after a red must not run"
+
         # requires_cmd probe fails with NO skip_reason → RED, same law as requires
         root = setup("steps:\n  probed:\n    run: \"echo never\"\n"
                      "    requires_cmd: \"exit 7\"\n")
@@ -293,7 +378,11 @@ def _selftest():
             shutil.rmtree(root, ignore_errors=True)
     print("gate selftest: OK (green + substitution, red stops, run-less red, "
           "silent-skip red, declared skip loud, requires_cmd green/skip/red, "
-          "2 WEAK banners, echo-test tripwire)")
+          "2 WEAK banners, echo-test tripwire — advisory (6 fixtures): "
+          "fails-without-blocking, still-prints, banner on GREEN, passes silently "
+          "leaving no banner, non-boolean reds, a hard red BEFORE and AFTER it still "
+          "stops the "
+          "run, and a bookkeeping-only run stays WEAK while naming the advisory)")
 
 
 if __name__ == "__main__":

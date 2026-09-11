@@ -36,6 +36,7 @@ then the largest font the platform allows. A clean scan is never a pass.
 | Where focus goes when a dialog opens | Into the dialog, trapped inside, and **back to the trigger** on close | Focus dumped to the top of the page is the most common keyboard defect |
 | Does a placeholder count as a label | No — a linked label is required | The placeholder disappears on first keystroke and is often unread |
 | A finding with no spec | Cite the external standard (WCAG SC, HIG, Material) as the oracle | That makes the finding defensible without a spec |
+| Is one rendering mode enough | No — repeat the keyboard pass under `forced-colors: active` | Shadows are dropped there; ask "painted at all?", not "what ratio?" — the theme picks both colours |
 
 ## Rules
 
@@ -43,13 +44,15 @@ then the largest font the platform allows. A clean scan is never a pass.
   *Otherwise:* you pass a screen a keyboard user cannot leave.
 - **Watch the focus indicator throughout; losing it is the finding.** *Otherwise:*
   "focus is somewhere" gets recorded as fine.
+- **Re-walk the keyboard pass with forced colours on.** Chrome paints no `box-shadow`
+  there, so a `ring`-only indicator changes **zero** pixels while passing every
+  default-mode check. *Otherwise:* you certify an indicator invisible to exactly the
+  people who turned the setting on.
 - **Open every overlay, press `Esc`, and check where focus lands.** *Otherwise:* the
   trap works, the return does not, and nobody notices.
-- **Run the real screen reader (VoiceOver / TalkBack / NVDA), not just the
-  accessibility tree.** *Otherwise:* you verify that labels exist rather than that
-  they make sense in order.
-- **Read every icon-only control as the screen reader says it.** *Otherwise:*
-  "button button button" ships.
+- **Run the real screen reader (VoiceOver / TalkBack / NVDA), not the accessibility
+  tree, and listen to every icon-only control.** *Otherwise:* you verify that labels
+  exist rather than that they make sense in order, and "button button button" ships.
 - **Measure contrast; never eyeball it, and record the ratio.** *Otherwise:* your
   finding is an aesthetic opinion and gets dismissed.
 - **Cite the right criterion at the right level.** A 32px target is not a WCAG AA
@@ -62,14 +65,6 @@ then the largest font the platform allows. A clean scan is never a pass.
 - **When the ticket is silent on accessibility, verify anyway and cite the standard.**
   *Otherwise:* silence becomes permission, permanently.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The scanner says zero violations." | It cannot see focus order, focus return, or a meaningless label. Those are the expensive ones. |
-| "It's not in the acceptance criteria." | WCAG is the oracle when the spec is silent. Cite it. |
-| "Our users don't use screen readers." | You do not know that, and contrast, font scale and target size affect everyone. |
-| "The designer chose that grey." | Then they chose a measurable defect. Give them the ratio. |
 
 ## Red flags
 
@@ -101,6 +96,11 @@ each with a standard, a measured value and a repro step — none reported by the
 - Does every finding cite a standard, a measured value and the right level?
 
 ## Sources
+
+- `reference/forced-colors.md` — the second rendering mode: why a shadow-only
+  indicator disappears, the measurement recipe, and the measured numbers.
+- `reference/qa-accessibility-verification.md` — the rationalizations, opened when a
+  finding is pushed back on.
 
 Field study of `nilbuild/developer-roadmap` @ `74a645b`. The gap is measured: the
 `android` roadmap has **zero** accessibility topic nodes; `frontend` places

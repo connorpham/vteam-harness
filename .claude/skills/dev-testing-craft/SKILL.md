@@ -56,34 +56,6 @@ every rule. A test that has never been red has proven nothing.
 - **Don't test the framework or the mock.** *Otherwise:* thousands of lines of
   false confidence.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "Too simple to test." | Simple code breaks; the test takes 40 seconds. |
-| "I tested it manually." | Unrepeatable and unrecorded; gone with the session. |
-| "I'll write the tests after." | They will pass immediately and prove nothing. |
-| "Mocking the repository is easier." | You are testing that the mock returns what you told it to. |
-| "Coverage is 90%." | Coverage measures execution, not assertion. Mutate a line; did anything red? |
-
-## Red flags
-
-- `expect(result).toBeTruthy()` / `toBeDefined()` as the only assertion.
-- A test with `sleep`, `setTimeout`, or `Date.now()`.
-- A test file that mirrors the implementation's structure line for line.
-- Green on the first run of a new test.
-- A boundary tested on one side only.
-
-## Example
-
-```ts
-describe("Wallet.topUp", () => {
-  it("when amount equals the daily limit, accepts and balance increases by amount (spec §4.1)", …);
-  it("when amount exceeds the daily limit by 1, rejects LIMIT_EXCEEDED and balance is unchanged (spec §4.1)", …);
-  it("when two top-ups run concurrently, balance reflects both (spec §4.3 atomicity)", …);
-});
-```
-
 ## Reviewer lens
 
 - For each rule in the spec touched by the diff: where is the pair (last valid, first invalid)?
@@ -96,3 +68,5 @@ goldbergyoni/javascript-testing-best-practices (3-part names, AAA, black-box,
 realistic data) · BMAD TEA test-quality standards (determinism, isolation,
 explicit assertions) and risk-based P0–P3 · obra/superpowers
 `test-driven-development` (red first, rationalizations).
+
+Rationalizations, red flags and a worked example live in `reference/dev-testing-craft.md` — opened when needed, never loaded by default.
