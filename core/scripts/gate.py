@@ -378,8 +378,10 @@ def _selftest():
             shutil.rmtree(root, ignore_errors=True)
     print("gate selftest: OK (green + substitution, red stops, run-less red, "
           "silent-skip red, declared skip loud, requires_cmd green/skip/red, "
-          "2 WEAK banners, echo-test tripwire, advisory: fails-without-blocking, "
-          "still-prints, banners on GREEN, passes silently, never softens a hard red)")
+          "2 WEAK banners, echo-test tripwire — advisory (6 fixtures): "
+          "fails-without-blocking, still-prints, banner on GREEN, passes silently "
+          "leaving no banner, non-boolean reds, a hard red after it still stops the "
+          "run, and a bookkeeping-only run stays WEAK while naming the advisory)")
 
 
 if __name__ == "__main__":

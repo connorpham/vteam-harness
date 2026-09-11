@@ -145,15 +145,19 @@ export class ManifestGuard {
   }
 
   save(version) {
-    // carry the ownership declaration forward — it is the repo's, not the run's
+    // The ownership declaration is the REPO's, not the run's, so it is carried
+    // forward as written. Both flags guard it: splitting the "malformed" message in
+    // review round 2 moved the partial case off the flag this used to read, and a
+    // list with one `..` entry got rewritten — the user's hand-written lines deleted
+    // silently, and only once, because the warning cannot fire again after the entry
+    // is gone. A `..` is far likelier to be a typo for a path they meant to own.
+    const ownedOut = (this.ownedInvalid || this.ownedPartial)
+      ? (this.old?.owned ?? [])
+      : [...this.ownedDecl];
     const sorted = Object.fromEntries(Object.entries(this.files).sort(([a], [b]) => a.localeCompare(b)));
-    this._put(MANIFEST_REL, JSON.stringify({ // BOTH flags. Splitting the message in round 2 moved the partial case off the
-    // flag this guard reads, so a list with one bad entry got rewritten and the
-    // user's hand-written lines vanished — silently, and only once, because the
-    // warning cannot fire again after the entry is gone. A `..` is far more likely
-    // to be a typo for a path they meant to own than junk to tidy away.
-    owned: (this.ownedInvalid || this.ownedPartial) ? (this.old?.owned ?? []) : [...this.ownedDecl], version, files: sorted }, null, 2) + "\n");
+    this._put(MANIFEST_REL, JSON.stringify({ owned: ownedOut, version, files: sorted }, null, 2) + "\n");
   }
+
 }
 
 /** Build junk that must never be copied into an install or recorded in the
