@@ -50,3 +50,17 @@ and for a gate, run it **after** the commit, never before. For a structured arte
 **Cheapest guard for a script that edits files:** assert the replacement happened.
 `assert s.count(old) == 1` before writing turns a silent no-op into a stack trace — this session
 used it in most places and every miss above is where it did not.
+
+**Addendum, found the round after this entry was written.** "The tree is clean" is a claim like any
+other, and `git status --porcelain` is its `grep -c`. This entry's four instances are all about
+reading back a *file*; the fifth was about reading back the *tree*. The report said "clean tree: 0
+dirty files" — true when the command ran, and then `vteam update` rewrote the deployed mirror and
+nobody looked again. `HEAD` shipped with the fix in `core/scripts/gate.py` and the old driver in
+`.vteam/scripts/gate.py`, which is the copy this repo actually executes, and `doctor` could not see
+it because it compares the mirror against the manifest and both were stale together.
+
+So the round-3 diagnosis — *"true of the working tree, false of the branch"* — runs in both
+directions. That time the commit was missing from the check; this time the check was missing a
+commit. **Produce a state report by running the command at the moment you write it**, not by
+remembering that you saved everything.
+
