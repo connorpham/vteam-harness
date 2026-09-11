@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 MAX_WORDS = 1100
 REQUIRED_SECTIONS = ["Identity", "When this applies", "Decide", "Rules", "Reviewer lens", "Sources"]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 REQUIRED_META = ["name", "description", "role", "loads", "applies"]
 APPLIES = re.compile(r"^(always|label:[\w-]+|path:[\w./-]+|profile:[\w-]+|term:[\w-]+|type:[A-Za-z][\w -]*)$")
 # A description that narrates the procedure ("first X, then Y → Z") is the
@@ -119,6 +120,28 @@ def index_text(role: str, files: list[tuple[str, dict[str, str]]]) -> str:
             + "\n".join(rows) + "\n")
 
 
+def workflow_steps(root: Path, role: str) -> tuple[list[str], bool] | None:
+    """(steps, does the lane load competencies at all) for a role's workflow.
+
+    Returns None when the workflow cannot be found — a consumer repo may hold it at
+    `.claude/skills/<lane>/SKILL.md`, the framework repo at `core/workflows/<lane>.md`,
+    and a layout with neither must not be failed for a file it never had.
+
+    Why this check exists: three competencies shipped in v0.18.0 declaring
+    `applies: always` — two BA, one PM — and their lanes' workflows did not contain the
+    word "competency" anywhere. They were written, gated, indexed and deployed, and the
+    lane that needed them never read one line. Nothing noticed for a day because every
+    check verified the file and none verified the chain.
+    """
+    for cand in (root / "core" / "workflows" / f"{role}.md",
+                 root / ".claude" / "skills" / role / "SKILL.md"):
+        if cand.is_file():
+            text = cand.read_text(encoding="utf-8", errors="replace")
+            steps = re.findall(r"^## ([A-Z][0-9]+[a-z]?) —", text, re.M)
+            return steps, ("competenc" in text.lower())
+    return None
+
+
 def check_dir(root: Path, write_index: bool) -> list[str]:
     errs: list[str] = []
     if not root.is_dir():
@@ -138,6 +161,19 @@ def check_dir(root: Path, write_index: bool) -> list[str]:
         if not files:
             errs.append(f"{role}/: no competency files")
             continue
+        wf = workflow_steps(REPO_ROOT, role)
+        if wf is not None:
+            steps, lane_loads = wf
+            if not lane_loads:
+                errs.append(f"{role}/: the /{role} workflow never mentions competencies, so none "
+                            f"of its {len(files)} file(s) is ever read by the lane — a competency "
+                            f"the lane cannot reach is decoration")
+            for fname, meta in files:
+                ld = (meta.get("loads") or "").strip()
+                if steps and ld not in steps:
+                    errs.append(f"{role}/{fname}: loads {ld!r}, which is not a step in the "
+                                f"/{role} workflow (it has {', '.join(steps)}) — the row will "
+                                f"never be opened at a step that does not exist")
         want = index_text(role, files)
         idx = rd / "INDEX.md"
         if write_index:

@@ -86,6 +86,17 @@ stop without it.
 
 ## B2 — SHARD THE SPEC (if not yet sharded) + DECOMPOSE INTO STORIES
 
+**Load the competencies this lane runs on, before writing a single story** — from
+`{paths.team}/competencies/ba/INDEX.md` (read the index, not the tree): every row whose
+`Applies` says `always`, plus every row a token matches on the feature in front of you.
+Both `always` rows are load-bearing here — `ba-story-slicing` governs the decomposition
+you are about to do, and `ba-acceptance-criteria` governs every `Then` you are about to
+write, including the question that criterion must survive: *if this check passed and the
+behaviour were still broken, what would that look like?* Name the loaded list in the
+story's **Competencies:** line. *Until 2026-09-11 this lane never mentioned competencies
+at all, so both files were written, gated, deployed — and never read by the lane that
+needs them.*
+
 - **Shard**: one file per feature in `{paths.specs}/<feature>.md` holding the
   requirements VERBATIM (no interpretation), section-numbered, plus one row in
   `{paths.specs}/INDEX.md` (feature | file | scope). This is the citable oracle

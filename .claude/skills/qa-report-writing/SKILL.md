@@ -41,8 +41,10 @@ Appendix (technical). The verdict word in the reader's terms, then the ladder.
 - **The verdict is a word a non-programmer can act on**: not "assertion failed"
   but "customers are overcharged". *Otherwise:* the person who decides priority
   cannot read their own release's risk.
-- **Every claim in the report has an evidence file behind it**; the report says
-  which. *Otherwise:* the report is testimony and the folder is decoration.
+- **Name the evidence file beside every claim**, not merely have one — the rule that
+  each claim is backed lives in `qa-identity`, which loads first; what this lane owes is
+  the pointer, in the report, next to the sentence it proves. *Otherwise:* the reader has
+  a folder and a verdict and no way to walk from one to the other.
 - **Screenshots are named for what they show** (`01_orders_list.png`, not
   `01.png`); the step that carried the verdict gets a box and a caption naming
   what it proves. *Otherwise:* the reader guesses which pixels mattered.

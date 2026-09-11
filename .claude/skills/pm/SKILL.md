@@ -124,6 +124,13 @@ and keeps the beat:
 
 ## P1 — PICK THE WORK
 
+**Load the competencies this lane runs on, before ordering anything** — from
+`docs/team/competencies/pm/INDEX.md` (read the index, not the tree): every `always`
+row, plus any row a token matches on today's board. `pm-prioritisation` is `always` and
+governs the ordering this step exists to do — picking by what shouts loudest is the
+failure it is written against. *Until 2026-09-11 this lane never mentioned competencies,
+so that file was never read by the step that declares it.*
+
 An item is **UNBLOCKED** when all 7 hold: (a) no 🔴 OPEN question/action blocks
 it; (b) if it's a UI ticket, its **design oracle** exists — a real design link on
 the ticket (missing → dispatch the DESIGN lane first; the dev ticket queues right
