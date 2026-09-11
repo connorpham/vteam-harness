@@ -25,9 +25,10 @@ Usage:
   route_check.py --weak                   only the rows that look like a routing fault
   route_check.py --json                   machine-readable
 
-Exit code is 0 unless --strict is passed, in which case a ticket whose routed set is
-empty for a lane that has routable competencies exits 1. Default is a REPORT, not a
-gate: what counts as over-routing is a judgement the owner has not yet made.
+Exit code is 0 unless --strict is passed, in which case a ticket/lane pair carrying a
+BODY-ONLY match (over-routing) exits 1. An earlier docstring described the opposite —
+under-routing — which would have wired the wrong rule into a gate. Default is a REPORT:
+what counts as over-routing is a judgement the owner has not yet made (D13).
 """
 import argparse, json, pathlib, re, sys
 
@@ -93,7 +94,37 @@ def ticket_fields(text):
 
 def where(term, fields):
     """Every field this term appears in, structural fields first."""
-    pat = re.compile(r"\b" + re.escape(term), re.I)
+    # A word, and its ordinary inflections — nothing more.
+    #
+    # Two mistakes were made here in two rounds and both are worth keeping in view. A
+    # bare leading `\b` made every token a PREFIX match (`lock` hit "lockfile",
+    # `api` hit "apiary"), inflating every body-only count. Adding only `(?:s|es)?`
+    # then over-corrected: a reviewer showed it loses the verb forms English tickets
+    # actually use — "the row is locked", "we are locking", "the value is cached",
+    # "synced nightly" — and on this repo's own backlog it lost `term:concurrent`
+    # against "concurrently", a TRUE match for dev-concurrency-and-transactions.
+    # Under-routing is the silent direction, so it is the more expensive one to be
+    # wrong in (VT-16 rejected its own narrowing on exactly that reasoning).
+    #
+    # THE SUFFIX SET WAS CHOSEN BY MEASUREMENT, not by intuition. Counting term-driven
+    # matches across both real backlogs:
+    #
+    #   (?:s|es)?            92 — recovers nothing the prefix version had
+    #   (?:s|es|ly)?         93 — recovers "concurrently" (a TRUE match for
+    #                             dev-concurrency-and-transactions on VT-5) and nothing false
+    #   (?:s|es|d|ed|ing|ly)? 97 — recovers that one TRUE match and FOUR false ones,
+    #                             all of them `term:form` against the word "formed"
+    #
+    # So `-ed`/`-ing` is rejected on evidence: it turns a noun into an unrelated word
+    # more often than it catches a verb. The reviewer's cases — "the row is locked",
+    # "the value is cached" — are real English and would be true matches, but they occur
+    # in neither backlog; widen the day one appears, with the same split published.
+    #
+    # A `y` stem also takes `-ies` ("query" → "queries"), which a suffix list cannot express.
+    stem = re.escape(term)
+    if term.endswith("y"):
+        stem = f"(?:{re.escape(term)}|{re.escape(term[:-1])}ies)"
+    pat = re.compile(r"\b" + stem + r"(?:s|es|ly)?\b", re.I)
     hits = [f for f in STRUCTURAL if f != "labels" and pat.search(fields.get(f) or "")]
     if any(pat.search(l) for l in fields["labels"]):
         hits.insert(0, "labels")
@@ -112,7 +143,12 @@ def route(fields, comps, role, profile=None):
             continue
         hits = []
         for tok in c["applies"]:
-            if tok.startswith("label:") and tok[6:] in fields["labels"]:
+            # Case-folded, like `type:` below. The two kinds had OPPOSITE case rules —
+            # `type: bug` matched `type:Bug` while `labels: UI` missed `label:ui` — which
+            # nobody decided; it was two lines in one function, failing in the silent
+            # under-routing direction. Whether label matching should be looser than this
+            # is D13's call; an accidental asymmetry is not.
+            if tok.startswith("label:") and tok[6:].lower() in {l.lower() for l in fields["labels"]}:
                 hits.append((tok, ["labels"]))
             elif tok.startswith("profile:"):
                 # the repo's stack profile — constant for a repo, so it either applies to
@@ -168,8 +204,12 @@ def main():
     # the script happens to run from. Reading the wrong one silently drops every
     # `profile:` match and undercounts the load — which is how the first version of this
     # measurement understated the real figure by 14%.
-    bl_arg = pathlib.Path(a.backlog)
-    target_root = bl_arg.resolve().parent.parent if bl_arg.is_absolute() else ROOT
+    # resolve() FIRST, so a relative --backlog pointing at another repo finds that
+    # repo's config too. The first version keyed on is_absolute(), so the same
+    # directory measured by a relative path silently lost every `profile:` match —
+    # the very undercount VT-20 was written to correct, surviving in half the inputs.
+    bl_arg = pathlib.Path(a.backlog).resolve()
+    target_root = bl_arg.parent.parent
     profile = None
     for cfg in (target_root / "vteam.config.yaml", ROOT / "vteam.config.yaml"):
         if cfg.is_file():
@@ -235,5 +275,93 @@ def main():
     return 1 if (a.strict and bad) else 0
 
 
+def _selftest() -> None:
+    """The file that produced four different answers for one measurement, guarded.
+
+    Every branch below is a mistake this script actually shipped: a prefix match, a
+    profile dropped on a relative path, an ignored token kind, and a `--strict`
+    contract documented backwards.
+    """
+    import tempfile, textwrap
+    fails = []
+
+    def comp(name, role, applies, words=100):
+        return {name: {"role": role, "loads": "T2", "words": words,
+                       "applies": [t.strip() for t in applies.split(",")], "path": name}}
+
+    # term: must match a whole word, not a prefix — `lock` is not `lockfile`
+    f = ticket_fields("# T-1: a\n- type: Bug\n- labels: x\n\nthe lockfile_check step passes\n")
+    a, r = route(f, comp("c", "dev", "term:lock"), "dev")
+    if r: fails.append("term:lock matched 'lockfile' — the trailing boundary is missing")
+    # …but a real occurrence, and its plural, must match
+    for body, why in (("we take a row lock here", "singular"), ("two locks are taken", "plural")):
+        f = ticket_fields(f"# T-1: a\n- labels: x\n\n{body}\n")
+        if not route(f, comp("c", "dev", "term:lock"), "dev")[1]:
+            fails.append(f"term:lock missed the {why} occurrence")
+
+    # inflections the second round lost, and the prefixes the first round wrongly kept
+    for term, body, want in (
+        # -ly and plurals are in; -ed/-ing are OUT, measured: on both real backlogs they
+        # recover one true match and four false ones ("form" vs "formed"). These two
+        # assert the rejected direction stays rejected, so a future widening is deliberate.
+        ("lock", "the row is locked", False), ("cache", "the value is cached", False),
+        ("concurrent", "it runs concurrently", True), ("query", "two queries per request", True),
+        ("retry", "three retries later", True), ("form", "the criteria are formed", False),
+        ("lock", "lockfile_check passes", False), ("form", "the output format", False),
+        ("api", "an apiary of bees", False),
+    ):
+        f = ticket_fields(f"# T: a\n- labels: x\n\n{body}\n")
+        got = bool(route(f, comp("c", "dev", f"term:{term}"), "dev")[1])
+        if got != want:
+            fails.append(f"term:{term} vs {body!r}: expected {want}, got {got}")
+
+    # label: is case-folded, like type: — the asymmetry was an accident, not a policy
+    f = ticket_fields("# T: a\n- labels: UI, Backend\n\nb\n")
+    if not route(f, comp("c", "dev", "label:ui"), "dev")[1]:
+        fails.append("label:ui missed a ticket labelled UI — the case asymmetry is back")
+
+    # type: reads the ticket's own field, and only that
+    f = ticket_fields("# T-2: a\n- type: Bug\n- labels: x\n\nno such word here\n")
+    if not route(f, comp("c", "dev", "type:Bug"), "dev")[1]:
+        fails.append("type:Bug did not match a ticket whose type field is Bug")
+    f = ticket_fields("# T-3: a\n- type: Story\n- labels: x\n\nthis mentions a bug in prose\n")
+    if route(f, comp("c", "dev", "type:Bug"), "dev")[1]:
+        fails.append("type:Bug matched a Story that merely says 'bug'")
+
+    # profile: matches the measured repo's profile, and is not silently dropped
+    f = ticket_fields("# T-4: a\n- labels: x\n\nbody\n")
+    if not route(f, comp("c", "dev", "profile:nextjs-prisma"), "dev", "nextjs-prisma")[1]:
+        fails.append("profile: did not match when the profile was supplied")
+    if route(f, comp("c", "dev", "profile:nextjs-prisma"), "dev", None)[1]:
+        fails.append("profile: matched with no profile resolved — that is the undercount bug")
+
+    # path: prefers CODE-SCOPE and says so; falls back to a labelled estimate
+    f = ticket_fields("# T-5: a\n- labels: x\n\ntouches src/api/thing.ts\n")
+    f["code_scope"] = ["apps/web/src/api/"]
+    _, r = route(f, comp("c", "dev", "path:src/api/"), "dev")
+    if not r or r[0]["hits"][0][1] != ["code-scope"]:
+        fails.append("path: did not resolve through CODE-SCOPE when one exists")
+    f["code_scope"] = None
+    _, r = route(f, comp("c", "dev", "path:src/api/"), "dev")
+    if not r or "path-mentioned-no-tasksheet" not in r[0]["hits"][0][1]:
+        fails.append("path: fallback is not labelled as an estimate")
+
+    # a body-only match is flagged, a structural one is not
+    f = ticket_fields("# T-6: a\n- labels: ui\n\nbody\n")
+    _, r = route(f, comp("c", "dev", "label:ui"), "dev")
+    if not r[0]["structural"]:
+        fails.append("a label match was not counted as structural")
+
+    if fails:
+        for x in fails:
+            print(f"  ✗ {x}")
+        raise SystemExit("route_check selftest: FAILED")
+    print("route_check selftest: OK (term whole-word + plural, type from the field not the prose, "
+          "profile present/absent, path via CODE-SCOPE vs labelled estimate, structural vs body-only)")
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    if "--selftest" in sys.argv:
+        _selftest()
+    else:
+        sys.exit(main())

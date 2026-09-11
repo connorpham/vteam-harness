@@ -39,7 +39,23 @@ export class ManifestGuard {
     // the hour. Worse, the parked file is where upstream improvements land, so a fork
     // silently stops receiving them. `owned` in the manifest ends the chore and keeps
     // the signal: update reports, once, that upstream moved under a file you own.
-    this.ownedDecl = new Set(this.old?.owned ?? []);
+    const decl = this.old?.owned;
+    // Validated, because a reviewer got a bare string character-split into a bogus
+    // array AND written back over the user's hand-edit. A malformed declaration is
+    // reported and IGNORED; it is never silently rewritten.
+    this.ownedInvalid = null;
+    this.ownedPartial = null;
+    if (decl === undefined || decl === null) {
+      this.ownedDecl = new Set();
+    } else if (Array.isArray(decl) && decl.every((x) => typeof x === "string")) {
+      this.ownedDecl = new Set(decl.filter((x) => x && !x.includes("..")));
+      const dropped = decl.filter((x) => !x || x.includes(".."));
+      if (dropped.length) this.ownedPartial = `${dropped.length} owned entr${dropped.length === 1 ? "y" : "ies"} ignored (empty, or containing "..")`;
+    } else {
+      this.ownedDecl = new Set();
+      this.ownedInvalid = `\`owned\` must be a list of path strings, got ${Array.isArray(decl) ? "a list with non-strings" : typeof decl}`;
+    }
+    this.ownedMatched = new Set();
   }
 
   _abs(rel) { return path.join(this.root, ...rel.split("/")); }
@@ -68,6 +84,12 @@ export class ManifestGuard {
   sync(rel, content, mode) {
     const abs = this._abs(rel);
     const newHash = sha256(content);
+    // Record the match FIRST. `ownedMatched` decides whether update warns "this owned
+    // path matched no framework file", and it used to be set only inside the owned
+    // branch — which sits below the two fast paths. So every owned path that was
+    // currently in sync got told it matched nothing, in the most ordinary steady state
+    // there is, and right after the hand-merge the feature exists for.
+    if (this.ownedDecl.has(rel)) this.ownedMatched.add(rel);
     if (!fs.existsSync(abs)) {              // new framework file
       this._put(rel, content, mode);
       this.files[rel] = newHash;
@@ -78,18 +100,26 @@ export class ManifestGuard {
       this.files[rel] = newHash;
       return "current";
     }
+    // Declared as owned by this repo: do not clobber AND do not park. Report that
+    // upstream moved — the signal without the file to delete every time.
+    //
+    // This sits ABOVE the refresh branch on purpose. A reviewer found it below, where
+    // the guarantee silently lapsed the moment a fork happened to be byte-identical to
+    // the package — which is exactly what happens right after someone merges upstream
+    // by hand. The declaration must hold whether or not the file has diverged yet.
+    if (this.ownedDecl.has(rel)) {
+      // Reached only when the file HAS diverged — the equality case returned above —
+      // so this is unconditionally "upstream moved under a file you own".
+      this.owned.push(rel);
+      // The recorded hash is the FRAMEWORK's last-known one, never the user's bytes.
+      // That is what keeps the guard from later mistaking a fork for framework content.
+      this.files[rel] = this.old?.files?.[rel] ?? newHash;
+      return "owned";
+    }
     if (this.old?.files?.[rel] === curHash) { // user-unmodified → safe to refresh
       this._put(rel, content, mode);
       this.files[rel] = newHash;
       return "written";
-    }
-    // Declared as owned by this repo: do not clobber AND do not park. Report that
-    // upstream moved, with the hash so a reader can tell "changed since I forked"
-    // from "unchanged" — the signal without the file to delete every time.
-    if (this.ownedDecl.has(rel)) {
-      this.owned.push(rel);
-      if (this.old?.files?.[rel]) this.files[rel] = this.old.files[rel];
-      return "owned";
     }
     // user-modified (or unowned): never clobber — park the new version beside it.
     this._put(`${rel}.new`, content, mode);
@@ -117,7 +147,7 @@ export class ManifestGuard {
   save(version) {
     // carry the ownership declaration forward — it is the repo's, not the run's
     const sorted = Object.fromEntries(Object.entries(this.files).sort(([a], [b]) => a.localeCompare(b)));
-    this._put(MANIFEST_REL, JSON.stringify({ owned: [...this.ownedDecl], version, files: sorted }, null, 2) + "\n");
+    this._put(MANIFEST_REL, JSON.stringify({ owned: this.ownedInvalid ? (this.old?.owned ?? []) : [...this.ownedDecl], version, files: sorted }, null, 2) + "\n");
   }
 }
 

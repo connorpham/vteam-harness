@@ -258,6 +258,40 @@ somewhere
         errs = check_dir(root, False)
         assert any("stale" in e for e in errs), errs
     assert check_dir(Path("/nonexistent/competencies"), False)[0].startswith("/nonexistent")
+    # the CHAIN rules: a lane that never mentions competencies, and a loads value
+    # naming no step in that lane's workflow. Both shipped three unreachable
+    # competencies before anyone noticed.
+    with tempfile.TemporaryDirectory() as td:
+        r = Path(td)
+        (r / "core" / "workflows").mkdir(parents=True)
+        (r / "docs" / "team" / "competencies" / "dev").mkdir(parents=True)
+        (r / "core" / "workflows" / "dev.md").write_text(
+            "# /dev\n\n## T0 — a\n\n## T2 — b\n\nLoad the competencies this ticket needs.\n",
+            encoding="utf-8")
+        body = good.replace("loads: T2", "loads: T2")
+        (r / "docs" / "team" / "competencies" / "dev" / "dev-thing.md").write_text(body, encoding="utf-8")
+        import competency_check as _cc
+        old_root = _cc.REPO_ROOT
+        try:
+            _cc.REPO_ROOT = r
+            errs = _cc.check_dir(r / "docs" / "team" / "competencies", True)
+            assert not any("never mentions competencies" in e for e in errs), errs
+            # loads a step the workflow does not have
+            (r / "docs" / "team" / "competencies" / "dev" / "dev-thing.md").write_text(
+                body.replace("loads: T2", "loads: T9"), encoding="utf-8")
+            errs = _cc.check_dir(r / "docs" / "team" / "competencies", True)
+            assert any("is not a step in the /dev workflow" in e for e in errs), \
+                f"a loads naming no step must red: {errs}"
+            # a lane that never mentions competencies at all
+            (r / "docs" / "team" / "competencies" / "dev" / "dev-thing.md").write_text(body, encoding="utf-8")
+            (r / "core" / "workflows" / "dev.md").write_text(
+                "# /dev\n\n## T0 — a\n\n## T2 — b\n", encoding="utf-8")
+            errs = _cc.check_dir(r / "docs" / "team" / "competencies", True)
+            assert any("never mentions competencies" in e for e in errs), \
+                f"an unreachable lane must red: {errs}"
+        finally:
+            _cc.REPO_ROOT = old_root
+
     print("competency_check selftest: OK (valid file green + 7 mutations red + index missing/stale red)")
 
 

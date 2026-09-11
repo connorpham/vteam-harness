@@ -101,7 +101,17 @@ export async function doctor(flags) {
     // reporting this framework exists to kill
     const list = (a) => a.slice(0, 5).join(", ") + (a.length > 5 ? ` (+${a.length - 5} more)` : "");
     if (gone.length) bad(`${gone.length} manifest-owned file(s) missing — re-run vteam update: ${list(gone)}`);
-    if (edited.length) warn(`${edited.length} framework file(s) locally modified — update will keep yours and park new versions as *.new: ${list(edited)}`);
+    if (edited.length) {
+      const mf = JSON.parse(fs.readFileSync(path.join(root, ".vteam", "manifest.json"), "utf8"));
+      const owned = new Set(Array.isArray(mf.owned) ? mf.owned : []);
+      const parked = edited.filter((f) => !owned.has(f));
+      const kept = edited.filter((f) => owned.has(f));
+      if (parked.length)
+        warn(`${parked.length} framework file(s) locally modified — update will keep yours and park new versions as *.new: ${list(parked)}`);
+      // Owned paths are never parked, so saying they will be is the wrong story.
+      if (kept.length)
+        ok(`${kept.length} framework file(s) declared owned — update keeps yours and parks NOTHING, reporting each run that upstream moved: ${list(kept)}`);
+    }
     if (!gone.length && !edited.length) ok(`manifest verified (${Object.keys(manifest.files).length} framework-owned files intact)`);
   }
 

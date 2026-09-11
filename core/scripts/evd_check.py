@@ -410,6 +410,26 @@ def attach_all(evd: Path, ticket: str) -> int:
     return 0
 
 
+def closure_statuses(c) -> set[str]:
+    """The statuses this repo calls closed, from config — not a hardcoded guess.
+
+    The first version tested only the literal `done`, while this project's own config
+    declares `done_statuses: [Done, Closed, Resolved]`. A reviewer closed a pack that
+    claims three cases and holds one simply by writing `Closed` — the exact failure
+    VT-17 added this sweep to catch, passing through the sweep itself.
+    """
+    v = c.cfg("tracker.done_statuses", ["Done"])
+    if isinstance(v, str):
+        v = [x.strip() for x in v.strip("[]").split(",")]
+    elif not isinstance(v, (list, tuple, set)):
+        v = [v]                      # a scalar (5, true) raised TypeError inside a gate step
+    out = {str(x).strip().lower() for x in (v or []) if x is not None and str(x).strip()}
+    # An empty set means NOTHING is ever closed, which silently restores the very
+    # condition this function was written to end. Fall back to the documented default
+    # rather than disarming the sweep.
+    return out or {"done"}
+
+
 def sweep(evidence_root: Path, backlog: Path, verbs: list[str], strict_statuses=("done",)) -> int:
     """Check every pack that carries a verdict, without being told which ticket.
 
@@ -441,7 +461,7 @@ def sweep(evidence_root: Path, backlog: Path, verbs: list[str], strict_statuses=
         print(f"✅ evd_check --sweep: no pack under {evidence_root} carries a REPORT.md yet")
         return 0
 
-    bad, warned, ok = [], [], []
+    bad, warned, ok, unresolved = [], [], [], []
     for pack in packs:
         st = status_of(pack.name)
         cited = {int(n) for n in re.findall(r"\bTC[_-](\d+)", read(pack / "REPORT.md"))}
@@ -457,7 +477,14 @@ def sweep(evidence_root: Path, backlog: Path, verbs: list[str], strict_statuses=
             ok.append(line)
             continue
         entry = (line, errs)
-        closed = st.strip().lower() in strict_statuses
+        stl = st.strip().lower()
+        if not stl or stl in ("(no ticket)", "(no status)", "unknown"):
+            # Unresolvable status — e.g. a Jira/Linear tracker this sweep cannot read.
+            # A silent pass here would make the whole gate step permanently green on
+            # those repos, so it is a DECLARED skip instead.
+            unresolved.append(line)
+            continue
+        closed = stl in strict_statuses
         (bad if (closed and not legacy) else warned).append(entry)
 
     for line in ok:
@@ -469,6 +496,9 @@ def sweep(evidence_root: Path, backlog: Path, verbs: list[str], strict_statuses=
             print(f"     - {e}")
         if len(errs) > 4:
             print(f"     … and {len(errs) - 4} more")
+    for line in unresolved:
+        print(f"⚠️  {line}: status could not be read from the tracker — the pack was checked "
+              f"but its closure state is unknown, so nothing is failed on it")
     for line, errs in bad:
         print(f"❌ {line}: {len(errs)} problem(s), and the ticket is closed")
         for e in errs:
@@ -477,7 +507,9 @@ def sweep(evidence_root: Path, backlog: Path, verbs: list[str], strict_statuses=
         print(f"evd_check --sweep: {len(bad)} closed ticket(s) carry a pack that does not "
               f"meet the standard. A verdict is a claim; the pack is the claim's proof.")
         return 1
-    print(f"✅ evd_check --sweep: {len(ok)} pack(s) green, {len(warned)} reported without failing")
+    tail = f", {len(unresolved)} with an unreadable status" if unresolved else ""
+    print(f"✅ evd_check --sweep: {len(ok)} pack(s) green, {len(warned)} reported "
+          f"without failing{tail}")
     return 0
 
 
@@ -498,7 +530,7 @@ def main():
         verbs = vocab(c).get("write_verbs", [])
         ev = Path(args.evd) if args.evd else c.root / c.cfg("paths.evidence", "evd")
         bl = Path(args.backlog) if args.backlog else c.root / c.cfg("paths.backlog", "docs/backlog")
-        sys.exit(sweep(ev, bl, verbs))
+        sys.exit(sweep(ev, bl, verbs, tuple(closure_statuses(c))))
     if not args.evd:
         ap.error("--evd is required unless --sweep is passed")
     evd = Path(args.evd)
@@ -738,6 +770,22 @@ def _selftest():
             assert any("index no longer matches" in x for x in got), f"a stale index must red: {got}"
         # the legacy fixture (no KIND anywhere) got these only as WARNINGS — asserted green above
         assert any("no KIND" in w for w in _) if False else True
+    # --sweep: the closure set comes from config, not from the literal "done"
+    with tempfile.TemporaryDirectory() as td:
+        r = Path(td); (r / "docs" / "backlog").mkdir(parents=True)
+        pack = r / "evd" / "P-1"; (pack / "TC_1_a").mkdir(parents=True)
+        (pack / "REPORT.md").write_text("# Verification report P-1 — PASS\nsees TC_1, TC_2, TC_3\n")
+        (pack / "TC_1_a" / "manifest.md").write_text("KIND: acceptance\nRESULT: PASS\n")
+        for st, must_fail in (("Done", True), ("Closed", True), ("Resolved", True),
+                              ("In Review", False)):
+            (r / "docs" / "backlog" / "P-1.md").write_text(f"# P-1: t\n- status: {st}\n\nb\n")
+            rc = sweep(r / "evd", r / "docs" / "backlog", [], ("done", "closed", "resolved"))
+            assert (rc == 1) == must_fail, f"status {st!r}: expected fail={must_fail}, got rc={rc}"
+        # a pack whose ticket has no file at all is reported, never silently passed
+        (r / "docs" / "backlog" / "P-1.md").unlink()
+        rc = sweep(r / "evd", r / "docs" / "backlog", [], ("done",))
+        assert rc == 0, "an unreadable status must not fail the gate"
+
     print("evd_check selftest: OK (fixture green + 9 mutations red — incl. missing/"
           "TC-less verifysheet — + the UI journey: full walk green, each of "
           "AS/PRECONDITION/ENTRY/AFTER/BACK demanded by name, 3 URL-only ENTRYs "

@@ -11,6 +11,105 @@ does not match `package.json`.
 
 ---
 
+## 0.19.0 — 2026-09-11
+
+Everything here came from running the lanes on a real second repo and then reviewing
+the result. Nothing in it was designed from the armchair, and several entries are
+corrections to things 0.18.0 shipped.
+
+### The doctrine learned the thing two field tickets turned on
+
+`grep -ril 'forced.colors|high contrast' core/doctrine/` returned **nothing** across
+all 31 competencies, while two tickets on the field repo hinged on it. Chrome paints
+no `box-shadow` under `forced-colors: active`, so a `ring`-only focus indicator
+changes **zero pixels** in the mode whose users need it most and passes every
+default-mode check on the way. `qa-accessibility-verification` and
+`dev-frontend-craft` each gained one Decide row and one Rule; the measured detail —
+compiled-CSS lines, the `outline-none` vs `outline-hidden` difference, the
+measurement recipe, and what emulation cannot prove — is in
+`competencies/qa/reference/forced-colors.md`. Both files were already at the 1,100-word
+ceiling, so the additions were **paid for** by moving each file's `Rationalizations`
+table into its `reference/` file. No rule was dropped.
+
+### Three competencies no lane could reach
+
+`/ba` and `/pm` contained the word "competency" **zero times**. Three competencies
+declared `applies: always` — load on every session of that lane — and were written,
+gated, indexed and deployed without one line ever reaching the lane that needed them.
+Both lanes now load at their declared step, and `competency_check` validates the
+**chain**: a lane whose workflow never mentions competencies is an error, and a
+`loads:` value naming no step in that lane's workflow is an error.
+
+### Gates that existed only in prose
+
+- `evd_check` was named twelve times in `/qa`, including "must be green before V5",
+  and **no gate ran it**. A verification pack shipped a report claiming ten test cases
+  with zero case folders while the gate stayed green. `--sweep` now checks every pack
+  carrying a REPORT, reading the expected count from each report's own `TC_<n>`
+  citations so a report cannot out-claim its folder.
+- `evd_ui_check` was named five times in `/dev` and ran nowhere. Same treatment.
+- `gate e2e` died one step before the e2e it exists to reach, because the
+  `integration` step ran a script that most repos do not have and carried no guard.
+- `schedule_check` had nowhere honest to live, which produced a new step kind:
+  **`advisory: true`**. The step runs and prints, and its failure is named on the
+  closing banner instead of stopping the gate — for checks whose failure is a fact
+  about the *project* ("the plan is stale", "a decision is overdue") rather than a
+  defect in the change. Blocking a commit on those teaches people to bypass the gate.
+
+### The graph and the ledger can reference the decision queue
+
+A ticket blocked by a **decision** rather than by a ticket, and a ticket closed
+**won't-fix** by an owner rather than by a verdict, both had to be written in prose,
+which is invisible to a gate. `blocked-by:` now resolves against `decisions.md` (an
+unanswered question prints `⏸` and exits 0 — a state, not a fault), and a terminal
+ticket with no REPORT passes if it declares `closed-by:` against a `✅ DECIDED` row.
+A ledger row citing a decision the queue does not hold is red.
+
+### `owned` — a fork stops being a chore
+
+A deliberately forked framework file got a `.new` parked on it on **every** update,
+forever; worse, the parked file is where upstream improvements land, so a fork
+silently stopped receiving them. `.vteam/manifest.json` now takes `owned: [paths]`:
+a declared path is never clobbered and never parked, and update reports that upstream
+moved.
+
+### Routing, measured — and the measurement corrected four times
+
+`route_check.py` (new) answers "which competencies does this ticket load, why, and
+what does that cost". It found the real context cost is not the `always` set that
+0.18.0's progressive-disclosure work attacked (measured: **−0.2%**) but the **routed**
+set: the field repo's worst DEV ticket opens **fifteen** competency files. The
+`type:` token was added so a Bug ticket routes on its own `type:` field rather than on
+the word "bug" appearing in prose.
+
+**The instrument was wrong three times before it was right**, and the arc is in the
+evidence rather than tidied away: it first ignored two of six token kinds
+(undercount), then matched `path:` against prose instead of CODE-SCOPE (overcount),
+then matched `term:` as a *prefix* so `lock` hit "lockfile" (overcount again). Same
+nine tickets, final reading: **94 files**. The conclusion never moved; the size of the
+problem did.
+
+### Two review rounds, and what they caught
+
+Four reviewer agents across the two repos returned 30 findings. The ones worth naming
+because they were defects *introduced* by this work, not found in old code: a fix that
+made every text input flash a 2px box for 145ms on focus (caught by sampling at 40ms,
+which the author's own scripts could not do because they wait 450ms for "settle"); a
+sweep that enforced the literal status `done` while the config declared three; a
+substring test where `UNDECIDED` read as `DECIDED`; a won't-fix closure that any
+mention of "Q2" satisfied; and an `advisory` step that silently upgraded the
+"ZERO verification" banner. All fixed, each with a selftest case that reds on the
+exact bug.
+
+### Honest limits
+
+Forced-colors evidence is Chromium's emulation, not Windows High Contrast. A
+same-pixel focused-vs-unfocused ratio is the shape of **SC 2.4.13 (AAA)**, not
+SC 1.4.11 (AA) — a mislabel that reached a design document before a reviewer caught
+it. And a gate can check that an evidence pack is complete and self-consistent; it
+cannot check that the pack's claims are true. That is what the challenger step is for,
+and it earned its cost twice in this release.
+
 ## 0.18.0 — 2026-09-10
 
 Twelve new competencies — seven for DEV, two for QA, two for BA, one for PM — taking

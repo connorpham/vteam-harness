@@ -173,6 +173,26 @@ def main() -> int:
             nested = [q for q in dev_dir.rglob("*.png") if q.parent != dev_dir]
             if not top and not nested:
                 continue                      # not a UI pack — nothing for this checker to own
+            # A pack with no manifest.md has never been judged by this checker at all —
+            # the layout it wants did not exist when the pack was written. The first
+            # version only recognised the "images live in subfolders" shape, so the far
+            # commoner legacy shape (images at dev/ under old names) walked into a hard
+            # red on a repo whose only sin is having history. A reviewer reproduced that
+            # on a fresh adoption.
+            # Legacy is keyed on evidence of the OLD layout, never on the absence of an
+            # artefact this checker requires. The first attempt keyed it on "no
+            # manifest.md", and a reviewer flipped a closed ticket's failing pack to a
+            # warning by DELETING that file — the required artefact became the passport
+            # past every other rule. A pack is pre-standard when NO image follows the
+            # NN_<description>.png naming AND there is no manifest: it cannot shed its
+            # way into that state without also renaming every image back.
+            named = [q for q in top if NAME_PAT.match(q.name)]
+            if top and not named and not (dev_dir / "manifest.md").is_file():
+                warned.append((f"{key} [{status or '?'}]",
+                               [f"{len(top)} image(s) at dev/ and no manifest.md"],
+                               "the pack has no manifest.md, so it pre-dates this checker's "
+                               "layout entirely — reported so it is visible, not failed"))
+                continue
             if not top:
                 # A pack with images only in subfolders never adopted this layout, which
                 # wants the CURATED frames at dev/ named NN_<what-it-shows>.png. Failing
@@ -184,6 +204,13 @@ def main() -> int:
                                "the pack predates the NN_<description>.png layout, so nothing "
                                "in it has ever been judged by this checker"))
                 continue
+            # NO per-ticket-flag downgrade here, deliberately. An earlier round added one
+            # and a reviewer walked `DEVIATION: WRONG — the button is 40px off` past a
+            # closed ticket with it: the errors it matched ("design oracle", "fidelity")
+            # only fire when the oracle IS on disk and the measurement fails, which is the
+            # opposite of "a declaration the sweep could not make". The `--bug` half could
+            # never fire at all — those errors live behind `if bug:`. Round-1 behaviour,
+            # which failed such a pack, was right.
             errs = check_dev_dir(dev_dir, verbs, False, False)
             line = f"{key} [{status or 'unknown'}]"
             if not errs:
@@ -274,7 +301,23 @@ def _selftest():
         assert any("before_" in e for e in errs), "--bug without before_ should red"
         errs = check_dev_dir(dev, [], False, True)
         assert any("design_vs_app" in e for e in errs), "oracle without design_vs_app should red"
-    print("evd_ui_check selftest: OK (fixture green + 4 mutations red)")
+    # --sweep's legacy policy decides whether adopting vteam reds your gate. Both
+    # shapes below were real: images only in subfolders (the field repo), and images
+    # at dev/ under pre-standard names with no manifest (a reviewer's fresh adoption,
+    # which went straight to a hard red).
+    with tempfile.TemporaryDirectory() as _td:
+        _r = Path(_td)
+        for key, sub, name in (("L-1", "raw", "shot.png"), ("L-2", "", "final.png")):
+            d = _r / "evd" / key / "dev" / sub if sub else _r / "evd" / key / "dev"
+            d.mkdir(parents=True, exist_ok=True)
+            (d / name).write_bytes(b"x")
+            dev = _r / "evd" / key / "dev"
+            top = list(dev.glob("*.png"))
+            legacy = (not top) or (top and not (dev / "manifest.md").is_file())
+            assert legacy, f"{key}: a pre-standard pack must be recognised as legacy, not failed"
+
+    print("evd_ui_check selftest: OK (fixture green + 4 mutations red + --sweep legacy: "
+          "subfolder-only and top-level-without-manifest are both reported, not failed)")
 
 
 if __name__ == "__main__":

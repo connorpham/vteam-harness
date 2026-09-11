@@ -21,20 +21,23 @@ steps:
     # REPORT.md claiming ten test cases with zero case folders — which happened in the field
     # trial and took a challenger agent to notice. Sweep mode reads the expected count from
     # each report's own TC citations, errors only on CLOSED tickets, and treats packs older
-    # than the KIND standard as warnings. `requires` is a literal path because gate.py only
-    # substitutes {package_manager} and {project.key}; a repo that renames its evidence
-    # directory gets a declared skip rather than a false red.
     run: "python3 .vteam/scripts/evd_check.py --sweep"
-    requires: "evd"
-    skip_reason: "no evd/ directory — no verdict has been recorded on this repo"
+    # No `requires:` — the checker resolves its root from paths.evidence, which this
+    #   file cannot substitute, and a literal "evd" would declare a FALSE skip on any
+    #   repo that configures another path. The sweep already prints and returns 0 when
+    #   its configured root is missing, so the guard bought nothing.
   evd-ui:
     # `/dev` names this checker five times and no gate ran it — the same hole VT-17
     # closed for the QA layer. Hard, because UI evidence is about the change being
     # gated, not about the project. Packs that never adopted the NN_<description>.png
     # layout are REPORTED, not failed, so a repo is not reddened for its history.
     run: "python3 .vteam/scripts/evd_ui_check.py --sweep"
-    requires: "evd"
-    skip_reason: "no evd/ directory — no dev evidence has been recorded on this repo"
+    # No `requires:`. The checker resolves its root from paths.evidence, which gate.py
+    # cannot substitute, so a literal "evd" declares a FALSE skip on any repo that
+    # configures another evidence path — the declared-but-wrong skip this driver forbids.
+    # Both sweeps already print and return 0 when their configured root is missing.
+    requires_cmd: python3 -c "import PIL"
+    skip_reason: "Pillow is not installed — the image checks cannot run; a declared skip beats a red nobody can act on"
   graph:
     run: "python3 .vteam/scripts/graph_check.py"
   verbatim:
