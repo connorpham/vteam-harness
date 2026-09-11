@@ -223,8 +223,11 @@ use it. `gate e2e` there goes RED-at-integration (14 steps) → GREEN (15 steps)
 
 **Correction (2026-09-11).** `route_check` shipped with two of the six `applies:` token
 kinds — `profile:` and `path:` — unimplemented, and read the stack profile from the wrong
-repo, so the figures above were a floor. Corrected: the nine field tickets load **102 →
-98 files** across the `type:` change, not 84 → 81, and the saving is **−4.2%**, not −3.8%.
+repo, so the figures above were a floor. Corrected twice: the first fix matched `path:` against prose
+rather than the ticket's CODE-SCOPE and over-counted in turn. Best available reading
+is **96 files / 105,403 tokens** for the nine field tickets — five measured against a
+real CODE-SCOPE, four labelled estimates — against **84** first published. The saving
+across the `type:` change is **−4.2%**, not −3.8%.
 The conclusions hold; the problem is 21% larger than first published. Found by reviewing
 the flow end to end, not by a gate — nothing checks that a measurement tool implements the
 grammar it measures.

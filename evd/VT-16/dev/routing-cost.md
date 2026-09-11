@@ -112,3 +112,26 @@ fifteen competency files, and body-only matches are still the cause. What was wr
 absolute size of the problem: it is **21% larger** than this pack reported. The rejected
 narrowing experiment was run with the same broken instrument on both sides, so its comparison
 holds even though its absolutes do not.
+
+### Second correction, same day — the fix over-corrected
+
+Asked "have you actually verified this?", the answer for `path:` was no. It was implemented as a
+**proxy** — the path string appearing anywhere in the ticket's prose — while `/dev` T2 defines it
+as the ticket's **CODE-SCOPE**. `path:` is the second-largest token kind (52 matches), so the proxy
+mattered: measured against the five field tickets that carry a real CODE-SCOPE, prose matching
+produced **19 matches where the真 value is 14** — TB-5 alone reads 6 against 2.
+
+`route_check` now reads CODE-SCOPE from the ticket's tasksheet, which is written at T1, before the
+lane loads competencies at T2 — so the real value was available all along. Where no tasksheet
+exists yet the row falls back to the prose mention and is **labelled an estimate** in the output.
+
+The full arc of this one number, because the instrument's history is part of the evidence:
+
+| reading | dev files | tokens | why it was wrong |
+|---|---|---|---|
+| first published | 84 | 88,191 | `profile:` and `path:` unimplemented — undercount |
+| first correction | 98 | 108,365 | `path:` matched prose, not CODE-SCOPE — overcount |
+| **best available** | **96** | **105,403** | 5 of 9 tickets measured, 4 labelled estimates |
+
+The worst single ticket has been 15 files ≈ 17,459 tokens in every reading. That figure, and the
+conclusion built on it, never moved.

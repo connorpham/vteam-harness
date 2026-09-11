@@ -56,7 +56,17 @@ def load_competencies():
     return out
 
 
-STRUCTURAL = ("title", "labels", "summary", "criteria", "type", "profile")
+STRUCTURAL = ("title", "labels", "summary", "criteria", "type", "profile", "code-scope")
+
+
+def code_scope_for(key, root):
+    """CODE-SCOPE from the ticket's tasksheet, or None when it has not been written yet."""
+    for cand in (root / "evd" / key / "dev" / "tasksheet.md",):
+        if cand.is_file():
+            m = re.search(r"^CODE-SCOPE:\s*(.+)$", cand.read_text(encoding="utf-8", errors="replace"), re.M)
+            if m:
+                return m.group(1).split()
+    return None
 
 
 def ticket_fields(text):
@@ -77,6 +87,7 @@ def ticket_fields(text):
         "summary": " ".join(x.group(1) for x in (summ, why) if x),
         "criteria": ac.group(1) if ac else "",
         "body": text,
+        "code_scope": None,
     }
 
 
@@ -110,11 +121,19 @@ def route(fields, comps, role, profile=None):
                 if profile and tok[8:].strip().lower() == profile.lower():
                     hits.append((tok, ["profile"]))
             elif tok.startswith("path:"):
-                # a ticket does not carry a diff, so the honest proxy is the path being
-                # named in the ticket. Recorded as its own field so a reader can see the
-                # match is by mention, not by a real changed-file list.
-                if tok[5:].strip().lower() in fields["body"].lower():
-                    hits.append((tok, ["path-mentioned"]))
+                # `path:` means the ticket's CODE-SCOPE, which /dev T2 names explicitly —
+                # not "the string appears somewhere in the prose". The tasksheet carrying
+                # it is written at T1, before the lane loads competencies at T2, so the
+                # real value IS available. Measured against 5 tickets that have one, the
+                # prose proxy over-counted by 5 of 19 matches (TB-5 alone: 6 vs 2).
+                # Where no tasksheet exists yet, fall back to the prose mention and SAY SO,
+                # so a reader can tell a measured row from an estimated one.
+                pre = tok[5:].strip().lower()
+                if fields.get("code_scope"):
+                    if any(pre in sc.lower() for sc in fields["code_scope"]):
+                        hits.append((tok, ["code-scope"]))
+                elif pre in fields["body"].lower():
+                    hits.append((tok, ["path-mentioned-no-tasksheet"]))
             elif tok.startswith("type:"):
                 want = tok[5:].strip().lower()
                 if (fields.get("type") or "").strip().lower() == want:
@@ -173,6 +192,7 @@ def main():
     report, bad = [], 0
     for f in files:
         fields = ticket_fields(f.read_text())
+        fields["code_scope"] = code_scope_for(f.stem, bl.parent.parent)
         for role in roles:
             always, routed = route(fields, comps, role, profile)
             if not always and not routed:

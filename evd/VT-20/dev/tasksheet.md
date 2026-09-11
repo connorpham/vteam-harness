@@ -1,6 +1,12 @@
 # VT-20 — DEV tasksheet
 
-CODE-SCOPE: core/scripts/ core/workflows/ core/doctrine/competencies/ profiles/ .claude/skills/
+CODE-SCOPE: core/scripts/ core/workflows/ core/doctrine/competencies/ profiles/ .claude/skills/ CHANGELOG.md
+
+`CHANGELOG.md` was added to the scope on the third red of the day from this same rule, and it
+belongs: this ticket's job includes correcting figures that were **published** there, and the
+changelog is not an always-legal process home the way `docs/` and `evd/` are. D12 ruled that
+`ALWAYS_LEGAL` stays as it is — the gate asking for a deliberate widening is the point — so the
+scope line moves, not the rule.
 
 Four homes because the finding was a chain, not a file: the workflow that loads, the competency
 that is loaded, the checker that should have noticed, and the profile that runs the checker.
