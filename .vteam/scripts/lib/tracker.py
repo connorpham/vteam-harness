@@ -108,6 +108,8 @@ class MarkdownTracker(Tracker):
         - labels: a, b
         - estimate: 1d
         - blocked-by: KEY-2, KEY-3
+        - closed-by: Q6            # optional: the DECIDED decision that closed a won't-fix,
+                                   #   when there is no QA verdict to close it (graph_check)
 
         <description…>
 
