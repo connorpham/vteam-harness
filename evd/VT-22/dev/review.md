@@ -158,3 +158,76 @@ adds `advisory:` to an existing step should be visible to review.
 twice in two rounds (`UTF-8`, then `AES-256`/`IEEE-754`). A denylist has no closing condition —
 filed as **D16** to invert it into a declared list of foreign project keys, rather than extend it
 one incident at a time.
+
+## Rounds 3–5 — and the two APPROVE cards
+
+Three more rounds. Each one found something real, twice inside code written to fix the previous
+round's finding, and once inside a claim that had been "verified" with the wrong command.
+
+### R1 — the checker scripts — **APPROVE** (round 4)
+
+**Tried to break it:**
+- Re-ran the `manifest.md` deletion attack against `is_legacy_pack()` on the committed tree,
+  including the case that separates the new rule from the old: `01_the_list.png` with the manifest
+  deleted → **RED**, where two rounds earlier it was a warning. Added two shapes I had not
+  fixtured: a mixed pack (one conforming image is enough to deny the exemption) and the
+  `DEVIATION: WRONG` pack with the manifest deleted, trying to combine both round-2 escapes →
+  RED. "The exemption no longer composes with anything."
+- **Reverted the fix and ran my selftest unmodified** — exit 1, `AssertionError: a properly-named
+  image with no manifest must NOT be legacy`. That is the check it could not make in round 3, when
+  the test asserted a hand-copy of the predicate instead of calling it.
+- Diffed all eight touched files source-against-mirror to check the gate was running the code
+  under review: byte-identical, all eight.
+- Read `closed-by` where a ticket author looks rather than where the checker defines it —
+  `tracker.py`'s documented file shape, `/pm`'s P-DECIDE, and the deployed `.claude/skills/pm/`
+  mirror a consumer reads.
+
+**Traces:** `core/scripts/evd_ui_check.py:43` (the single `is_legacy_pack()` definition) and
+`:343` (the assert that fails when the fix is reverted); `core/scripts/lib/tracker.py:111`
+(`- closed-by: Q6`, under `blocked-by`).
+
+**Findings:** one residual, found by attacking rather than reading — a `before_*`/`after_*`-only
+pack has no `NAME_PAT` match, so it reaches the legacy exemption in one deletion (VT-23 item 6).
+Everything from rounds 1–3 confirmed closed on the committed tree, each re-attacked with the
+construction that broke it rather than re-read.
+
+### R2 — the gate driver, the profile manifests, the installer — **APPROVE** (round 5)
+
+**Tried to break it:**
+- Widened the mirror check past the file we had been arguing about: **all 40 files** under
+  `core/scripts/` diffed against `.vteam/scripts/` at `HEAD` — drift 0. "The instance I found was
+  one file; the class is forty, and the class is clean."
+- **Cloned `HEAD` and ran the driver the clone actually has**, because "the source carries the
+  fix" was precisely the claim that had not survived the round before.
+- Re-ran the advisory battery: bookkeeping-only plus a failing advisory keeps the strongest WEAK
+  banner *and* names the advisory; a passing advisory leaves every banner bare; `advisory:
+  "false"` reds; a hard red after an advisory failure still stops the run.
+- Re-ran the installer battery over two consecutive updates against a package with a real
+  upstream change: a three-entry `owned` list carrying `../bad` and an empty string is preserved
+  byte-for-byte, fork intact, zero `.new`, and the upstream change did not leak into the owned file.
+- Re-ran the adoption fixture: a repo adopting vteam with a closed ticket and pre-standard
+  screenshots is reported, not walled.
+
+**Traces:** `core/scripts/gate.py:379` and its deployed counterpart under the runtime directory —
+identical at `HEAD`, where the round before they differed; `src/cli/manifest.mjs:155` (the
+`(ownedInvalid || ownedPartial)` guard that preserves a partly-bad declaration). Reproduced by
+cloning `HEAD` with `--no-local` and running the clone's own driver, which prints the six-fixture
+line.
+
+**Findings:** none open. Two deliberate non-fixes correctly filed rather than rushed (`init`
+ignoring `owned`; the parser naming duplicate keys, which R2 argued against turning into an error
+because the parser is shared with every consumer's `vteam.config.yaml`).
+
+### What the five rounds were actually worth
+
+R2's closing note, kept because it is the honest summary: the value was not any single defect but
+that **three of them lived in the distance between an artifact and a claim about it** — a docstring
+reported by eye, a green measured before the commit, and a source carrying a fix the executed
+mirror did not. This framework's premise is machine-checkable claims, and the one surface never
+machine-checked was the review reply itself. **VT-23 item 7 closes the mirror half in code; KB-R1
+closes the human half in habit.**
+
+## Remaining dissent
+
+None. Two reviewers, five rounds, 26 findings, all closed or filed with the filing reason recorded
+(VT-23 items 1–7, D16).
