@@ -3,7 +3,7 @@ name: dev-frontend-craft
 description: "Use when a ticket touches the browser — a component, a screen, styling, client state, data fetching, routing, or a rendering strategy — and when choosing between the six or seven tools that all solve the same frontend problem. Also when a UI is 'done' but nobody has said which states it has."
 role: dev
 loads: T2
-applies: label:ui, label:frontend, path:app/, path:components/, path:src/components/, term:component, term:css, term:hydration, term:jsx
+applies: label:a11y, label:accessibility, label:ui, label:frontend, path:app/, path:components/, path:src/components/, term:component, term:css, term:hydration, term:jsx
 ---
 
 

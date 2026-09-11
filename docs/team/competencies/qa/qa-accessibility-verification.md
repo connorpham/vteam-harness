@@ -3,7 +3,7 @@ name: qa-accessibility-verification
 description: "Use when verifying any user interface — web or mobile — and the ticket, spec or design says nothing about accessibility. Also when an automated scan came back clean, when a design hands over only the default state, and when 'accessible' has to become a pass or fail with a number behind it."
 role: qa
 loads: V2
-applies: label:ui, label:frontend, label:mobile, term:screen, term:form, term:dialog, term:modal, term:keyboard, term:contrast
+applies: label:a11y, label:accessibility, label:ui, label:frontend, label:mobile, term:screen, term:form, term:dialog, term:modal, term:keyboard, term:contrast
 ---
 
 

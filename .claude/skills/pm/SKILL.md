@@ -273,6 +273,12 @@ fallback below (design APIs are read-only — the machine cannot create frames):
 
 ## P-DECIDE — unblocking (the heart of the workflow)
 
+> Named, not numbered, and that is deliberate: this section plus `The SA lane` and
+> `The DESIGN lane` occupy the sequence slot between P2 and P4. `/pm` has no `P3`
+> for that reason, not by omission (decision D10). A competency for the SA or
+> DESIGN sub-lane declares `role: pm` and `loads: P2`, the step that dispatches them.
+
+
 1. Filter the decision queue: overdue first, then nearest deadline. **Expected-
    value exception:** a question whose recorded savings/risk is **≥2 person-days**
    joins EVERY asking round regardless of deadline — a question due in three
