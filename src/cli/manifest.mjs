@@ -32,6 +32,14 @@ export class ManifestGuard {
     this.old = loadManifest(root); // null on pre-manifest installs
     this.files = {};               // the manifest being built this run
     this.conflicts = [];           // rel paths preserved as <rel>.new
+    this.owned = [];               // rel paths this repo has DECLARED it owns
+    // A repo may deliberately fork a framework file — a monorepo profile the stock
+    // one will never match, a hook with local rules. Without a way to say so, every
+    // update parks another `.new` on it forever: reviewed, deleted, and back within
+    // the hour. Worse, the parked file is where upstream improvements land, so a fork
+    // silently stops receiving them. `owned` in the manifest ends the chore and keeps
+    // the signal: update reports, once, that upstream moved under a file you own.
+    this.ownedDecl = new Set(this.old?.owned ?? []);
   }
 
   _abs(rel) { return path.join(this.root, ...rel.split("/")); }
@@ -75,6 +83,14 @@ export class ManifestGuard {
       this.files[rel] = newHash;
       return "written";
     }
+    // Declared as owned by this repo: do not clobber AND do not park. Report that
+    // upstream moved, with the hash so a reader can tell "changed since I forked"
+    // from "unchanged" — the signal without the file to delete every time.
+    if (this.ownedDecl.has(rel)) {
+      this.owned.push(rel);
+      if (this.old?.files?.[rel]) this.files[rel] = this.old.files[rel];
+      return "owned";
+    }
     // user-modified (or unowned): never clobber — park the new version beside it.
     this._put(`${rel}.new`, content, mode);
     this.conflicts.push(rel);
@@ -99,8 +115,9 @@ export class ManifestGuard {
   }
 
   save(version) {
+    // carry the ownership declaration forward — it is the repo's, not the run's
     const sorted = Object.fromEntries(Object.entries(this.files).sort(([a], [b]) => a.localeCompare(b)));
-    this._put(MANIFEST_REL, JSON.stringify({ version, files: sorted }, null, 2) + "\n");
+    this._put(MANIFEST_REL, JSON.stringify({ owned: [...this.ownedDecl], version, files: sorted }, null, 2) + "\n");
   }
 }
 

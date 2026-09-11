@@ -5,6 +5,15 @@ steps:
     run: "bash .vteam/scripts/docs_shrink_check.sh"
   ledger:
     run: "python3 .vteam/scripts/log_check.py"
+  schedule:
+    # Advisory by design. A stale sprint plan or an overdue decision is a fact about the
+    # PROJECT, not a defect in the change being gated — blocking a commit on it teaches
+    # people to bypass the gate, which is worse than the condition. It still runs and
+    # still prints, and GREEN is never printed bare while it is failing.
+    run: "python3 .vteam/scripts/schedule_check.py"
+    requires: "docs/pm/plan.yaml"
+    skip_reason: "no docs/pm/plan.yaml — this repo has no sprint plan to be on or off"
+    advisory: true
   evd:
     # `/qa` names evd_check a dozen times and the gate never ran it, so a pack could ship a
     # REPORT.md claiming ten test cases with zero case folders — which happened in the field
@@ -16,6 +25,14 @@ steps:
     run: "python3 .vteam/scripts/evd_check.py --sweep"
     requires: "evd"
     skip_reason: "no evd/ directory — no verdict has been recorded on this repo"
+  evd-ui:
+    # `/dev` names this checker five times and no gate ran it — the same hole VT-17
+    # closed for the QA layer. Hard, because UI evidence is about the change being
+    # gated, not about the project. Packs that never adopted the NN_<description>.png
+    # layout are REPORTED, not failed, so a repo is not reddened for its history.
+    run: "python3 .vteam/scripts/evd_ui_check.py --sweep"
+    requires: "evd"
+    skip_reason: "no evd/ directory — no dev evidence has been recorded on this repo"
   verbatim:
     run: "python3 .vteam/scripts/verbatim_gate.py"
   competencies:

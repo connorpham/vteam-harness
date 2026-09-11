@@ -102,6 +102,12 @@ export async function update(_flags) {
   }
 
   guard.save(pkgVersion());
+  if (guard.owned.length) {
+    console.log(`\n📌 ${guard.owned.length} file(s) this repo OWNS moved upstream — kept yours, nothing parked:`);
+    for (const o of guard.owned) console.log(`  ${o}`);
+    console.log("  Declared in .vteam/manifest.json → owned. Merge by hand when you want the change;");
+    console.log("  remove it from `owned` to go back to receiving the framework's version.");
+  }
   if (guard.conflicts.length) {
     console.log(`\n⚠ ${guard.conflicts.length} file(s) differ from what the framework last wrote — kept YOURS, new version parked beside it:`);
     for (const c of guard.conflicts) console.log(`  ${c}  →  ${c}.new`);

@@ -186,6 +186,13 @@ which pre-mortem is absent or toothless (leads to no patched AC and no "accepted
 because…")? which gap question misses one of the 3 conditions? Card per
 `review-standard.md` (APPROVE carries the tried-to-break list — the 2-card quota
 is not an excuse to invent findings).
+**Paste the `## Reviewer lens` block of every competency this lane loaded** (the
+`Competencies:` line on the story) into the challenger's prompt, and require it to work
+each item one by one — an item ignored without saying why sends the card back. This is
+the same rule `/qa` V6 runs on. Until 2026-09-11 every competency in this framework was
+*required* to carry a `Reviewer lens` and this lane consulted none of them: the sections
+were written, gated and unread.
+
 **QC lens (shift-left — early testing is cheaper):** for the draft's riskiest
 story, the challenger must SKETCH ONE TC in its card (account + steps + expected
 per the AC) — an AC no TC can be sketched from mechanically is a failed AC,

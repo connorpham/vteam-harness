@@ -83,6 +83,7 @@ def main() -> int:
         print(f"GATE: RED at manifest — profile {profile!r} declares no steps")
         return 1
     ran, skipped = [], []
+    advisory_failed = []
     for name, spec in steps.items():
         if not isinstance(spec, dict) or not spec.get("run"):
             print(f"GATE: RED at {name} — manifest step has no `run` (a step that "
@@ -122,11 +123,18 @@ def main() -> int:
         # BOUNDARY in the module docstring); the only shell exec in the framework.
         r = subprocess.run(cmd, shell=True, cwd=c.root)
         if r.returncode != 0:
+            if spec.get("advisory"):
+                advisory_failed.append(name)
+                ran.append(name)
+                continue
             print(f"GATE: RED at {name}")
             return 1
         ran.append(name)
     for name, why in skipped:
         print(f"⚠️  skipped {name}: {why}")
+    for name in advisory_failed:
+        print(f"🟡 advisory {name}: FAILED — reported, not blocking; the condition is "
+              f"about the project, not about this change")
     # Bookkeeping steps guard the ledgers, not the code. A green where ONLY they
     # ran is honest but weak — say so, loudly (field-trial finding #19: a Go repo
     # on the generic profile read as plain GREEN with zero verification run).
@@ -146,7 +154,10 @@ def main() -> int:
               f"verification of behavior. {len(ran)} steps ran, "
               f"{len(skipped)} declared skips)")
     else:
-        print(f"GATE: GREEN ({len(ran)} steps ran, {len(skipped)} declared skips)")
+        tail_note = (f" — {len(advisory_failed)} ADVISORY FAILED: "
+                     f"{', '.join(advisory_failed)}" if advisory_failed else "")
+        print(f"GATE: GREEN ({len(ran)} steps ran, {len(skipped)} declared skips)"
+              f"{tail_note}")
     return 0
 
 
@@ -232,6 +243,31 @@ def _selftest():
             and "probe says the tool is absent" in r.stdout, r.stdout
         assert "never" not in r.stdout, "a skipped step still ran"
 
+        # advisory: the step RUNS, PRINTS, does not block — and GREEN is never bare
+        root = setup("steps:\n  real:\n    run: \"echo real-ran\"\n"
+                     "  health:\n    run: \"echo health-noise; exit 3\"\n"
+                     "    advisory: true\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 0, f"an advisory failure must not block:\n{r.stdout}"
+        assert "health-noise" in r.stdout, f"an advisory step must still PRINT:\n{r.stdout}"
+        assert "ADVISORY FAILED: health" in r.stdout, \
+            f"GREEN must never be bare while an advisory failed:\n{r.stdout}"
+
+        # advisory that PASSES leaves no banner
+        root = setup("steps:\n  health:\n    run: \"echo fine\"\n    advisory: true\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 0 and "ADVISORY FAILED" not in r.stdout, r.stdout
+
+        # advisory does NOT weaken a hard step: a red before it still stops the run
+        root = setup("steps:\n  hard:\n    run: \"exit 1\"\n"
+                     "  health:\n    run: \"echo never\"\n    advisory: true\n")
+        roots.append(root)
+        r = run_gate(root)
+        assert r.returncode == 1 and "RED at hard" in r.stdout, r.stdout
+        assert "never" not in r.stdout, "a step after a red must not run"
+
         # requires_cmd probe fails with NO skip_reason → RED, same law as requires
         root = setup("steps:\n  probed:\n    run: \"echo never\"\n"
                      "    requires_cmd: \"exit 7\"\n")
@@ -293,7 +329,8 @@ def _selftest():
             shutil.rmtree(root, ignore_errors=True)
     print("gate selftest: OK (green + substitution, red stops, run-less red, "
           "silent-skip red, declared skip loud, requires_cmd green/skip/red, "
-          "2 WEAK banners, echo-test tripwire)")
+          "2 WEAK banners, echo-test tripwire, advisory: fails-without-blocking, "
+          "still-prints, banners on GREEN, passes silently, never softens a hard red)")
 
 
 if __name__ == "__main__":

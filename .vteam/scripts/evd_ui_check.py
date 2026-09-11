@@ -138,12 +138,78 @@ def main() -> int:
     from vocab import vocab
     c = Ctx()
     ap = argparse.ArgumentParser()
-    ap.add_argument("ticket")
+    ap.add_argument("ticket", nargs="?")
+    ap.add_argument("--sweep", action="store_true",
+                    help="check every dev evidence pack whose ticket is closed; the per-ticket "
+                         "flags do not apply. Open tickets are reported, not failed.")
     ap.add_argument("--bug", action="store_true")
     ap.add_argument("--oracle", action="store_true",
                     help="declare a design oracle exists even without design/ or fidelity.json")
     ap.add_argument("--attach", action="store_true")
     args = ap.parse_args()
+
+    if args.sweep:
+        # `/dev` names this checker five times and no gate ran it, so a UI pack could
+        # ship incomplete and nothing said so — the same hole VT-17 closed for the QA
+        # layer. Sweep applies the same policy: a CLOSED ticket's pack must meet the
+        # standard, an open one is reported. `--bug` and `--oracle` are per-ticket
+        # declarations a sweep cannot make, so a pack that needs one is reported rather
+        # than failed, and says which flag it would need.
+        import tracker as trk
+        t = trk.load(c)
+        evd_root = c.path("evidence")
+        verbs = vocab(c).get("hedge_phrases", [])
+        if not evd_root.is_dir():
+            print(f"✅ evd_ui_check --sweep: no evidence directory at {evd_root}")
+            return 0
+        bad, warned, ok = [], [], []
+        for dev_dir in sorted(evd_root.glob("*/dev")):
+            key = dev_dir.parent.name
+            try:
+                status = (t.get_issue(key) or {}).get("status", "")
+            except Exception:
+                status = ""
+            top = list(dev_dir.glob("*.png"))
+            nested = [q for q in dev_dir.rglob("*.png") if q.parent != dev_dir]
+            if not top and not nested:
+                continue                      # not a UI pack — nothing for this checker to own
+            if not top:
+                # A pack with images only in subfolders never adopted this layout, which
+                # wants the CURATED frames at dev/ named NN_<what-it-shows>.png. Failing
+                # it would red a repo for its history — the same trap schedule_check
+                # would be. Reported so it is visible, and the count says how much is
+                # down there unjudged.
+                warned.append((f"{key} [{status or '?'}]",
+                               [f"{len(nested)} image(s) live in subfolders and none at dev/"],
+                               "the pack predates the NN_<description>.png layout, so nothing "
+                               "in it has ever been judged by this checker"))
+                continue
+            errs = check_dev_dir(dev_dir, verbs, False, False)
+            line = f"{key} [{status or 'unknown'}]"
+            if not errs:
+                ok.append(line)
+            elif str(status).strip().lower() in ("done", "closed", "resolved"):
+                bad.append((line, errs))
+            else:
+                warned.append((line, errs, "the ticket is not closed"))
+        for l in ok:
+            print(f"✅ {l}: DEV evidence meets the standard")
+        for l, errs, why in warned:
+            print(f"⚠️  {l}: {len(errs)} problem(s) — reported, not failed, because {why}")
+            for e in errs[:3]:
+                print(f"     - {e}")
+        for l, errs in bad:
+            print(f"❌ {l}: {len(errs)} problem(s), and the ticket is closed")
+            for e in errs:
+                print(f"     - {e}")
+        if bad:
+            print("evd_ui_check --sweep: a closed ticket's UI evidence does not meet the standard")
+            return 1
+        print(f"✅ evd_ui_check --sweep: {len(ok)} pack(s) green, {len(warned)} reported without failing")
+        return 0
+
+    if not args.ticket:
+        ap.error("a ticket is required unless --sweep is passed")
     ticket = args.ticket.upper()
     dev = c.path("evidence") / ticket / "dev"
 

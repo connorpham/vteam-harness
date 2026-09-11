@@ -118,6 +118,12 @@ and keeps the beat:
 
 ## P1 — PICK THE WORK
 
+**Before the order is final, read back the `## Reviewer lens` of every competency you
+loaded and answer each item on today's actual board.** This lane spawns no challenger for
+the ordering — nobody else will ask these — so the lens is the only check the pick gets.
+Record the answers in one line each in the desk report at P4; a lens item you cannot
+answer is a pick you cannot defend.
+
 **Load the competencies this lane runs on, before ordering anything** — from
 `{paths.team}/competencies/pm/INDEX.md` (read the index, not the tree): every `always`
 row, plus any row a token matches on today's board. `pm-prioritisation` is `always` and
