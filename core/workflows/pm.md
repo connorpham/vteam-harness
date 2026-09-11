@@ -267,6 +267,14 @@ fallback below (design APIs are read-only — the machine cannot create frames):
 
 ## P-DECIDE — unblocking (the heart of the workflow)
 
+> **Closing a ticket the team decided NOT to do.** A won't-fix has no QA verdict to close
+> it, so it closes on the decision instead — and the decision has to be in a field, not in
+> prose. Write `- closed-by: <Qn|Dn>` in the ticket header, naming a row that already reads
+> `✅ DECIDED` in `{paths.pm}/decisions.md`. `graph_check` reds a terminal ticket that cites
+> nothing, cites a key the queue does not hold, or cites a question still open — *"a ticket
+> cannot be closed by a question"*. A sentence mentioning the decision does not close it:
+> "we will revisit this in Q2" used to, which is why the field exists.
+
 > Named, not numbered, and that is deliberate: this section plus `The SA lane` and
 > `The DESIGN lane` occupy the sequence slot between P2 and P4. `/pm` has no `P3`
 > for that reason, not by omission (decision D10). A competency for the SA or

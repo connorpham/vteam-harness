@@ -38,6 +38,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 
 NAME_PAT = re.compile(r"^\d{2}_[\w-]+\.png$")
 SPECIAL = {"design_vs_app.png"}
+
+
+def is_legacy_pack(dev: Path) -> bool:
+    """Has this pack never been judged by this checker at all?
+
+    ONE definition, called by both the sweep and the selftest. An earlier round had
+    the rule in the sweep and a hand-copy of it in the test; the copy was the
+    pre-fix version, so the test passed identically whether the fix was present or
+    reverted — coverage in the summary line and none in fact.
+
+    Legacy means evidence of the OLD layout, never the absence of a required
+    artefact: keying it on "no manifest.md" alone let a reviewer flip a failing pack
+    to a warning by deleting one file. A pack qualifies when it has no image named
+    the way this checker wants AND no manifest — a state it cannot reach without
+    renaming every image back.
+    """
+    top = list(dev.glob("*.png"))
+    nested = [q for q in dev.rglob("*.png") if q.parent != dev]
+    if not top and not nested:
+        return False                       # not a UI pack at all
+    if not top:
+        return True                        # images only in subfolders
+    named = [q for q in top if NAME_PAT.match(q.name)]
+    return not named and not (dev / "manifest.md").is_file()
 NOT_MEASURED = "NOT MEASURED"
 
 
@@ -186,8 +210,7 @@ def main() -> int:
             # past every other rule. A pack is pre-standard when NO image follows the
             # NN_<description>.png naming AND there is no manifest: it cannot shed its
             # way into that state without also renaming every image back.
-            named = [q for q in top if NAME_PAT.match(q.name)]
-            if top and not named and not (dev_dir / "manifest.md").is_file():
+            if is_legacy_pack(dev_dir):
                 warned.append((f"{key} [{status or '?'}]",
                                [f"{len(top)} image(s) at dev/ and no manifest.md"],
                                "the pack has no manifest.md, so it pre-dates this checker's "
@@ -301,20 +324,29 @@ def _selftest():
         assert any("before_" in e for e in errs), "--bug without before_ should red"
         errs = check_dev_dir(dev, [], False, True)
         assert any("design_vs_app" in e for e in errs), "oracle without design_vs_app should red"
-    # --sweep's legacy policy decides whether adopting vteam reds your gate. Both
-    # shapes below were real: images only in subfolders (the field repo), and images
-    # at dev/ under pre-standard names with no manifest (a reviewer's fresh adoption,
-    # which went straight to a hard red).
+    # --sweep's legacy policy, asserted against the FUNCTION THE GATE CALLS. The
+    # third fixture is the one that separates the shipped rule from the one it
+    # replaced: a properly-named image with no manifest is NOT legacy, and under the
+    # earlier predicate it was.
     with tempfile.TemporaryDirectory() as _td:
         _r = Path(_td)
-        for key, sub, name in (("L-1", "raw", "shot.png"), ("L-2", "", "final.png")):
-            d = _r / "evd" / key / "dev" / sub if sub else _r / "evd" / key / "dev"
+        def _pack(key, sub, name):
+            d = _r / key / "dev" / sub if sub else _r / key / "dev"
             d.mkdir(parents=True, exist_ok=True)
             (d / name).write_bytes(b"x")
-            dev = _r / "evd" / key / "dev"
-            top = list(dev.glob("*.png"))
-            legacy = (not top) or (top and not (dev / "manifest.md").is_file())
-            assert legacy, f"{key}: a pre-standard pack must be recognised as legacy, not failed"
+            return _r / key / "dev"
+        assert is_legacy_pack(_pack("L-1", "raw", "shot.png")), \
+            "images only in subfolders must be legacy"
+        assert is_legacy_pack(_pack("L-2", "", "final.png")), \
+            "an unnamed image with no manifest must be legacy"
+        d3 = _pack("L-3", "", "01_the_list.png")
+        assert not is_legacy_pack(d3), \
+            "a properly-named image with no manifest must NOT be legacy — deleting the " \
+            "manifest cannot be an exemption from every other rule"
+        (d3 / "manifest.md").write_text("x")
+        assert not is_legacy_pack(d3), "a pack with a manifest is never legacy"
+        assert not is_legacy_pack(_pack("L-4", "", "notes.txt").parent / "dev"), \
+            "a pack with no images at all is not this checker's business"
 
     print("evd_ui_check selftest: OK (fixture green + 4 mutations red + --sweep legacy: "
           "subfolder-only and top-level-without-manifest are both reported, not failed)")

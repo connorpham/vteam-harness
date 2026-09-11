@@ -15,7 +15,7 @@ Manifest step shape (vteam YAML subset):
                                      # nonzero exit → declared skip (same law as requires)
         skip_reason: "no package.json — not a Node project"
         tail: false                  # optional: only runs when the tail arg (e.g. e2e) is passed
-          advisory: true               # optional, BOOLEAN: the step RUNS and PRINTS, but a
+        advisory: true                 # optional, BOOLEAN: the step RUNS and PRINTS, but a
                                        # nonzero exit is named on the closing banner instead
                                        # of stopping the gate
 Rules the driver enforces:
