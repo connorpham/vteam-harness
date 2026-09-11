@@ -56,7 +56,7 @@ def load_competencies():
     return out
 
 
-STRUCTURAL = ("title", "labels", "summary", "criteria", "type")
+STRUCTURAL = ("title", "labels", "summary", "criteria", "type", "profile")
 
 
 def ticket_fields(text):
@@ -91,7 +91,7 @@ def where(term, fields):
     return hits
 
 
-def route(fields, comps, role):
+def route(fields, comps, role, profile=None):
     always, routed = [], []
     for name, c in sorted(comps.items()):
         if role and c["role"] != role:
@@ -103,6 +103,18 @@ def route(fields, comps, role):
         for tok in c["applies"]:
             if tok.startswith("label:") and tok[6:] in fields["labels"]:
                 hits.append((tok, ["labels"]))
+            elif tok.startswith("profile:"):
+                # the repo's stack profile — constant for a repo, so it either applies to
+                # every ticket or to none. Omitting it (as the first version of this script
+                # did) makes every measurement an UNDERCOUNT, which is worse than noisy.
+                if profile and tok[8:].strip().lower() == profile.lower():
+                    hits.append((tok, ["profile"]))
+            elif tok.startswith("path:"):
+                # a ticket does not carry a diff, so the honest proxy is the path being
+                # named in the ticket. Recorded as its own field so a reader can see the
+                # match is by mention, not by a real changed-file list.
+                if tok[5:].strip().lower() in fields["body"].lower():
+                    hits.append((tok, ["path-mentioned"]))
             elif tok.startswith("type:"):
                 want = tok[5:].strip().lower()
                 if (fields.get("type") or "").strip().lower() == want:
@@ -133,6 +145,19 @@ def main():
     a = ap.parse_args()
 
     comps = load_competencies()
+    # The profile belongs to the repo whose BACKLOG is being measured, not to the repo
+    # the script happens to run from. Reading the wrong one silently drops every
+    # `profile:` match and undercounts the load — which is how the first version of this
+    # measurement understated the real figure by 14%.
+    bl_arg = pathlib.Path(a.backlog)
+    target_root = bl_arg.resolve().parent.parent if bl_arg.is_absolute() else ROOT
+    profile = None
+    for cfg in (target_root / "vteam.config.yaml", ROOT / "vteam.config.yaml"):
+        if cfg.is_file():
+            m = re.search(r"^\s*profile:\s*([\w-]+)", cfg.read_text(), re.M)
+            if m:
+                profile = m.group(1)
+                break
     if not comps:
         print(f"route_check: no competencies found under {COMP}", file=sys.stderr)
         return 2
@@ -149,7 +174,7 @@ def main():
     for f in files:
         fields = ticket_fields(f.read_text())
         for role in roles:
-            always, routed = route(fields, comps, role)
+            always, routed = route(fields, comps, role, profile)
             if not always and not routed:
                 continue
             names = always + [r["name"] for r in routed]

@@ -196,7 +196,8 @@ two of seven criteria, and then caught a third on the second pass.
 2,459 words off the `always` path and measured **−0.2%** on the DEV floor, because the
 catalogue grew by as much as the `always` set shrank. `route_check.py` (new) explains
 that: the cost is in a ticket's **routed** set. The field trial's worst DEV ticket opens
-**15 competency files ≈ 17,270 tokens**, and 5 of 9 dev ticket/lane pairs load at least
+**15 competency files ≈ 17,459 tokens** (first published as 17,270 — the tool was
+undercounting, see the correction note below), and 5 of 9 dev ticket/lane pairs load at least
 one competency pulled in by a word appearing only in the ticket's prose — a CSS
 focus-ring ticket loads `dev-mobile-craft` on the word "permission". The obvious fix was
 run and **rejected on its own numbers**: matching `term:` only against title + labels +
@@ -219,6 +220,14 @@ Also fixed: the `integration` gate step ran a script with no guard, so `gate e2e
 one step before the e2e it exists to reach and the end-to-end layer had never run on the
 field repo. The driver already had `requires_cmd` + `skip_reason`; the manifest did not
 use it. `gate e2e` there goes RED-at-integration (14 steps) → GREEN (15 steps).
+
+**Correction (2026-09-11).** `route_check` shipped with two of the six `applies:` token
+kinds — `profile:` and `path:` — unimplemented, and read the stack profile from the wrong
+repo, so the figures above were a floor. Corrected: the nine field tickets load **102 →
+98 files** across the `type:` change, not 84 → 81, and the saving is **−4.2%**, not −3.8%.
+The conclusions hold; the problem is 21% larger than first published. Found by reviewing
+the flow end to end, not by a gate — nothing checks that a measurement tool implements the
+grammar it measures.
 
 What none of this fixes, stated because the tempting summary is shorter than the truth:
 a sweep can tell whether a pack is complete and self-consistent, never whether its

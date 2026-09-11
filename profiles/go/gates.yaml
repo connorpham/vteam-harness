@@ -20,6 +20,16 @@ steps:
     run: "python3 .vteam/scripts/verbatim_gate.py"
   competencies:
     run: "python3 .vteam/scripts/competency_check.py"
+  doctrine-source:
+    # VT-19 shipped a doctrine change whose INDEX was never regenerated AT THE SOURCE,
+    # and a consuming repo's gate went RED the moment it ran `vteam update`: the
+    # competency file arrived fresh, the INDEX arrived stale. The reason is that
+    # `--write-index` writes {paths.team} — the DEPLOYED mirror — so in the framework
+    # repo it can never reach core/doctrine, which is the copy that actually ships.
+    # `requires` keeps this step out of consumer repos, which have no core/doctrine.
+    run: "python3 .vteam/scripts/competency_check.py --root core/doctrine/competencies"
+    requires: "core/doctrine/competencies"
+    skip_reason: "no core/doctrine — this repo consumes the doctrine, it does not publish it"
   parallel:
     run: "python3 .vteam/scripts/parallel_check.py"
   coord:

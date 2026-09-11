@@ -89,3 +89,26 @@ valid JSON, 36 rows
 default exit: 0   (body-only matches present, still 0)
 --strict exit: 1
 ```
+
+## Correction, 2026-09-11 — the instrument was undercounting
+
+Found in an end-to-end review of the flow, not by a gate. `route_check.py` shipped with only four
+of the six `applies:` token kinds implemented: `always`, `label:`, `term:` and (later) `type:`.
+**`profile:` and `path:` were silently ignored**, so every figure this pack published was a floor,
+not a measurement. A second bug compounded it: the CLI read `stack.profile` from the repo the
+script *ran from* rather than the repo whose backlog was being measured, which dropped the profile
+match even after the token was implemented.
+
+Both are fixed. The corrected figures, one instrument, one reading:
+
+| | files | tokens |
+|---|---|---|
+| published here | 84 | 88,191 |
+| **actual** | **102** | **113,156** |
+| worst single ticket | 15 / 17,270 | **15 / 17,459** |
+
+The *conclusions* survive, and the direction was never in doubt — the worst ticket still opens
+fifteen competency files, and body-only matches are still the cause. What was wrong is the
+absolute size of the problem: it is **21% larger** than this pack reported. The rejected
+narrowing experiment was run with the same broken instrument on both sides, so its comparison
+holds even though its absolutes do not.
