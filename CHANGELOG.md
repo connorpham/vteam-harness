@@ -17,6 +17,15 @@ Everything here came from running the lanes on a real second repo and then revie
 the result. Nothing in it was designed from the armchair, and several entries are
 corrections to things 0.18.0 shipped.
 
+### Added before publish (2026-09-17): the first benchmark result — a loss (VT-27)
+
+The vteam-vs-BMAD run from 2026-09-03 was finally judged. **BMAD 91/91, vteam 84/91 (92.3 %),
+and three vteam "done" claims were contradicted by the held-out probes** (AC-A07, AC-D02,
+AC-D07). Published as promised in `docs/BENCHMARK.md` with the scorecard, the five repairs the
+judge needed before scoring (all applied to both arms, re-calibrated to 91/91 afterwards), and
+the caveats: one sample, arm-a scored at its stop state, no token cost recorded. VT-28 is open
+on why the arm's own e2e passed what the probes fail — the answer goes in the same page.
+
 ### Added before publish (2026-09-17): the line-by-line code review (VT-24)
 
 0.19.0 was still waiting on the registry, so a full read of the framework's 64 files
