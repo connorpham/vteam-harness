@@ -31,7 +31,10 @@ machine (schedule_check warns on them).
 
 | D16 | **`log_check`'s foreign-key test is a denylist of acronyms, and a denylist has no closing condition.** A ledger row citing a decision the queue does not hold is red — unless the row also contains something shaped like a foreign ticket key, in which case it is a warning, because the row may be about another project. Round 1 of review broke that with `UTF-8`; it is now letters-only minus an exclusion list (UTF, SHA, MD, RFC, ISO, PR, CVE, HTTP, WCAG, ADR, TC), and round 2 broke it again with `AES-256`, `IEEE-754`, `SC-1.4.11`, `TLS-1`. Each fix is one incident behind. Options: (A) invert it — match against project keys the repo declares it works with (a new `tracker.foreign_keys:` list), so an unknown acronym reds instead of excusing; (B) drop the foreign-key concept and make every unresolvable citation a warning, losing the distinction but ending the arms race; (C) keep extending the denylist. Reversal: A needs a config key and a default; B is a deletion; C is free and endless. | none — (A) adds a config surface every repo inherits | 🔴 OPEN | 2026-09-25 |
 
+| D17 | **Who is the front page for?** Measured 2026-09-17: 6 ⭐ / 0 forks / 0 outside issues after 31 days and 27 releases, while BMAD (53k) and superpowers (288k, 2 months) ship as copy-in markdown. Two readings. **(a) Solo developer on one agent tool** — README leads with `audit` (Node only, 10 s), install in two commands, the PM/BA/Actor/parallel layer presented as opt-in; cost: enterprise buyers see a hobby tool first. **(b) Team lead / enterprise** — lead with the field-trial case study and per-person accountability; cost: the individual who stars repos never reaches the install line. VT-26 rewrote the README under **(a)** because it is reversible in one file and (b) has no case study yet; the doctrine, gates and team machinery are untouched either way. Reversal cost: one README, one day. | VT-26 | 🔴 OPEN | 2026-09-24 |
+
 ## 2. Owner-only actions
+
 
 | # | Action | Why machine-exempt | Status | Due |
 |---|---|---|---|---|

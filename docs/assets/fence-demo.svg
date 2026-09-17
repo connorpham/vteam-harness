@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="508" viewBox="0 0 1120 508" role="img" aria-label="vteam demo: audit F, install, push to main refused, push without review dossier refused, audit 91/100 · grade A">
+<style>
+text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;white-space:pre}
+.cmd{fill:#e6edf3;font-weight:600} .ok{fill:#3fb950} .bad{fill:#ff7b72} .dim{fill:#8b949e}
+.l{opacity:0;animation:show 15.5s linear infinite}
+@keyframes show{0%{opacity:0}100%{opacity:1}}
+</style>
+<rect width="1120" height="508" rx="10" fill="#0d1117"/>
+<circle cx="22" cy="20" r="6" fill="#ff5f56"/><circle cx="42" cy="20" r="6" fill="#ffbd2e"/><circle cx="62" cy="20" r="6" fill="#27c93f"/>
+<text x="86" y="25" class="dim" style="font-size:12px">vteam — real transcripts, 2026-09-17 · loops</text>
+<text x="22" y="68" class="l cmd" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s0">$ npx vteam-harness audit</text>
+<style>@keyframes s0{0%{opacity:0}0.00%{opacity:0}0.01%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="90" class="l bad" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s1">  0/100 · grade F    (A ≥85 · B ≥70 · C ≥55 · D ≥35 · F &lt;35)</text>
+<style>@keyframes s1{0%{opacity:0}3.55%{opacity:0}3.56%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="112" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s2">   ❌ no active git hooks — a push leaves this machine completely unchecked</text>
+<style>@keyframes s2{0%{opacity:0}7.10%{opacity:0}7.11%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="134" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s3">   ❌ no mechanism ties an approval to a commit — every verdict is &quot;trust me, it was this version&quot;</text>
+<style>@keyframes s3{0%{opacity:0}10.65%{opacity:0}10.66%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="156" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s4">   ❌ no check can demonstrate it fails — green that cannot go red is decoration</text>
+<style>@keyframes s4{0%{opacity:0}14.19%{opacity:0}14.20%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="178" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s5"></text>
+<style>@keyframes s5{0%{opacity:0}17.74%{opacity:0}17.75%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="200" class="l cmd" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s6">$ npx vteam-harness init --yes &amp;&amp; npx vteam-harness doctor</text>
+<style>@keyframes s6{0%{opacity:0}21.29%{opacity:0}21.30%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="222" class="l ok" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s7">✅ manifest verified · ✅ gate selftests green (34 discovered checks prove they can red)</text>
+<style>@keyframes s7{0%{opacity:0}24.84%{opacity:0}24.85%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="244" class="l ok" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s8">PREFLIGHT: GREEN — the ticket→design→code→git chain runs end-to-end</text>
+<style>@keyframes s8{0%{opacity:0}28.39%{opacity:0}28.40%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="266" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s9"></text>
+<style>@keyframes s9{0%{opacity:0}31.94%{opacity:0}31.95%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="288" class="l cmd" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s10">$ git push origin main</text>
+<style>@keyframes s10{0%{opacity:0}35.48%{opacity:0}35.49%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="310" class="l bad" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s11">❌ No direct pushes to &#x27;main&#x27;.</text>
+<style>@keyframes s11{0%{opacity:0}39.03%{opacity:0}39.04%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="332" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s12">   Everything reaches main through a PR with green CI — code, docs, config alike.</text>
+<style>@keyframes s12{0%{opacity:0}42.58%{opacity:0}42.59%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="354" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s13"></text>
+<style>@keyframes s13{0%{opacity:0}46.13%{opacity:0}46.14%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="376" class="l cmd" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s14">$ git push origin feat/SHOP-12-discount        # product code, no review dossier</text>
+<style>@keyframes s14{0%{opacity:0}49.68%{opacity:0}49.69%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="398" class="l bad" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s15">❌ review_check: evd/SHOP-12/dev/review.md NOT in commit 194cfdb1ab81 — the review</text>
+<style>@keyframes s15{0%{opacity:0}53.23%{opacity:0}53.24%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="420" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s16">   dossier commits with the code; a file on one machine is a fabricated report</text>
+<style>@keyframes s16{0%{opacity:0}56.77%{opacity:0}56.78%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="442" class="l dim" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s17"></text>
+<style>@keyframes s17{0%{opacity:0}60.32%{opacity:0}60.33%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="464" class="l cmd" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s18">$ npx vteam-harness audit</text>
+<style>@keyframes s18{0%{opacity:0}63.87%{opacity:0}63.88%{opacity:1}100%{opacity:1}}</style>
+<text x="22" y="486" class="l ok" style="animation-delay:0s;animation-timing-function:steps(1,end);animation-name:s19">  91/100 · grade A</text>
+<style>@keyframes s19{0%{opacity:0}67.42%{opacity:0}67.43%{opacity:1}100%{opacity:1}}</style>
+</svg>
