@@ -59,9 +59,21 @@ from tracker import KEY_RE  # noqa: E402 — the one ticket-key grammar
 # word-boundary (audit L1 — '# PASSPORT verification' is NOT a PASS).
 VERDICT_PAT = re.compile(r"\b(PASS|FAIL|PARTIAL|NEW-BUG|BLOCKED|UNCLEAR)\b")
 SCOPE_PAT = re.compile(r"^CODE-SCOPE:\s*(.+)$", re.M)
-# paths every ticket may always touch — process artifacts, never product code
+# paths every ticket may always touch — process artifacts, never product code.
+# The CONFIGURED homes join at runtime (always_legal): a repo whose evidence lives
+# at proof/ must not read every /qa commit as derailment.
 ALWAYS_LEGAL = ("docs/", "evd/", ".vteam/", ".githooks/", ".github/",
                 "vteam.config.yaml", ".gitattributes", ".gitignore")
+
+
+def always_legal(c: Ctx) -> tuple:
+    homes = []
+    for key in ("evidence", "pm", "qa", "specs", "adr", "team", "design", "backlog"):
+        v = c.cfg(f"paths.{key}", None)
+        if v:
+            homes.append(str(v).strip().rstrip("/") + "/")
+    return tuple(dict.fromkeys(ALWAYS_LEGAL + tuple(homes)))
+
 
 
 def attributes(subject: str, key: str) -> bool:
@@ -305,7 +317,9 @@ def check_ledger(text: str, budget: int) -> list[str]:
 
 def check_scope(c: Ctx, tickets: list[str], evd_dir: Path) -> tuple[list, list]:
     errs, notes = [], []
+    legal = always_legal(c)
     for k in tickets:
+
         sheet = evd_dir / k / "dev" / "tasksheet.md"
         if not sheet.is_file():
             continue
@@ -326,7 +340,8 @@ def check_scope(c: Ctx, tickets: list[str], evd_dir: Path) -> tuple[list, list]:
                 ["git", "-C", str(c.root), "show", "--name-only", "--format=", sha],
                 capture_output=True, text=True).stdout.split()
             out = [f for f in files
-                   if not f.startswith(ALWAYS_LEGAL)
+                   if not f.startswith(legal)
+
                    and not any(f == s.rstrip("/") or f.startswith(s if s.endswith("/") else s + "/")
                                for s in scope)]
             if out:
@@ -449,14 +464,15 @@ def _selftest():
         return subprocess.run([sys.executable, str(self_path)],
                               cwd=cwd, capture_output=True, text=True)
 
-    def mk(td, *, budget=4):
+    def mk(td, *, budget=4, evidence="evd"):
         root = Path(td)
         sh(root, "git", "init", "-q", ".")
         sh(root, "git", "config", "user.email", "t@t.t")
         sh(root, "git", "config", "user.name", "t")
         (root / "vteam.config.yaml").write_text(
             "version: 1\nproject:\n  key: PROJ\n  adopted: 2026-01-01\n"
-            "paths:\n  pm: docs/pm\n  evidence: evd\n  backlog: docs/backlog\n"
+            f"paths:\n  pm: docs/pm\n  evidence: {evidence}\n  backlog: docs/backlog\n"
+
             f"team:\n  loop_budget_per_day: {budget}\n"
             "tracker:\n  provider: markdown\n  done_statuses: [Done]\n"
             "  review_status: \"In Review\"\n", encoding="utf-8")
@@ -650,14 +666,31 @@ def _selftest():
         assert r.returncode == 1 and "MAST 1.3" in r.stdout, \
             f"ledger checks must run even with a remote tracker:\n{r.stdout}"
 
+    # the always-legal homes follow the CONFIG: evidence at proof/ is not derailment
+    with tempfile.TemporaryDirectory() as td:
+        root = mk(td, evidence="proof")
+        ticket(root, "PROJ-2", "To Do")
+        sheet = root / "proof" / "PROJ-2" / "dev"
+        sheet.mkdir(parents=True)
+        (sheet / "tasksheet.md").write_text("# tasksheet PROJ-2\nCODE-SCOPE: src/auth/\n", encoding="utf-8")
+        (root / "proof" / "PROJ-2" / "notes.md").write_text("qa notes\n", encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-qm", "PROJ-2 evidence only"],
+                       cwd=root, check=True, capture_output=True)
+        r = run_gate(root)
+        assert r.returncode == 0, \
+            f"a commit under the CONFIGURED evidence dir must not read as derailment:\n{r.stdout}"
+
     print("graph_check selftest: OK (coherent graph green + 9 reds + 2 new greens: dangling, "
+
           "cycle, done-sans-verdict, done-with-FAIL, identical repeat, loop "
           "budget, out-of-scope commit — + loud skips: undeclared scope, "
           "remote tracker — + attribution, 17 positive / 12 negative: leading key "
           "attributed (bare/`type:`-prefixed/`feat(KEY):`/multi-scope "
           "`feat(a,KEY):`/`[KEY]`/`Revert \"…\"`), prose mention + longer key + "
           "merge-commit NOT, both directions proven end-to-end on the same "
-          "out-of-scope directory)")
+          "out-of-scope directory; always-legal homes follow paths.*)")
+
 
 
 if __name__ == "__main__":

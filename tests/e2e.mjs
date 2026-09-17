@@ -234,7 +234,126 @@ console.log("5. update honors the manifest");
           JSON.parse(fs.readFileSync(mfPath, "utf8")).owned === "docs/team/ops.md");
 }
 
+// ── 5b. update follows the CURRENT config + prunes orphans + guards agents ──
+// VT-24 (2026-09-17 code review): three installer holes. A provider switched
+// after init was unreachable (update only refreshed files already present, init
+// refused because the config existed); files the package stopped shipping stayed
+// on disk forever and dropped out of the manifest; packaged agents and the
+// SessionStart hook were written OUTSIDE the manifest, so an upstream change
+// never reached a consumer who was told "kept YOURS" about a file never touched.
+console.log("5b. update: providers follow config, orphans pruned, agents manifest-guarded");
+{
+  const dir = freshRepo("t5b");
+  const r0 = vteam(dir, ...INIT_FLAGS);
+  check("init exits 0", r0.status === 0, r0.stdout + r0.stderr);
+
+  // the gate on a fresh install is GREEN and now RUNS the stale-verdict step
+  const g0 = run("bash", [path.join(dir, ".vteam", "scripts", "gate.sh")], { cwd: dir });
+  check("gate.sh on a fresh install is GREEN", g0.status === 0 && /GATE: GREEN/.test(g0.stdout),
+    g0.stdout.slice(-800) + g0.stderr);
+  check("the stale-verdict step RAN (it was named by 5 workflows and wired into 0 profiles)",
+    /▶ stale-verdict:/.test(g0.stdout) && /no stale verdicts|no evidence dirs with key/.test(g0.stdout), g0.stdout.slice(-800));
+
+  // and preflight's driver probe no longer executes the whole gate
+  const help = run("python3", [path.join(dir, ".vteam", "scripts", "gate.py"), "--help"], { cwd: dir });
+  check("gate.py --help prints usage and runs NO step (preflight probed with it and ran the whole gate)",
+    help.status === 0 && !/▶ /.test(help.stdout) && /Usage: gate\.py/.test(help.stdout), help.stdout.slice(0, 300));
+
+  // (a) provider follows the config: markdown → github after init
+  const cfgF = path.join(dir, "vteam.config.yaml");
+  fs.writeFileSync(cfgF, fs.readFileSync(cfgF, "utf8").replace("provider: markdown", "provider: github"));
+  const r1 = vteam(dir, "update");
+  const ghProv = path.join(dir, ".vteam", "providers", "tracker_github.py");
+  check("update installs the provider the config names NOW", r1.status === 0 && fs.existsSync(ghProv),
+    r1.stdout + r1.stderr);
+  // switch back: the github provider is an orphan the framework no longer needs here
+  fs.writeFileSync(cfgF, fs.readFileSync(cfgF, "utf8").replace("provider: github", "provider: markdown"));
+
+  // (b) orphans: plant two files the "previous package" owned
+  const mfPath = path.join(dir, ".vteam", "manifest.json");
+  const mf = JSON.parse(fs.readFileSync(mfPath, "utf8"));
+  const { createHash } = await import("node:crypto");
+  const sha = (s) => createHash("sha256").update(s).digest("hex");
+  fs.writeFileSync(path.join(dir, ".vteam", "scripts", "old_gate.py"), "# retired\n");
+  mf.files[".vteam/scripts/old_gate.py"] = sha("# retired\n");            // unmodified orphan
+  fs.writeFileSync(path.join(dir, ".vteam", "scripts", "old_edited.py"), "# user changed me\n");
+  mf.files[".vteam/scripts/old_edited.py"] = sha("# what the package wrote\n"); // modified orphan
+  fs.writeFileSync(path.join(dir, ".vteam", "scripts", "old_owned.py"), "# forked on purpose\n");
+  mf.files[".vteam/scripts/old_owned.py"] = sha("# forked on purpose\n");
+  mf.owned = [".vteam/scripts/old_owned.py"];                            // owned orphan
+  fs.writeFileSync(mfPath, JSON.stringify(mf, null, 2) + "\n");
+  const r2 = vteam(dir, "update");
+  check("update exits 0 with orphans present", r2.status === 0, r2.stdout + r2.stderr);
+  check("unmodified orphan REMOVED and reported",
+    !fs.existsSync(path.join(dir, ".vteam", "scripts", "old_gate.py")) && /old_gate\.py/.test(r2.stdout), r2.stdout);
+  check("modified orphan KEPT and reported (never deletes user work)",
+    fs.existsSync(path.join(dir, ".vteam", "scripts", "old_edited.py")) && /KEPT[\s\S]*old_edited\.py/.test(r2.stdout), r2.stdout);
+  check("owned orphan untouched", fs.existsSync(path.join(dir, ".vteam", "scripts", "old_owned.py")));
+  check("switched-away provider pruned as an unmodified orphan", !fs.existsSync(ghProv), r2.stdout);
+  const mf2 = JSON.parse(fs.readFileSync(mfPath, "utf8"));
+  check("manifest no longer tracks the pruned/kept orphans, still tracks the owned one",
+    !(".vteam/scripts/old_gate.py" in mf2.files) && !(".vteam/scripts/old_edited.py" in mf2.files) &&
+    (".vteam/scripts/old_owned.py" in mf2.files), JSON.stringify(Object.keys(mf2.files).filter((k) => /old_/.test(k))));
+
+  // (c) packaged agents + hook live in the manifest and obey it
+  check("manifest records the packaged agents and the SessionStart hook",
+    ".claude/agents/backend-specialist.md" in mf2.files && ".claude/hooks/vteam-session-start.sh" in mf2.files);
+  const agent = path.join(dir, ".claude", "agents", "backend-specialist.md");
+  const pkgAgent = fs.readFileSync(path.join(PKG, "core", "agents", "backend-specialist.md"), "utf8");
+  // simulate "the package changed": pretend the framework last wrote a different body
+  fs.writeFileSync(agent, pkgAgent + "\n<!-- older packaged text -->\n");
+  const mf3 = JSON.parse(fs.readFileSync(mfPath, "utf8"));
+  mf3.files[".claude/agents/backend-specialist.md"] = sha(pkgAgent + "\n<!-- older packaged text -->\n");
+  fs.writeFileSync(mfPath, JSON.stringify(mf3, null, 2) + "\n");
+  const r3 = vteam(dir, "update");
+  check("an UNMODIFIED agent is refreshed to the new packaged text (was: kept forever)",
+    r3.status === 0 && fs.readFileSync(agent, "utf8") === pkgAgent, r3.stdout);
+  // and a user-edited agent is parked, not clobbered
+  fs.writeFileSync(agent, pkgAgent + "\nMY LOCAL AGENT RULE\n");
+  const r4 = vteam(dir, "update");
+  check("a user-EDITED agent is kept and the new version parked as .new",
+    r4.status === 0 && /MY LOCAL AGENT RULE/.test(fs.readFileSync(agent, "utf8")) &&
+    fs.existsSync(`${agent}.new`), r4.stdout);
+}
+
+// ── 5c. profile detection asks the manifest, adapters emit valid YAML ──────
+console.log("5c. detectProfile needs `next`; copilot/windsurf frontmatter is quoted");
+{
+  const prismaRepo = (name, deps) => {
+    const d = freshRepo(name);
+    fs.mkdirSync(path.join(d, "prisma"));
+    fs.writeFileSync(path.join(d, "prisma", "schema.prisma"), "// schema\n");
+    fs.writeFileSync(path.join(d, "package.json"), JSON.stringify({ name, dependencies: deps }));
+    run("git", ["-C", d, "add", "-A"]); run("git", ["-C", d, "commit", "-qm", "prisma"]);
+    return d;
+  };
+  const noNext = prismaRepo("t5c-express", { express: "4", "@prisma/client": "6" });
+  const rA = vteam(noNext, "init", "--yes", "--tools", "claude-code");
+  check("prisma WITHOUT next detects `node` (nextjs-prisma ran `next typegen` and reddened it)",
+    rA.status === 0 && /profile: node$/m.test(fs.readFileSync(path.join(noNext, "vteam.config.yaml"), "utf8")),
+    rA.stdout + rA.stderr + fs.readFileSync(path.join(noNext, "vteam.config.yaml"), "utf8").match(/profile:.*/)?.[0]);
+  const withNext = prismaRepo("t5c-next", { next: "15", "@prisma/client": "6" });
+  const rB = vteam(withNext, "init", "--yes", "--tools", "claude-code");
+  check("prisma WITH next detects `nextjs-prisma`",
+    rB.status === 0 && /profile: nextjs-prisma$/m.test(fs.readFileSync(path.join(withNext, "vteam.config.yaml"), "utf8")));
+  // the typegen step declares its skip on a repo where next is absent
+  const gy = fs.readFileSync(path.join(PKG, "profiles", "nextjs-prisma", "gates.yaml"), "utf8");
+  check("nextjs-prisma typegen probes for `next` (declared skip, not a red)",
+    /typegen:[\s\S]*?requires_cmd:[^\n]*next[\s\S]*?skip_reason:/.test(gy));
+
+  const dir = freshRepo("t5c-tools");
+  const r = vteam(dir, "init", "--yes", "--tools", "copilot,windsurf", "--profile", "generic",
+    "--tracker", "markdown", "--design", "none");
+  check("init --tools copilot,windsurf exits 0", r.status === 0, r.stdout + r.stderr);
+  for (const f of [".github/prompts/plan.prompt.md", ".windsurf/workflows/plan.md"]) {
+    const line2 = fs.readFileSync(path.join(dir, f), "utf8").split("\n")[1];
+    check(`${f}: description is a quoted YAML scalar (plan.md's "kernel: Why" broke the plain form)`,
+      /^description: "[^"]*"$/.test(line2), line2.slice(0, 120));
+  }
+}
+
 // ── 6. invalid input writes NOTHING ──────────────────────────────────────────
+
 console.log("6. invalid --profile: clean failure, zero writes");
 {
   const dir = freshRepo("t6");

@@ -61,8 +61,16 @@ STRUCTURAL = ("title", "labels", "summary", "criteria", "type", "profile", "code
 
 
 def code_scope_for(key, root):
-    """CODE-SCOPE from the ticket's tasksheet, or None when it has not been written yet."""
-    for cand in (root / "evd" / key / "dev" / "tasksheet.md",):
+    """CODE-SCOPE from the ticket's tasksheet, or None when it has not been written yet.
+    The evidence home is read from the measured repo's config, not assumed to be evd/."""
+    ev = "evd"
+    cfg = root / "vteam.config.yaml"
+    if cfg.is_file():
+        m = re.search(r"^\s*evidence:\s*([\w./-]+)", cfg.read_text(encoding="utf-8", errors="replace"), re.M)
+        if m:
+            ev = m.group(1).rstrip("/")
+    for cand in (root / ev / key / "dev" / "tasksheet.md",):
+
         if cand.is_file():
             m = re.search(r"^CODE-SCOPE:\s*(.+)$", cand.read_text(encoding="utf-8", errors="replace"), re.M)
             if m:

@@ -3,7 +3,8 @@ import path from "node:path";
 import { pkgRoot, repoRoot, render } from "./util.mjs";
 import { loadConfig, cfgGet } from "./config.mjs";
 import { ManifestGuard, walkFiles } from "./manifest.mjs";
-import { TOOLS, renderTool, adapterMarker } from "./adapters.mjs";
+import { TOOLS, renderTool, adapterMarker, adapterOutputDirs } from "./adapters.mjs";
+
 import { CI_WORKFLOW, GITIGNORE_RULES, GITATTR_RULES, pkgVersion } from "./init.mjs";
 
 /** Refresh framework-owned files from the package. NEVER touches user ledgers
@@ -46,17 +47,25 @@ export async function update(_flags) {
   if (fs.existsSync(path.join(pkgRoot, "profiles", profile))) {
     guard.syncDir(path.join(pkgRoot, "profiles", profile), `.vteam/profiles/${profile}`);
   }
-  for (const kind of ["tracker", "design"]) {
-    const dir = path.join(root, ".vteam", "providers");
-    if (!fs.existsSync(dir)) continue;
-    for (const f of fs.readdirSync(dir)) {
-      const m = f.match(new RegExp(`^${kind}_(\\w+)\\.py$`));
-      if (m && fs.existsSync(path.join(pkgRoot, "providers", kind, `${m[1]}.py`))) {
-        guard.sync(`.vteam/providers/${f}`,
-          fs.readFileSync(path.join(pkgRoot, "providers", kind, `${m[1]}.py`)));
-      }
+  // Providers follow the CURRENT config, not the files that happen to be on disk. The
+  // first version only refreshed providers already present, so a tracker switched after
+  // init was unreachable: update never installed it, tracker.py said "run init", and
+  // init refused because the config existed. A provider the config no longer names is
+  // an orphan for prune() below.
+  for (const [kind, key, builtin] of [["tracker", "tracker.provider", "markdown"],
+                                      ["design", "design.provider", "none"]]) {
+    const name = String(cfgGet(userCfg, key, builtin));
+    if (name === builtin) continue;
+    const shipped = fs.readdirSync(path.join(pkgRoot, "providers", kind))
+      .filter((f) => f.endsWith(".py")).map((f) => f.slice(0, -3));
+    if (!shipped.includes(name)) { // never build a path from an unshipped name
+      console.log(`⚠ ${key}: ${JSON.stringify(name)} — no such provider ships with this package (have: ${shipped.join(", ")}); the gates that need it will fail loudly`);
+      continue;
     }
+    guard.sync(`.vteam/providers/${kind}_${name}.py`,
+      fs.readFileSync(path.join(pkgRoot, "providers", kind, `${name}.py`)));
   }
+
   console.log("✓ .vteam runtime refreshed");
 
   // ---- doctrine (framework-owned, but user edits are preserved as conflicts) -----
@@ -94,14 +103,32 @@ export async function update(_flags) {
   }
 
   // ---- adapters: re-render every tool already present ------------------------------
+  const prunable = [".vteam/scripts/", ".vteam/locales/", `.vteam/profiles/${profile}/`,
+    ".vteam/providers/", `${teamDir}/`];
   for (const tool of TOOLS) {
     if (fs.existsSync(path.join(root, await adapterMarker(tool)))) {
-      await renderTool(tool, root, cfg, (rel, text) => guard.sync(rel, text));
+      await renderTool(tool, root, cfg, (rel, text, mode) => guard.sync(rel, text, mode));
+      prunable.push(...await adapterOutputDirs(tool));
       console.log(`✓ ${tool} workflows re-rendered`);
     }
   }
 
+  // ---- orphans: files the framework no longer ships, under the trees this run
+  // refreshed. Unmodified → removed (a stale gate in .vteam/scripts was drift that
+  // doctor could never see); modified → kept and named; owned → never touched.
+  guard.prune(prunable);
+
   guard.save(pkgVersion());
+  if (guard.pruned.length) {
+    console.log(`\n🧹 ${guard.pruned.length} file(s) the framework no longer ships were removed (unmodified copies):`);
+    for (const p of guard.pruned) console.log(`  ${p}`);
+  }
+  if (guard.orphansKept.length) {
+    console.log(`\n⚠ ${guard.orphansKept.length} file(s) the framework no longer ships were KEPT — you modified them:`);
+    for (const p of guard.orphansKept) console.log(`  ${p}`);
+    console.log("  Delete them yourself when you no longer need them; the manifest no longer tracks them.");
+  }
+
   if (guard.ownedPartial) {
     console.log(`\n⚠ .vteam/manifest.json: ${guard.ownedPartial} — the rest of the declaration was honoured.`);
   }

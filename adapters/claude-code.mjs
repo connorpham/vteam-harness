@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 
 export const id = "claude-code";
 export const marker = ".claude/skills/team/SKILL.md";
+// everything this adapter writes lives here — update prunes orphans under these only
+export const outputDirs = [".claude/skills/", ".claude/agents/", ".claude/hooks/"];
+
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -26,17 +29,23 @@ export function render(wf, ctx) {
 }
 
 /** Post-step: install the specialist subagents and the SessionStart hook.
- * Subagents (core/agents/*.md → .claude/agents/) follow the same
- * non-destructive rule as the hook: written when absent, a user-edited copy
- * is kept — loudly, never silently.
- * Then the SessionStart hook. Two writes, both non-destructive:
- * the hook script (a user-edited copy is kept — loudly, never silently), and a
- * SessionStart entry merged into .claude/settings.json — parsed and added only
- * when absent; when the entry is already there the file is not rewritten, so
- * user content stays byte-for-byte. A file this adapter cannot faithfully
+ * Subagents (core/agents/*.md → .claude/agents/) and the hook script go through
+ * `write` — the caller's manifest-guarded path (init: force; update: sync), so an
+ * unmodified copy is refreshed when the package changes and a user-edited copy
+ * is parked as `.new`, exactly like a workflow file. The first version wrote
+ * them directly and kept ANY differing copy, so an upstream agent change never
+ * reached a consumer, who was told "kept YOURS" about a file it never touched.
+ * The SessionStart entry is MERGED into .claude/settings.json — parsed and added
+ * only when absent; when the entry is already there the file is not rewritten,
+ * so user content stays byte-for-byte. A file this adapter cannot faithfully
  * preserve (unparseable JSON, unexpected shapes) is warned about and SKIPPED,
  * never overwritten. */
-export function pointers(root) {
+export function pointers(root, write = (rel, text, mode) => {
+  const abs = path.join(root, ...rel.split("/"));
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, text);
+  if (mode !== undefined) fs.chmodSync(abs, mode);
+}) {
   const changed = [];
   const settingsRel = ".claude/settings.json";
   const skip = (msg) => { console.log(`⚠ claude-code: ${msg}`); return changed; };
@@ -46,34 +55,17 @@ export function pointers(root) {
   if (fs.existsSync(agentsSrc)) {
     for (const f of fs.readdirSync(agentsSrc).filter((n) => n.endsWith(".md")).sort()) {
       const rel = `.claude/agents/${f}`;
-      const wantAgent = fs.readFileSync(path.join(agentsSrc, f), "utf8");
-      const abs = path.join(root, ".claude", "agents", f);
-      const haveAgent = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
-      if (haveAgent === null) {
-        fs.mkdirSync(path.dirname(abs), { recursive: true });
-        fs.writeFileSync(abs, wantAgent);
-        changed.push(rel);
-      } else if (haveAgent !== wantAgent) {
-        console.log(`⚠ claude-code: ${rel} differs from the packaged version — kept YOURS ` +
-          "(delete it and re-run vteam update for a fresh copy)");
-      }
+      const status = write(rel, fs.readFileSync(path.join(agentsSrc, f), "utf8"));
+      if (status !== "current") changed.push(rel);
     }
   }
 
-  // 1) the hook script, from the packaged template
+  // 1) the hook script, from the packaged template (exec bit travels with it)
   const want = fs.readFileSync(
     path.join(pkgRoot, "core", "templates", "hooks", "session-start"), "utf8");
+  if (write(HOOK_REL, want, 0o755) !== "current") changed.push(HOOK_REL);
   const hookAbs = path.join(root, ...HOOK_REL.split("/"));
-  const have = fs.existsSync(hookAbs) ? fs.readFileSync(hookAbs, "utf8") : null;
-  if (have === null) {
-    fs.mkdirSync(path.dirname(hookAbs), { recursive: true });
-    fs.writeFileSync(hookAbs, want);
-    changed.push(HOOK_REL);
-  } else if (have !== want) {
-    console.log(`⚠ claude-code: ${HOOK_REL} differs from the packaged template — kept YOURS ` +
-      "(delete it and re-run vteam update for a fresh copy)");
-  }
-  try { fs.chmodSync(hookAbs, 0o755); } catch { /* mode is cosmetic: the settings entry runs it via bash */ }
+
 
   // 2) merge the SessionStart entry into settings.json
   const settingsAbs = path.join(root, ...settingsRel.split("/"));

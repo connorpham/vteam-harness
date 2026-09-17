@@ -65,18 +65,6 @@ export function parseFrontmatter(text) {
 }
 
 // ---- fs helpers ------------------------------------------------------------
-export function copyDir(src, dst) {
-  fs.mkdirSync(dst, { recursive: true });
-  for (const e of fs.readdirSync(src, { withFileTypes: true })) {
-    const s = path.join(src, e.name);
-    const d = path.join(dst, e.name);
-    if (e.isDirectory()) copyDir(s, d);
-    else {
-      fs.copyFileSync(s, d);
-      fs.chmodSync(d, fs.statSync(s).mode);
-    }
-  }
-}
 
 /** Write only when absent — user ledgers are never clobbered. */
 export function writeIfAbsent(file, content) {

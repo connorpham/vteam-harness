@@ -4,11 +4,16 @@ import path from "node:path";
 
 export const id = "copilot";
 export const marker = ".github/prompts/team.prompt.md";
+export const outputDirs = [".github/prompts/"];
+
 
 export function render(wf, ctx) {
   return {
     path: path.join(".github", "prompts", `${wf.name}.prompt.md`),
-    text: `---\ndescription: ${wf.description.slice(0, 250)}\n---\n\n` + ctx.noSubagentNote + wf.body,
+    // quoted like the claude-code adapter: a plain scalar carrying `: ` (plan.md's
+    // "kernel: Why, …") is not YAML — "mapping values are not allowed here"
+    text: `---\ndescription: "${wf.description.slice(0, 250).replace(/"/g, "'")}"\n---\n\n` + ctx.noSubagentNote + wf.body,
+
   };
 }
 

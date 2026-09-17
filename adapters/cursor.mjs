@@ -3,6 +3,8 @@ import path from "node:path";
 
 export const id = "cursor";
 export const marker = ".cursor/commands/team.md";
+export const outputDirs = [".cursor/commands/"];
+
 
 export function render(wf, ctx) {
   return {

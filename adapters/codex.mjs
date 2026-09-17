@@ -4,6 +4,8 @@ import path from "node:path";
 
 export const id = "codex";
 export const marker = ".codex/prompts/team.md";
+export const outputDirs = [".codex/prompts/"];
+
 
 export function render(wf, ctx) {
   return {

@@ -52,7 +52,9 @@ deal as package.json scripts or a Makefile, deliberately. Review manifest
 changes like you review code, and treat a diff that touches gates.yaml in a PR
 as high-stakes.
 
-Usage: gate.py [e2e] ; wrapped by gate.sh for muscle memory.
+Usage: gate.py [--help] [e2e] ; wrapped by gate.sh for muscle memory. `--help` prints
+this text and runs NOTHING; an unknown `--flag` exits 2 instead of becoming a tail.
+
 Selftest: gate.py --selftest (green/red/skip/no-reason/substitution fixtures +
 requires_cmd green/skip/red + both WEAK banners + the echo-test tripwire).
 """
@@ -86,8 +88,22 @@ def find_manifest(c: Ctx, profile: str) -> Path:
 
 
 def main() -> int:
+    args = sys.argv[1:]
+    if any(a in ("--help", "-h") for a in args):
+        print(__doc__)
+        return 0
+    flags = [a for a in args if a.startswith("-")]
+    if flags:
+        # Every argument used to become a tail name, so `gate.py --help` — which
+        # preflight.sh ran as an "is the driver installed" probe — executed the ENTIRE
+        # gate silently at every /dev T0, /pm P0 and /ba B0. A flag this driver does
+        # not know is an error, never a no-op and never a tail.
+        print(f"gate: unknown flag(s) {' '.join(flags)} — usage: gate.py [--help] [<tail> …] "
+              f"(a tail names a `tail: true` step, e.g. e2e)")
+        return 2
     c = Ctx()
-    tails = {a for a in sys.argv[1:]}
+    tails = set(args)
+
     profile = str(c.cfg("stack.profile", "generic"))
     manifest = parse_config(find_manifest(c, profile).read_text(encoding="utf-8"))
     steps = manifest.get("steps", {})
@@ -168,7 +184,8 @@ def main() -> int:
                  f"{', '.join(advisory_failed)}" if advisory_failed else "")
     BOOKKEEPING = {"docs-shrink", "ledger", "verbatim", "lockfile", "graph", "competencies",
                    "parallel", "coord", "bdd-report", "evd", "evd-ui", "schedule",
-                   "doctrine-source"}
+                   "doctrine-source", "stale-verdict"}
+
     skipped_names = {s for s, _ in skipped}
     if all(s in BOOKKEEPING for s in ran):
         print(f"GATE: GREEN (WEAK — only bookkeeping steps ran, ZERO verification "
@@ -317,7 +334,21 @@ def _selftest():
         assert r.returncode == 1 and "RED at hard" in r.stdout, r.stdout
         assert "never" not in r.stdout, "a step after a red must not run"
 
+        # --help prints usage and runs NOTHING — preflight.sh probes with it, and the
+        # old driver read it as a tail name and ran the whole gate; an unknown flag reds
+        root = setup("steps:\n  loud:\n    run: \"echo GATE-RAN\"\n")
+        roots.append(root)
+        r = subprocess.run([sys.executable, str(self_path), "--help"],
+                           cwd=root, capture_output=True, text=True)
+        assert r.returncode == 0 and "GATE-RAN" not in r.stdout and "gate.py" in r.stdout, \
+            f"--help must print usage and run no step:\n{r.stdout}"
+        r = subprocess.run([sys.executable, str(self_path), "--bogus"],
+                           cwd=root, capture_output=True, text=True)
+        assert r.returncode == 2 and "unknown flag" in r.stdout and "GATE-RAN" not in r.stdout, \
+            f"an unknown flag must exit 2 and run nothing:\n{r.stdout}"
+
         # requires_cmd probe fails with NO skip_reason → RED, same law as requires
+
         root = setup("steps:\n  probed:\n    run: \"echo never\"\n"
                      "    requires_cmd: \"exit 7\"\n")
         roots.append(root)
@@ -377,7 +408,9 @@ def _selftest():
         for root in roots:
             shutil.rmtree(root, ignore_errors=True)
     print("gate selftest: OK (green + substitution, red stops, run-less red, "
-          "silent-skip red, declared skip loud, requires_cmd green/skip/red, "
+          "silent-skip red, declared skip loud, --help runs nothing, unknown flag exits 2, "
+          "requires_cmd green/skip/red, "
+
           "2 WEAK banners, echo-test tripwire — advisory (6 fixtures): "
           "fails-without-blocking, still-prints, banner on GREEN, passes silently "
           "leaving no banner, non-boolean reds, a hard red BEFORE and AFTER it still "

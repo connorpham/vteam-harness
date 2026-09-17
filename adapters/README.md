@@ -19,9 +19,17 @@ export function render(wf, ctx) {    // one workflow → one file
   //       subagent spawning run reviewer/challenger passes — fresh chat per pass)
   return { path: "<repo-relative output path>", text: "<file content>" };
 }
-export function pointers(root) { ... } // optional post-step: discovery pointers
-                                       // (e.g. an AGENTS.md section); returns [changed paths]
+export const outputDirs = ["<dir>/"]; // every directory this adapter writes into — update
+                                      // prunes files the package no longer ships under these
+export function pointers(root, write) { ... } // optional post-step: discovery pointers
+                                       // (an AGENTS.md section, packaged agents, a hook).
+                                       // Copies of PACKAGED files go through `write(rel,
+                                       // text[, mode])` — the caller's manifest-guarded path
+                                       // (init forces, update refreshes-or-parks). Merges into
+                                       // files the user owns (settings.json) stay hand-written.
+                                       // Returns [changed paths].
 ```
+
 
 Rules:
 

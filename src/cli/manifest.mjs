@@ -33,6 +33,9 @@ export class ManifestGuard {
     this.files = {};               // the manifest being built this run
     this.conflicts = [];           // rel paths preserved as <rel>.new
     this.owned = [];               // rel paths this repo has DECLARED it owns
+    this.pruned = [];              // orphans removed (unmodified, no longer shipped)
+    this.orphansKept = [];         // orphans kept (user-modified) — reported, untracked
+
     // A repo may deliberately fork a framework file — a monorepo profile the stock
     // one will never match, a hook with local rules. Without a way to say so, every
     // update parks another `.new` on it forever: reviewed, deleted, and back within
@@ -144,7 +147,35 @@ export class ManifestGuard {
     }
   }
 
+  /** update only: files the OLD manifest owned under `prefixes` that this run did
+   * not write are files the framework no longer ships. save() used to drop them
+   * from the manifest and leave them on disk — so a renamed gate lingered forever
+   * in .vteam/scripts, and doctor (which reads the manifest) could never see it.
+   *   unmodified (hash == manifest) → deleted, listed in this.pruned
+   *   modified                      → kept, listed in this.orphansKept, untracked
+   *   declared owned                → never touched, stays recorded
+   *   already gone                  → nothing to do (drops from the manifest)
+   * Only under `prefixes` — the trees this run actually refreshed — so a tool
+   * whose marker is gone is not swept on the strength of a stale manifest. */
+  prune(prefixes) {
+    if (!this.old?.files) return;
+    for (const [rel, hash] of Object.entries(this.old.files)) {
+      if (rel in this.files) continue;
+      if (!prefixes.some((p) => rel.startsWith(p))) continue;
+      if (this.ownedDecl.has(rel)) { this.files[rel] = hash; continue; }
+      const abs = this._abs(rel);
+      if (!fs.existsSync(abs)) continue;
+      if (sha256(fs.readFileSync(abs)) === hash) {
+        fs.rmSync(abs);
+        this.pruned.push(rel);
+      } else {
+        this.orphansKept.push(rel);
+      }
+    }
+  }
+
   save(version) {
+
     // The ownership declaration is the REPO's, not the run's, so it is carried
     // forward as written. Both flags guard it: splitting the "malformed" message in
     // review round 2 moved the partial case off the flag this used to read, and a

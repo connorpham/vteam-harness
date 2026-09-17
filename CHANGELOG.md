@@ -17,6 +17,59 @@ Everything here came from running the lanes on a real second repo and then revie
 the result. Nothing in it was designed from the armchair, and several entries are
 corrections to things 0.18.0 shipped.
 
+### Added before publish (2026-09-17): the line-by-line code review (VT-24)
+
+0.19.0 was still waiting on the registry, so a full read of the framework's 64 files
+(18,602 lines) went in first. Thirteen defects, every one with a test that was RED
+before the fix (`evd/VT-24/dev/proof.md`, `mutations.md`):
+
+- **`preflight.sh` ran the ENTIRE gate on every `/dev T0`, `/pm P0`, `/ba B0`.** Its
+  "is the driver installed" probe was `gate.py --help`, and the driver read every
+  argument as a tail name. `gate.py --help` now prints usage and runs nothing; an
+  unknown `--flag` exits 2 instead of silently becoming a tail.
+- **`stale_verdict_check` was named by five workflows and wired into zero profiles** —
+  the same declared-but-unwired hole VT-17 closed for `evd_check`. All six profiles
+  now run it as the `stale-verdict` step (declared skip on remote trackers, where it
+  would be one network call per ticket).
+- **A tracker or design provider switched after init was unreachable**: `update` only
+  refreshed provider files already on disk, `tracker.py` said "run init", `init`
+  refused because the config existed. `update` now installs whatever the CURRENT
+  config names.
+- **`update` never removed files the package stopped shipping** — a retired gate
+  lingered in `.vteam/scripts` forever and dropped out of the manifest, where doctor
+  could not see it. `ManifestGuard.prune()`: unmodified orphans are removed and named,
+  modified ones kept and named, `owned` paths never touched. This repo's own
+  `.vteam/profiles/generic/gates.yaml` mirror turned out to be six weeks behind its
+  source (and a stray `.new` was committed) — both corrected by the same run.
+- **Packaged agents and the SessionStart hook were written outside the manifest**, so
+  an upstream change never reached a consumer, who was told "kept YOURS" about a file
+  it never edited. Adapters' `pointers()` now write through the caller's
+  manifest-guarded path (refreshed while unmodified, parked as `.new` once edited);
+  each adapter declares `outputDirs` so prune knows its tree.
+- **copilot and windsurf emitted invalid YAML frontmatter** — `plan.md`'s description
+  carries `kernel: Why, …`, and an unquoted plain scalar with `: ` is "mapping values
+  are not allowed here". Quoted, like the claude-code adapter always did.
+- **Profile detection keyed on `prisma/` alone**, so an Express + Prisma repo got
+  `nextjs-prisma` and its gate reddened on `npx next typegen`. Detection now asks
+  `package.json` for `next`; the `typegen` step declares a skip when it is absent.
+- `bdd_report_check.py --root <dir>` crashed (`IsADirectoryError`) — real argparse.
+- `ctx.py` and `ctx.mjs` disagreed on `[a,,b]` (Python returned `['a','','b']`, Node
+  threw), and both silently DROPPED every top-level key after a first key that sat at
+  column 2. Both die loudly now with one message; two conformance fixtures (15 → 17).
+- `--attach` (both evidence checkers) erased every section AFTER `## TRACKER
+  ATTACHMENTS` to the end of the file on a re-run — `evdpack.replace_section` replaces
+  exactly one section.
+- `schedule_check` took the FIRST dated cell of a decision row as its deadline; a
+  Question that quotes the day it was asked read as OVERDUE on the spot. The `Due`
+  column (from the header) decides; last dated cell without one.
+- `graph_check`'s always-legal homes, `log_check`'s path check and `route_check`'s
+  tasksheet lookup hardcoded `evd/`; they follow `paths.*` now.
+- Dead code removed (`util.copyDir`, an always-true assert in `evd_check`'s selftest).
+
+`npm test` grew from 172 to 192 checks. Still not covered by any test, filed as VT-25:
+`orca_team.sh`, `ui-evidence.mjs`, `ui_fidelity.mjs`, `auth.mjs`, `prepublish-check.mjs`.
+
+
 ### The doctrine learned the thing two field tickets turned on
 
 `grep -ril 'forced.colors|high contrast' core/doctrine/` returned **nothing** across
