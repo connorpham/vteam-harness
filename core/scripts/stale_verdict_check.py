@@ -163,7 +163,17 @@ def main() -> int:
 
         if not judged:
             continue  # no pinned sha and never judged — nothing to be stale
+        # A ticket closed by a DECISION (graph_check's `closed-by: <Qn|Dn>` — a won't-fix the
+        # owner called) never had a QA verdict, so there is nothing to date and nothing to go
+        # stale. Found the day this scan became a gate step: a consumer's won't-fix ticket
+        # read as UNVERIFIABLE. The decision's own row is the durable record.
+        if not (c.path("evidence") / tk / "REPORT.md").is_file() and \
+                re.search(r"^[-*]?\s*closed-by\s*:\s*[QDA]\d+", issue.get("description", ""), re.M | re.I):
+            print(f"ℹ️  {tk}: closed by decision (closed-by field), no QA verdict to date — "
+                  f"graph_check holds the closure to a ✅ DECIDED row")
+            continue
         if vat:
+
             after = changes_after_time(c, tk, vat)
             if after:
                 stale.append((tk, f"{issue['status']} · VERIFIED-AT "
@@ -339,8 +349,32 @@ def _selftest():
         assert r.returncode == 1 and "PROJ-9" in r.stdout, \
             f"post-verdict change must RED on the time anchor:\n{r.stdout}{r.stderr}"
 
+    # ── closed by decision: no REPORT.md, no verdict — nothing to date, never UNVERIFIABLE ──
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        sh(root, "git", "init", "-q", ".")
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\nproject:\n  key: PROJ\n"
+            "paths:\n  evidence: evd\n  backlog: docs/backlog\n"
+            "git:\n  code_paths: [src/]\n"
+            "tracker:\n  provider: markdown\n  done_statuses: [Done]\n", encoding="utf-8")
+        (root / "docs" / "backlog").mkdir(parents=True)
+        (root / "docs" / "backlog" / "PROJ-3.md").write_text(
+            "# PROJ-3: won't fix\n- status: Done\n- closed-by: Q2\n\nbody\n", encoding="utf-8")
+        (root / "evd" / "PROJ-3" / "dev").mkdir(parents=True)   # dev evidence only, no REPORT.md
+        r = run_gate(root)
+        assert r.returncode == 0 and "closed by decision" in r.stdout, \
+            f"a closed-by ticket has no verdict to date and must not red:\n{r.stdout}{r.stderr}"
+        # …but the SAME shape without the field is still an undated closure → RED
+        (root / "docs" / "backlog" / "PROJ-3.md").write_text(
+            "# PROJ-3: won't fix\n- status: Done\n\nbody\n", encoding="utf-8")
+        r = run_gate(root)
+        assert r.returncode == 1 and "UNVERIFIABLE" in r.stdout, \
+            f"done with no verdict and no closed-by stays UNVERIFIABLE:\n{r.stdout}"
+
     with tempfile.TemporaryDirectory() as td:
         root = squash_repo(td, verified_at_line=False)
+
         # mutation: sha gone AND no VERIFIED-AT AND no changelog → RED, never a
         # warning (the old warn-and-continue made this gate a green no-op on
         # every squash-merge repo)
@@ -351,7 +385,9 @@ def _selftest():
 
     print("stale_verdict_check selftest: OK (pinned verdict green + post-verdict "
           "code change red + out-of-code-paths ignored + --fix reopens via tracker "
-          "+ squash: VERIFIED-AT anchors green/red + unanchorable verdict RED)")
+          "+ squash: VERIFIED-AT anchors green/red + unanchorable verdict RED "
+          "+ closed-by decision: no verdict to date, green; same without the field red)")
+
 
 
 if __name__ == "__main__":

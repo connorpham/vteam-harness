@@ -17,6 +17,8 @@
 #   orca_team.sh open-run <objective>   create a Run + ensure coordination.md; print RUN=<id>
 #   orca_team.sh wait <run_id>          block for worker_done/escalation/question
 #   orca_team.sh trust <path>           pre-accept Claude's trust dialog for a worktree
+#   orca_team.sh --selftest             offline proof (fake orca, temp HOME) — see the block below
+
 #
 # Why `trust` exists: `orca orchestration worker-start --worktree new-child`
 # creates a directory Claude Code has never seen, so Claude opens its "Do you
@@ -81,8 +83,80 @@ ensure_coord() {
   [ -f "$COORD" ] || printf '# Coordination log — peer handoffs between parallel DEV agents\n\n| Round | From | To | Path/Contract | What/why |\n|---|---|---|---|---|\n' > "$COORD"
 }
 
+# ── selftest: offline, in a temp repo — a fake `orca` on PATH, HOME in a temp dir ──
+# The tool talks to a bus and edits the user's ~/.claude.json; neither may be touched
+# by a test, so both are stand-ins. Green paths + the refusals that protect the
+# user's own config (VT-25 — this script had no test of any kind).
+if [ "${1:-}" = "--selftest" ]; then
+  SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  td="$(mktemp -d)"; trap 'rm -rf "$td"' EXIT
+  fail() { echo "orca_team selftest: FAIL — $1" >&2; exit 1; }
+  mkdir -p "$td/repo" "$td/bin" "$td/home" "$td/wt" "$td/wt2" "$td/wt3"
+  ( cd "$td/repo" && git init -q . )
+  cat > "$td/bin/orca" <<'FAKE'
+#!/bin/sh
+case "$*" in
+  "status --json") echo "{\"result\":{\"runtime\":{\"reachable\":${FAKE_REACHABLE:-true}}}}" ;;
+  orchestration\ run-create*) echo '{"result":{"run":{"id":"run-42"}}}' ;;
+  orchestration\ check*) echo "CHECK $*" ;;
+  *) echo "fake orca: unexpected $*" >&2; exit 9 ;;
+esac
+FAKE
+  chmod +x "$td/bin/orca"
+  run() { ( cd "$td/repo" && PATH="$td/bin:$PATH" HOME="$td/home" ORCA_CLI_COMMAND=orca bash "$SELF" "$@" ); }
+  # status: reachable → ✅; unreachable → the TEXT-relay fallback, still exit 0
+  out="$(run status)" || fail "status must exit 0"
+  case "$out" in *"transport reachable"*) ;; *) fail "reachable status not reported: $out" ;; esac
+  out="$(FAKE_REACHABLE=false run status)" || fail "unreachable status must still exit 0"
+  case "$out" in *"falls back to TEXT relay"*) ;; *) fail "fallback not printed when unreachable: $out" ;; esac
+  # open-run: the Run id comes from the transport, coordination.md is created with the header
+  out="$(run open-run demo)" || fail "open-run must exit 0"
+  case "$out" in *"RUN=run-42"*) ;; *) fail "run id not surfaced: $out" ;; esac
+  [ -f "$td/repo/docs/pm/coordination.md" ] || fail "coordination.md not created"
+  grep -q "^| Round | From | To |" "$td/repo/docs/pm/coordination.md" || fail "coordination.md lacks the handoff header"
+  out="$(FAKE_REACHABLE=false run open-run demo)" || fail "open-run without transport must exit 0"
+  case "$out" in *"COORD="*"coordination.md"*) ;; *) fail "fallback open-run must still name COORD: $out" ;; esac
+  # wait: exec's the transport's check with the run id
+  out="$(run wait run-42 5)" || fail "wait must pass the transport's exit 0"
+  case "$out" in "CHECK orchestration check --run run-42 --wait"*) ;; *) fail "wait did not call check with the run id: $out" ;; esac
+  # trust: creates ~/.claude.json 0600 with the flag, idempotent on the second run
+  key="$(cd "$td/wt" && pwd)"
+  out="$(run trust "$td/wt")" || fail "trust on an existing dir must exit 0"
+  python3 - "$td/home/.claude.json" "$key" <<'PY' || fail "trust did not record the flag as 0600"
+import json, os, stat, sys
+d = json.load(open(sys.argv[1]))
+assert d["projects"][sys.argv[2]]["hasTrustDialogAccepted"] is True, d
+assert stat.S_IMODE(os.stat(sys.argv[1]).st_mode) == 0o600, oct(os.stat(sys.argv[1]).st_mode)
+PY
+  [ ! -e "$td/home/.claude.json.vteam-bak" ] || fail "a config we CREATED must not be backed up"
+  out="$(run trust "$td/wt")" || fail "second trust must exit 0"
+  case "$out" in *"already trusted"*) ;; *) fail "second trust is not idempotent: $out" ;; esac
+  # a PRE-EXISTING config: other keys kept, mode 0600 kept, backed up exactly once
+  printf '{"oauthAccount":{"x":1},"projects":{}}' > "$td/home/.claude.json"; chmod 600 "$td/home/.claude.json"
+  run trust "$td/wt2" >/dev/null || fail "trust over an existing config must exit 0"
+  [ -f "$td/home/.claude.json.vteam-bak" ] || fail "existing config was not backed up"
+  grep -q '"oauthAccount"' "$td/home/.claude.json" || fail "existing keys were lost"
+  # portable mode read: GNU `stat -f` is "file-SYSTEM status" and succeeds with the wrong
+  # output, so a `stat -f … || stat -c …` chain never falls through on Linux (CI caught it)
+  mode="$(python3 -c 'import os, stat, sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$td/home/.claude.json")"
+  [ "$mode" = "0o600" ] || fail "mode 0600 not preserved (got $mode)"
+
+  bak1="$(cat "$td/home/.claude.json.vteam-bak")"
+  run trust "$td/wt3" >/dev/null || fail "third trust must exit 0"
+  [ "$(cat "$td/home/.claude.json.vteam-bak")" = "$bak1" ] || fail "the backup was overwritten on a later run"
+  # mutations: a path that does not exist, a config that is not JSON, an unknown subcommand
+  if run trust "$td/nope" >/dev/null 2>&1; then fail "trust must refuse a non-existent path"; fi
+  printf 'not json' > "$td/home/.claude.json"
+  if run trust "$td/wt" >/dev/null 2>&1; then fail "trust must refuse to overwrite a non-JSON config"; fi
+  [ "$(cat "$td/home/.claude.json")" = "not json" ] || fail "a REFUSED run modified the config"
+  if run bogus >/dev/null 2>&1; then fail "an unknown subcommand must exit non-zero"; fi
+  echo "orca_team selftest: OK (status reachable/unreachable, open-run with and without the transport, wait → check, trust: create 0600 + idempotent + backup-once + mode kept + bad path/bad JSON refused, unknown subcommand red)"
+  exit 0
+fi
+
 case "${1:-}" in
   status)
+
     if transport_up; then
       echo "✅ Orca transport reachable via '$ORCA' — parallel DEV agents coordinate on the Run mailbox."
     else

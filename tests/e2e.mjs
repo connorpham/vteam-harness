@@ -895,7 +895,36 @@ console.log("19. resume — derived crash recovery (artifact ladder)");
     vteam(repo19, "resume", "DEMO-9").stdout === r.stdout);
 }
 
+// ── 20. VT-25: the tools that had no test behind them prove themselves ──────
+// The 2026-09-17 review found five scripts with neither a selftest nor an e2e
+// case. orca_team.sh joined doctor's discovery (section 3); the three profile
+// scripts and the publish guard are not under .vteam/scripts, so they run here.
+console.log("20. profile tools + publish guard — selftests (no browser, no network)");
+{
+  for (const rel of ["profiles/nextjs-prisma/scripts/auth.mjs",
+    "profiles/nextjs-prisma/scripts/ui_fidelity.mjs",
+    "profiles/nextjs-prisma/scripts/ui-evidence.mjs",
+    "tools/prepublish-check.mjs"]) {
+    const r = run("node", [path.join(PKG, rel), "--selftest"], { cwd: PKG });
+    check(`${rel} --selftest green`, r.status === 0 && /selftest: OK/.test(r.stdout), r.stdout + r.stderr);
+  }
+  // the profile tools import playwright LAZILY: the contract is provable from a
+  // directory with no node_modules at all
+  const bare = path.join(TMP, "t20-bare");
+  fs.mkdirSync(bare, { recursive: true });
+  const r = run("node", [path.join(PKG, "profiles", "nextjs-prisma", "scripts", "ui_fidelity.mjs"), "--selftest"], { cwd: bare });
+  check("ui_fidelity --selftest needs no playwright (lazy import inside main)", r.status === 0, r.stdout + r.stderr);
+  // …and without playwright a REAL run refuses loudly, naming the install, instead of a stack trace
+  const spec = path.join(bare, "fidelity.json");
+  fs.writeFileSync(spec, JSON.stringify({ anon: true, path: "/", checks: [{ selector: "h1", expect: { color: "#000000" } }] }));
+  run("git", ["init", "-q", bare]);
+  const r2 = run("node", [path.join(PKG, "profiles", "nextjs-prisma", "scripts", "ui_fidelity.mjs"), "T-1", spec], { cwd: bare });
+  check("ui_fidelity without playwright: loud refusal naming `npm i -D playwright`, no stack trace",
+    r2.status === 1 && /playwright is not installed/.test(r2.stderr) && !/at .*\.mjs:\d+/.test(r2.stderr), r2.stdout + r2.stderr);
+}
+
 // ── every shipped version has a CHANGELOG entry ────────────────────────────
+
 // 22 versions were published before this file existed and none of them said
 // what changed. A changelog nobody is forced to write is a changelog that stops
 // at the version someone last remembered.
