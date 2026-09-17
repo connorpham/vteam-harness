@@ -372,7 +372,8 @@ models:
 
   // ---- adapters (outputs are framework-owned → recorded) --------------------------
   for (const tool of tools) {
-    const written = await renderTool(tool, root, cfg, (rel, text) => guard.force(rel, text));
+    const written = await renderTool(tool, root, cfg, (rel, text, mode) => guard.force(rel, text, mode));
+
     console.log(`✓ ${tool}: ${written.length} workflow files`);
   }
 
@@ -431,8 +432,18 @@ function detectProfile(root) {
   const has = (f) => fs.existsSync(path.join(root, f));
   if (has("go.mod")) return "go";
   if (has("Cargo.toml")) return "rust";
-  if (has("prisma/schema.prisma") && has("package.json")) return "nextjs-prisma";
-  if (has("package.json")) return "node";
+  if (has("package.json")) {
+    // nextjs-prisma runs `npx next typegen` — on a Prisma repo that is not a Next app
+    // (Express + Prisma, a NestJS API) that step reds the gate. Ask the manifest,
+    // not the directory layout.
+    let deps = {};
+    try {
+      const p = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+      deps = { ...(p.dependencies || {}), ...(p.devDependencies || {}) };
+    } catch { /* unparseable package.json — no next dependency can be proven */ }
+    return has("prisma/schema.prisma") && deps.next ? "nextjs-prisma" : "node";
+  }
+
   if (has("pyproject.toml") || has("setup.py") || has("requirements.txt")) return "python";
   return "generic";
 }

@@ -79,7 +79,11 @@ else
 fi
 
 # 5. Test infra — the gate must have steps to run
-if python3 .vteam/scripts/gate.py --help >/dev/null 2>&1 || [ -f .vteam/scripts/gate.py ]; then
+# `gate.py --help` prints usage and exits 0 WITHOUT running a step. Before VT-24 the
+# driver read every argument as a tail name, so this probe ran the WHOLE gate — lint,
+# build, tests — silently, on every /dev T0, /pm P0 and /ba B0.
+if [ -f .vteam/scripts/gate.py ] && python3 .vteam/scripts/gate.py --help >/dev/null 2>&1; then
+
   ok "Gate: driver installed ($(python3 .vteam/scripts/lib/ctx.py stack.profile 2>/dev/null || echo '?') profile)"
 else
   miss "Gate" "gate driver missing — broken install, re-run npx vteam init"

@@ -116,7 +116,11 @@ function competencies() {
  * paths. `write(relPath, text)` lets init/update route output through the
  * manifest guard; the default writes directly. */
 export async function renderTool(tool, root, cfg,
-  write = (rel, text) => writeFile(path.join(root, rel), text)) {
+  write = (rel, text, mode) => {
+    writeFile(path.join(root, rel), text);
+    if (mode !== undefined) fs.chmodSync(path.join(root, rel), mode);
+  }) {
+
   const adapter = await loadAdapter(tool);
   const routing = routingBlock(tool, root);
   const ctx = { root, cfg, noSubagentNote: NO_SUBAGENT_NOTE };
@@ -148,6 +152,19 @@ export async function renderTool(tool, root, cfg,
     write(out.path, out.text);
     written.push(out.path);
   }
-  if (adapter.pointers) written.push(...adapter.pointers(root));
+  // pointers get the SAME write path as the workflows, so a packaged agent or hook
+  // is manifest-guarded like everything else: refreshed while unmodified, parked as
+  // `.new` once the user edits it. The first version wrote them directly and kept
+  // any differing copy — so a consumer never received an upstream agent change and
+  // was told "kept YOURS" about a file it had never touched.
+  if (adapter.pointers) written.push(...adapter.pointers(root, write));
   return written;
 }
+
+/** The directories a tool's adapter writes into — what update may prune orphans
+ * from once that tool has been re-rendered (a skill or agent the package no longer
+ * ships must not linger as a live file). */
+export async function adapterOutputDirs(tool) {
+  return (await loadAdapter(tool)).outputDirs ?? [];
+}
+

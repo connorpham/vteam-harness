@@ -84,26 +84,47 @@ def workdays(a: dt.date, b: dt.date) -> int:
     return n
 
 
+DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+
 def decision_deadlines(text: str, today: dt.date) -> tuple[list[str], list[str]]:
+    """🔴 OPEN rows due within 7 days (or overdue), and deadlines written as words.
+
+    The Due column is located from the table HEADER (`| # | … | Due |`), and the
+    row's Due cell decides. The first version took the FIRST cell carrying a date —
+    and a Question cell routinely carries one ("asked 2026-09-01: …"), so an open
+    question due next month read as OVERDUE on the day it was asked. Without a
+    header naming Due, the LAST dated cell is used: deadlines sit at the end."""
     burning, textual = [], []
+    due_idx = None
     for line in text.splitlines():
-        if "🔴 OPEN" not in line or not line.startswith("|"):
+        if not line.startswith("|"):
             continue
         cols = [c.strip() for c in line.split("|")]
+        low = [c.lower() for c in cols]
+        if "due" in low:  # a header row — fixes the Due column for the rows below it
+            due_idx = low.index("due")
+            continue
+        if "🔴 OPEN" not in line:
+            continue
         ident = cols[1] if len(cols) > 1 else "?"
-        due_cell = next((c for c in cols if re.search(r"\d{4}-\d{2}-\d{2}", c)), None)
-        if due_cell:
-            due = dt.date.fromisoformat(re.search(r"(\d{4}-\d{2}-\d{2})", due_cell).group(1))
+        if due_idx is not None and due_idx < len(cols):
+            cell = cols[due_idx]
+        else:
+            dated = [c for c in cols if DATE_RE.search(c)]
+            cell = dated[-1] if dated else " ".join(cols[2:])[:60]
+        m = DATE_RE.search(cell)
+        if m:
+            due = dt.date.fromisoformat(m.group(1))
             delta = (due - today).days
             if delta <= 7:
                 burning.append(f"{ident} — due {due.isoformat()} "
                                f"({'OVERDUE' if delta < 0 else f'{delta} days left'})")
-        else:
-            cell = " ".join(cols[2:])[:60]
-            if re.search(r"asap|soon|sprint|week", cell, re.I):
-                textual.append(f"{ident} — deadline written as words: “{cell.strip()}” "
-                               f"→ convert to YYYY-MM-DD")
+        elif re.search(r"asap|soon|sprint|week", cell, re.I):
+            textual.append(f"{ident} — deadline written as words: “{cell.strip()[:60]}” "
+                           f"→ convert to YYYY-MM-DD")
     return burning, textual
+
 
 
 def evaluate(sprints, statuses: dict[str, str], today: dt.date, cap_per_day: float,
@@ -204,8 +225,21 @@ def _selftest():
     b, t = decision_deadlines("| Q1 | question | 🔴 OPEN | 2026-01-07 |\n"
                               "| Q2 | question | 🔴 OPEN | asap |\n", today)
     assert b and t, (b, t)
+    # the Due COLUMN decides, not the first dated cell — a Question quoting the day it
+    # was asked used to read as OVERDUE on the spot
+    b, t = decision_deadlines("| # | Question | Blocks | Status | Due |\n|---|---|---|---|---|\n"
+                              "| Q3 | asked 2026-01-01: is X ok? | — | 🔴 OPEN | 2026-01-30 |\n"
+                              "| Q4 | asked 2026-01-01: and Y? | — | 🔴 OPEN | 2026-01-09 |\n"
+                              "| Q5 | asked 2026-01-01: and Z? | — | 🔴 OPEN | next sprint |\n", today)
+    assert b == ["Q4 — due 2026-01-09 (4 days left)"], b
+    assert t and "Q5" in t[0], t
+    # no header at all: the LAST dated cell is the deadline (the first was the asking day)
+    b, _ = decision_deadlines("| Q6 | asked 2026-01-01: and W? | — | 🔴 OPEN | 2026-01-09 |\n", today)
+    assert b == ["Q6 — due 2026-01-09 (4 days left)"], b
+
     try:
         parse_plan("sprint-1:\n  start: 2026-01-05\n  end: 2026-01-16\n  items:\n    - \"PROJ-1\"\n")
+
         raise AssertionError("malformed item should exit")
     except SystemExit:
         pass
@@ -221,7 +255,8 @@ def _selftest():
         raise AssertionError("unknown unit should exit")
     except SystemExit:
         pass
-    print("schedule_check selftest: OK (on-schedule green + 3 reds + parser guard "
+    print("schedule_check selftest: OK (on-schedule green + 3 reds + Due column by header + parser guard "
+
           "+ hour units at 8h/day, rescaled at 4h/day, unknown unit red)")
 
 

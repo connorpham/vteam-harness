@@ -129,17 +129,24 @@ def check_report(text: str) -> list[str]:
 
 
 def main() -> int:
-    args = [a for a in sys.argv[1:] if a != "--root" and not a.startswith("--")]
+    import argparse
+    ap = argparse.ArgumentParser(description="BDD reports must be readable, complete and concise")
+    ap.add_argument("--root", help="repo root (default: the git root of the cwd)")
+    ap.add_argument("files", nargs="*", help="specific *.bdd.md files (default: every one under paths.evidence)")
+    # The first version hand-filtered sys.argv and kept --root's VALUE as a file name, so
+    # `--root <dir>` crashed on IsADirectoryError instead of scanning.
+    a = ap.parse_args()
     files: list[Path]
-    if "--root" in sys.argv:
-        root = Path(sys.argv[sys.argv.index("--root") + 1])
+    if a.root:
+        root = Path(a.root)
     else:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
         from ctx import Ctx  # noqa: E402
         root = Ctx().root
-    if args:
-        files = [Path(a) for a in args]
+    if a.files:
+        files = [Path(f) for f in a.files]
     else:
+
         ev = "evd"
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
@@ -192,7 +199,16 @@ When it opens a south-branch order by its link
 Then the screen refuses with a not-allowed message and shows nothing else
 """
     assert check_report(andbut) == [], check_report(andbut)
-    print("bdd_report_check selftest: OK (good green + 6 mutations red + And/But inheritance)")
+    # --root's VALUE must not be read as a report file (it was: IsADirectoryError on any dir)
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        r = subprocess.run([sys.executable, __file__, "--root", td], capture_output=True, text=True)
+        assert r.returncode == 0 and "nothing to check" in r.stdout, \
+            f"--root <dir> must scan, not crash:\n{r.stdout}{r.stderr}"
+    print("bdd_report_check selftest: OK (good green + 6 mutations red + And/But inheritance "
+          "+ --root <dir> scans instead of crashing)")
+
 
 
 if __name__ == "__main__":

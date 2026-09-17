@@ -274,11 +274,12 @@ def main() -> int:
                 print(f"❌ --attach: read-back did not confirm {p.name}")
                 return 1
             lines.append(f"- {p.name} · md5 {res['md5']} · {res['url']}\n")
+        from evdpack import replace_section
         mf = dev / "manifest.md"
         old = mf.read_text(encoding="utf-8") if mf.is_file() else ""
-        if "## TRACKER ATTACHMENTS" in old:
-            old = re.sub(r"\n## TRACKER ATTACHMENTS.*", "", old, flags=re.S)
-        mf.write_text(old + "".join(lines), encoding="utf-8")
+        # only THIS section is replaced — never the prose after it
+        mf.write_text(replace_section(old, "TRACKER ATTACHMENTS", "".join(lines)), encoding="utf-8")
+
         print(f"✅ --attach: {len(pngs)} images on {ticket}, read-back confirmed")
 
     errs = check_dev_dir(dev, vocab(c).get("hedge_phrases", []), args.bug, args.oracle)

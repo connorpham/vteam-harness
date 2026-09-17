@@ -214,7 +214,22 @@ const FIXTURES = [
     config: "x: [a, b\n",
     error: /unterminated inline list/,
   },
+  {
+    // VT-24: ctx.py returned ['a', '', 'b'] while ctx.mjs threw — a parity gap the
+    // suite never covered. Both die now, with one message.
+    name: "empty inline-list element (must die in both)",
+    config: "x: [a,,b]\n",
+    error: /empty value in an inline list/,
+  },
+  {
+    // VT-24: block(indent) stopped at the first shallower line, so a file whose first
+    // key sat at column 2 kept that key and silently DROPPED every later top-level key.
+    name: "first key indented (must die, never drop the rest)",
+    config: "  a: 1\nb: 2\n",
+    error: /first key must start at column 0/,
+  },
 ];
+
 
 // ---- runners ----------------------------------------------------------------
 function makeRepo(configText) {

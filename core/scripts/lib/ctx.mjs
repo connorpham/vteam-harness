@@ -70,7 +70,11 @@ function splitTop(s, ln) {
 
 function parseScalar(s, ln) {
   s = s.trim();
+  // `"&*".includes("")` is true, so an empty element used to die with the
+  // anchors/multiline message; same message as ctx.py now
+  if (s === "") die(ln, "empty value in an inline list — outside the vteam YAML subset");
   if ("&*".includes(s[0] ?? "") || s === "|" || s === ">" ||
+
       s.startsWith("| ") || s.startsWith("> ")) {
     die(ln, `outside the vteam YAML subset (anchors/multiline): ${JSON.stringify(s)}`);
   }
@@ -151,8 +155,14 @@ export function parseConfig(text) {
     return d;
   }
 
-  return lines.length ? block(lines[0][1]) : {};
+  if (lines.length && lines[0][1] !== 0) {
+    // block(indent) stops at the first SHALLOWER line — a first key at column 2
+    // kept that key and silently dropped every top-level key after it
+    die(lines[0][0], "the first key must start at column 0");
+  }
+  return lines.length ? block(0) : {};
 }
+
 
 /** Inert .env loader: os env wins, .env fills the gaps. Never executed. */
 export function loadEnv(root) {
@@ -262,7 +272,10 @@ function selftest() {
   for (const bad of ["b: &anchor x\n", "a:\n  - 1\n - 2\n", "weird ! line\n",
                      "a:\n\tb: 1\n",   // tab indentation must die loudly (H10)
                      "x: { a }\n",     // flow entry without a value
-                     "x: { a: b\n"]) { // unterminated flow mapping
+                     "x: { a: b\n",    // unterminated flow mapping
+                     "x: [a,,b]\n",    // empty inline-list element
+                     "  a: 1\nb: 2\n"]) { // first key indented: the rest was silently dropped
+
     try {
       parseConfig(bad);
       console.error(`ctx.mjs selftest FAILED: should have rejected ${JSON.stringify(bad)}`);

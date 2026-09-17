@@ -81,7 +81,10 @@ def _split_top(s: str, ln: int) -> list[str]:
 
 def _parse_scalar(s: str, ln: int):
     s = s.strip()
+    if s == "":  # only reachable from `[a,,b]` / `[a, ]` — ctx.mjs already refused it
+        _die(ln, "empty value in an inline list — outside the vteam YAML subset")
     if s[:1] in ("&", "*") or s in ("|", ">") or s[:2] in ("| ", "> "):
+
         _die(ln, f"outside the vteam YAML subset (anchors/multiline): {s!r}")
     if s.startswith("["):
         if not s.endswith("]"):
@@ -162,7 +165,13 @@ def parse_config(text: str) -> dict:
                 d[key] = {}
         return d
 
-    return block(lines[0][1]) if lines else {}
+    if lines and lines[0][1] != 0:
+        # block(indent) stops at the first SHALLOWER line and returns — so a file
+        # whose first key sat at column 2 kept that key and silently dropped every
+        # top-level key after it. Loud, like every other subset violation.
+        _die(lines[0][0], "the first key must start at column 0")
+    return block(0) if lines else {}
+
 
 
 class Ctx:
@@ -240,7 +249,10 @@ def _selftest():
     bads = ("b: &anchor x\n", "a:\n  - 1\n - 2\n", "weird ! line\n",
             "a:\n\tb: 1\n",          # tab indentation must die loudly (H10)
             "x: { a }\n",            # flow entry without a value
-            "x: { a: b\n")           # unterminated flow mapping
+            "x: { a: b\n",           # unterminated flow mapping
+            "x: [a,,b]\n",           # empty inline-list element (ctx.mjs refused, ctx.py returned '')
+            "  a: 1\nb: 2\n")        # first key indented: the rest was silently dropped
+
     for bad in bads:
         r = subprocess.run([sys.executable, __file__, "--parse-stdin"],
                            input=bad, capture_output=True, text=True)

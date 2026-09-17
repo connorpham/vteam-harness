@@ -41,6 +41,15 @@ steps:
     # Both sweeps already print and return 0 when their configured root is missing.
     requires_cmd: python3 -c "import PIL"
     skip_reason: "Pillow is not installed — the image checks cannot run; a declared skip beats a red nobody can act on"
+  stale-verdict:
+    # A verdict is valid only for the code it examined. /qa V7 and /pm name this scan
+    # five times and NO profile ran it — the same declared-but-unwired hole VT-17 closed
+    # for evd_check. A remote tracker means one network call per evidenced ticket, so
+    # the step declares a skip there instead of making the gate depend on the network;
+    # on those repos /qa V7 runs stale_verdict_check.py by hand.
+    run: "python3 .vteam/scripts/stale_verdict_check.py"
+    requires_cmd: test "$(python3 .vteam/scripts/lib/ctx.py tracker.provider 2>/dev/null || echo markdown)" = markdown
+    skip_reason: "remote tracker — stale_verdict_check calls the tracker per ticket; run it by hand at /qa V7"
   graph:
     run: "python3 .vteam/scripts/graph_check.py"
   verbatim:

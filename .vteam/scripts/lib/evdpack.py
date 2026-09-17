@@ -190,6 +190,22 @@ def read(path):
         return ""
 
 
+def replace_section(text, heading_prefix, block):
+    """Replace ONE `## <heading_prefix>…` section — its heading through the line
+    before the next `## ` heading (or the end of the file) — with `block`; append
+    `block` when the section is absent. Both `--attach` callers used to run
+    `re.sub(r"\\n## TRACKER ATTACHMENTS.*", "", text, re.S)`, which erased every
+    section AFTER the attachments to the end of the file on the second run."""
+    pat = re.compile(r"(?ms)^## " + re.escape(heading_prefix) + r"\b.*?(?=^## |\Z)")
+    block = block.strip("\n") + "\n"
+    m = pat.search(text)
+    if m:
+        tail = text[m.end():]
+        return text[:m.start()] + block + ("\n" if tail and not tail.startswith("\n") else "") + tail
+    return text.rstrip("\n") + ("\n\n" if text.strip() else "") + block
+
+
+
 def canon(value, allowed):
     """Match a declared value against the vocabulary, case-insensitively.
     Anything else comes back "" — an unrecognised severity is not a severity."""

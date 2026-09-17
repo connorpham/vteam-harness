@@ -401,12 +401,14 @@ def attach_all(evd: Path, ticket: str) -> int:
             print(f"❌ --attach: read-back did not confirm {p.name}")
             return 1
         lines.append(f"- {p.relative_to(evd)} · md5 {res['md5']} · {res['url']}\n")
+    from evdpack import replace_section
     mf = evd / "manifest.md"
     old = mf.read_text(encoding="utf-8") if mf.is_file() else ""
-    if "## TRACKER ATTACHMENTS" in old:
-        old = re.sub(r"\n## TRACKER ATTACHMENTS.*", "", old, flags=re.S)
-    mf.write_text(old + "".join(lines), encoding="utf-8")
+    # only THIS section is replaced — the prose after it (Notes for QA, the index
+    # block) used to be erased to the end of the file on every re-run
+    mf.write_text(replace_section(old, "TRACKER ATTACHMENTS", "".join(lines)), encoding="utf-8")
     print(f"✅ --attach: {len(pngs)} images on {ticket}, read-back confirmed, pointers in manifest.md")
+
     return 0
 
 
@@ -768,8 +770,8 @@ def _selftest():
                 (d / "cmd_verify.md").write_text("$ x -> 1\n")
             got = fresh(stale_mut)
             assert any("index no longer matches" in x for x in got), f"a stale index must red: {got}"
-        # the legacy fixture (no KIND anywhere) got these only as WARNINGS — asserted green above
-        assert any("no KIND" in w for w in _) if False else True
+        # the legacy fixture (no KIND anywhere) gets these only as WARNINGS — asserted green above
+
     # --sweep: the closure set comes from config, not from the literal "done"
     with tempfile.TemporaryDirectory() as td:
         r = Path(td); (r / "docs" / "backlog").mkdir(parents=True)
@@ -785,6 +787,20 @@ def _selftest():
         (r / "docs" / "backlog" / "P-1.md").unlink()
         rc = sweep(r / "evd", r / "docs" / "backlog", [], ("done",))
         assert rc == 0, "an unreadable status must not fail the gate"
+    # --attach replaces ONLY its own section — the prose after it must survive a re-run
+    # (the old regex erased everything from the heading to the end of the file)
+    from evdpack import replace_section
+    old = ("# M\n\nCOVERAGE:\n- security: TC_1\n\n## TRACKER ATTACHMENTS (evd_check --attach)\n"
+           "- old.png · md5 0 · u\n\n## Notes for QA\nkeep me\n")
+    new = replace_section(old, "TRACKER ATTACHMENTS",
+                          "## TRACKER ATTACHMENTS (evd_check --attach)\n- new.png · md5 1 · v\n")
+    assert "keep me" in new and "COVERAGE:" in new, new
+    assert "old.png" not in new and "new.png" in new and new.count("## TRACKER ATTACHMENTS") == 1, new
+    assert replace_section("# M\n", "TRACKER ATTACHMENTS", "## TRACKER ATTACHMENTS\n- a\n") \
+        == "# M\n\n## TRACKER ATTACHMENTS\n- a\n"
+    assert replace_section(new, "TRACKER ATTACHMENTS", "## TRACKER ATTACHMENTS\n- z\n") \
+        .count("## Notes for QA\nkeep me") == 1, "a third run must still keep the trailing prose"
+
 
     print("evd_check selftest: OK (fixture green + 9 mutations red — incl. missing/"
           "TC-less verifysheet — + the UI journey: full walk green, each of "
@@ -792,7 +808,9 @@ def _selftest():
           "red, click-path+URL green, unannotated PASS red; v2 readable pack green + "
           "14 readability mutations red: vague EXPECTED/ACTUAL, invalid KIND, no boundary/"
           "whole-screen, no ENVIRONMENT/ORACLE, COVERAGE missing/lens-less/reasonless/ghost-TC, "
-          "write-readback w/o db_verify, bare TC_n, stale index — legacy pack stays green)")
+          "write-readback w/o db_verify, bare TC_n, stale index — legacy pack stays green; "
+          "--attach replaces only its own section)")
+
 
 
 if __name__ == "__main__":

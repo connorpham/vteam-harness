@@ -61,8 +61,11 @@ def decision_keys(root: Path | None, pm_dir: str = "docs/pm") -> set[str]:
 
 
 def check_text(text: str, key: str, adopted: date, root: Path | None, pm_dir: str = "docs/pm",
-               team_size: int = 1) -> tuple[list, list]:
+               team_size: int = 1, evidence_dir: str = "evd") -> tuple[list, list]:
     errs, warns = [], []
+    # repo paths worth an existence check — the configured evidence home, not a literal
+    path_pat = re.compile(rf"\b((?:docs|{re.escape(evidence_dir.rstrip('/'))}|src|prisma|\.vteam)/[\w./-]+)")
+
     known_decisions = decision_keys(root, pm_dir)
     shape, prev_date = None, None
     # project.key is config-supplied text, not a regex — escape it (audit M15;
@@ -114,7 +117,8 @@ def check_text(text: str, key: str, adopted: date, root: Path | None, pm_dir: st
                 errs.append(f"line {n}: link {link!r} is not recognizable evidence "
                             f"(need PR #n / {key}-nn / URL / repo path)")
             elif root is not None:
-                for path in re.findall(r"\b((?:docs|evd|src|prisma|\.vteam)/[\w./-]+)", link):
+                for path in path_pat.findall(link):
+
                     if not (root / path).exists():
                         warns.append(f"line {n}: path {path} no longer exists — "
                                      f"verify, or accept if deliberate cleanup")
@@ -177,7 +181,9 @@ def main() -> int:
         c.root,
         pm_dir=str(c.cfg("paths.pm", "docs/pm")),
         team_size=team_size,
+        evidence_dir=str(c.cfg("paths.evidence", "evd")),
     )
+
     for w in warns:
         print(f"⚠️  {w}")
     if errs:
