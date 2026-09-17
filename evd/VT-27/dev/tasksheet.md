@@ -1,4 +1,5 @@
 # VT-27 · dev tasksheet — publish the vteam-vs-BMAD scorecard
+CODE-SCOPE: README.md CHANGELOG.md docs/ evd/VT-27/ docs/pm/ docs/backlog/
 
 Branch `feat/VT-27-benchmark-scorecard` (stacked on `feat/VT-26-first-run`, which introduced the stub and the README line).
 
