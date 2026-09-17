@@ -136,8 +136,11 @@ PY
   run trust "$td/wt2" >/dev/null || fail "trust over an existing config must exit 0"
   [ -f "$td/home/.claude.json.vteam-bak" ] || fail "existing config was not backed up"
   grep -q '"oauthAccount"' "$td/home/.claude.json" || fail "existing keys were lost"
-  mode="$(stat -f %Lp "$td/home/.claude.json" 2>/dev/null || stat -c %a "$td/home/.claude.json")"
-  [ "$mode" = "600" ] || fail "mode 0600 not preserved (got $mode)"
+  # portable mode read: GNU `stat -f` is "file-SYSTEM status" and succeeds with the wrong
+  # output, so a `stat -f … || stat -c …` chain never falls through on Linux (CI caught it)
+  mode="$(python3 -c 'import os, stat, sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$td/home/.claude.json")"
+  [ "$mode" = "0o600" ] || fail "mode 0600 not preserved (got $mode)"
+
   bak1="$(cat "$td/home/.claude.json.vteam-bak")"
   run trust "$td/wt3" >/dev/null || fail "third trust must exit 0"
   [ "$(cat "$td/home/.claude.json.vteam-bak")" = "$bak1" ] || fail "the backup was overwritten on a later run"

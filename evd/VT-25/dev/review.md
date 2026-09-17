@@ -29,3 +29,10 @@ Tried to break:
 - checked the `closed-by` rule cannot hide a real stale verdict: it applies only when `REPORT.md` is ABSENT; a ticket with a REPORT keeps every anchor rule, and a Done ticket with neither report nor field stays UNVERIFIABLE (both asserted)
 
 Traces: profiles/nextjs-prisma/scripts/ui-evidence.mjs:57, profiles/nextjs-prisma/scripts/ui_fidelity.mjs:72, tools/prepublish-check.mjs:41, core/scripts/stale_verdict_check.py:172, `node profiles/nextjs-prisma/scripts/ui_fidelity.mjs --selftest` from an empty dir, `bash .vteam/scripts/gate.sh` in ~/Documents/testbed-base
+
+## Round 2 — CI (Linux) red on the first push
+R2 above claimed "`stat -f` falls back to `stat -c`". False: GNU `stat -f` means file-**system**
+status, succeeds, and prints `File: "…"` — the `||` never fired, so the mode check failed on
+every Linux job. Replaced with a python `os.stat` read (python3 is a hard dependency anyway).
+A reviewer statement about a platform the reviewer did not run on is testimony; CI was the
+reviewer here. Cards stand otherwise.
