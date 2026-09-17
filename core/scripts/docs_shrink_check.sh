@@ -11,7 +11,7 @@
 # declare intent:  ALLOW_DOCS_SHRINK=1 bash .vteam/scripts/docs_shrink_check.sh
 #
 # Selftest: --selftest (temp repo: grown ledger green + 2 shrink mutations red
-# + declared-intent hatch).
+# + declared-intent hatch + PR-mode base fetch leaves a full clone full).
 set -uo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/ctx.sh"
 
@@ -42,7 +42,20 @@ if [[ "${1:-}" == "--selftest" ]]; then
   # declared intent: the hatch passes LOUDLY
   ( cd "$tmp" && env -u GITHUB_BASE_REF ALLOW_DOCS_SHRINK=1 bash "$SELF" ) >/dev/null \
     || fail "ALLOW_DOCS_SHRINK=1 should pass on declared intent"
-  echo "docs_shrink_check selftest: OK (grow green + 2 shrink mutations red + declared-intent hatch)"
+  # PR mode must not damage the clone: a full clone + a base fetch must stay FULL.
+  # (--depth=1 on a full repo writes .git/shallow with the base tip as a root; every
+  # later gate step that reads commit parents — graph_check's CODE-SCOPE — then sees
+  # the whole tree as that commit's diff.)
+  bare="$tmp/origin.git"; clone="$tmp/clone"
+  ( cd "$tmp" && git checkout -q -- . && git clone -q --bare . "$bare" && git clone -q "$bare" "$clone" ) || fail "cannot build the origin/clone pair"
+  ( cd "$clone" && git config user.email t@t.t && git config user.name t \
+      && git checkout -q -b topic && seq 1 36 | sed 's/^/decision line /' > docs/pm/decisions.md \
+      && git commit -qam "topic grows the ledger" )
+  base_branch=$(cd "$clone" && git rev-parse --abbrev-ref origin/HEAD | sed 's#^origin/##')
+  ( cd "$clone" && GITHUB_BASE_REF="$base_branch" bash "$SELF" ) >/dev/null \
+    || fail "PR-mode comparison against the base branch should pass on a grown ledger"
+  [[ -f "$clone/.git/shallow" ]] && fail "PR-mode base fetch turned a full clone SHALLOW (.git/shallow appeared) — later gate steps read commit parents"
+  echo "docs_shrink_check selftest: OK (grow green + 2 shrink mutations red + declared-intent hatch + PR-mode fetch keeps the clone full)"
   exit 0
 fi
 
@@ -65,7 +78,9 @@ fail=0
 #   · CI on a push to the protected branch (no base ref): the PR already checked
 #     it → nothing to compare, pass.
 if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
-  git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF" >/dev/null 2>&1
+  # No --depth: a depth-limited fetch into a full clone makes the WHOLE repository
+  # shallow (.git/shallow), and graph_check then reads the base tip as a root commit.
+  git fetch --no-tags origin "$GITHUB_BASE_REF" >/dev/null 2>&1
   base="FETCH_HEAD"
   after_lines() { git show "HEAD:$1" 2>/dev/null | wc -l | tr -d ' '; }
   changed() { git diff "$base" HEAD --name-only --diff-filter=M | grep -E "$WATCH" || true; }
