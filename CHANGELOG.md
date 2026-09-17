@@ -66,8 +66,22 @@ before the fix (`evd/VT-24/dev/proof.md`, `mutations.md`):
   tasksheet lookup hardcoded `evd/`; they follow `paths.*` now.
 - Dead code removed (`util.copyDir`, an always-true assert in `evd_check`'s selftest).
 
-`npm test` grew from 172 to 192 checks. Still not covered by any test, filed as VT-25:
-`orca_team.sh`, `ui-evidence.mjs`, `ui_fidelity.mjs`, `auth.mjs`, `prepublish-check.mjs`.
+`npm test` grew from 172 to 192 checks.
+
+**VT-25 (same day):** the five tools that had no test of any kind now prove themselves.
+`orca_team.sh --selftest` runs offline against a fake `orca` and a temp `HOME` (status,
+open-run, wait, and every `trust` guard — 0600, idempotent, backup-once, mode kept, bad
+path / bad JSON refused). `auth.mjs` drives the csrf → callback → session flow on a fake
+Playwright context. `ui_fidelity.mjs` and `ui-evidence.mjs` export their rules (colour /
+px / font comparison and the closed-list intent grammar; args, headed policy and the
+shots.json contract) and import playwright lazily, so the rules are provable on a machine
+with no browser and a real run without playwright refuses with the install command instead
+of a stack trace. `tools/prepublish-check.mjs` became `check({root, run})` with an
+injectable runner: all five refusals (dirty tree, HEAD ahead/behind, published version,
+red suite, bytecode in the tarball) fire on a fixture repo with a stubbed npm — the guard
+behind every publish had never been shown to refuse one. `npm test`: 192 → 198; doctor
+discovers 34 selftests.
+
 
 
 ### The doctrine learned the thing two field tickets turned on
