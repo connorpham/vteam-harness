@@ -36,7 +36,7 @@ Every ❌ is a claim an agent can make today without proof. That score is the wh
 
 ```bash
 npx vteam-harness init --yes   # the team, the gates, the push fence — validated before the first byte is written
-npx vteam-harness doctor       # every selftest (36 today) + provider preflight — GREEN, or it names what is missing
+npx vteam-harness doctor       # every selftest (37 today) + provider preflight — GREEN, or it names what is missing
 ```
 
 Then open your agent tool and type `/team` for a workday, or `/dev PROJ-12` for one ticket. Works with **Claude Code, Cursor, Windsurf, Codex, Copilot** — same gates, rendered for each. Needs git, Node ≥ 20, Python 3.9+ (`audit` needs only Node).
