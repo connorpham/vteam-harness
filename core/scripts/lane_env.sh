@@ -54,10 +54,36 @@ sqlite_datasource() { # 0 only when prisma/schema.prisma declares sqlite
   [ -f "$schema" ] && grep -Eq 'provider[[:space:]]*=[[:space:]]*"sqlite"' "$schema"
 }
 
+# 3100..3899 is 800 buckets, so two lanes WILL hash to one port eventually — with a
+# handful of lanes it is a coin flip, and CI found it the day after the helper shipped
+# ("reviewer lane R1 derived the author's port 3724"). A collision here is precisely
+# the failure this helper exists to prevent, so the derived port is a STARTING POINT:
+# step forward until no other lane's marker claims it. Still deterministic for a given
+# set of lanes, and the marker records where the lane actually landed.
+claimed_by_others() { # <slug> → ports claimed in markers that are not this lane's
+  local mine="$1" f
+  for f in "$(lanes_root)"/*/lane.env; do
+    [ -f "$f" ] || continue
+    case "$f" in */"$mine"/lane.env) continue ;; esac
+    sed -n 's/^PORT=//p' "$f"
+  done
+}
+free_port() { # <start> <slug> → the first port from <start> no other lane claims
+  local port="$1" slug="$2" taken tries=0
+  taken="$(claimed_by_others "$slug" | tr '\n' ' ')"
+  while [ "$tries" -lt 800 ]; do
+    case " $taken " in *" $port "*) ;; *) printf '%s' "$port"; return 0 ;; esac
+    port=$(( port + 1 )); [ "$port" -ge 3900 ] && port=3100
+    tries=$(( tries + 1 ))
+  done
+  printf '%s' "$1"   # 800 lanes on one machine: give the derived port back, loudly
+}
+
 emit() { # <root> <lane> → the export lines on stdout, and the marker on disk
-  local root="$1" lane="$2" port hash slug scratch app db_line
-  read -r port hash < <(derive "$root" "$lane")
+  local root="$1" lane="$2" port hash slug scratch app db_line derived
+  read -r derived hash < <(derive "$root" "$lane")
   slug="$(basename "$root")-${hash}"; [ "$lane" != "main" ] && slug="${slug}-${lane}"
+  port="$(free_port "$derived" "$slug")"
   scratch="$(lanes_root)/$slug"
   mkdir -p "$scratch" || { echo "lane_env: cannot create $scratch" >&2; return 1; }
   app="http://127.0.0.1:$port"
@@ -73,6 +99,9 @@ emit() { # <root> <lane> → the export lines on stdout, and the marker on disk
     echo "export VTEAM_SCRATCH=\"$scratch\""
     echo "export VTEAM_LANE=\"$lane\""
     echo "# lane '$lane' of $root → port $port · scratch $scratch (E13: one worktree, one port, one database, one scratch dir)"
+    if [ "$port" != "$derived" ]; then
+      echo "# port $derived was already claimed by another lane; stepped to $port (800 buckets collide)"
+    fi
   }
   {
     echo "WORKTREE=$root"
@@ -124,7 +153,20 @@ if [ "${1:-}" = "--selftest" ]; then
   rm "$td/b/prisma/schema.prisma"; b2="$(cd "$td/b" && bash "$SELF")" || fail "repo b without schema exited non-zero"
   printf '%s\n' "$b2" | grep -q '^export DATABASE_URL=' && fail "a non-sqlite repo must not get a derived DATABASE_URL"
   printf '%s\n' "$b2" | grep -q '^# DATABASE_URL: no sqlite datasource' || fail "the non-sqlite hint is missing: $b2"
-  echo "lane_env selftest: OK (stable per worktree + distinct ports/dbs across worktrees and lanes + marker written + parity with init.derivePort + non-sqlite hint)"
+  # a FORCED collision must be stepped over, not shared: plant a marker on the port a
+  # third lane is about to derive, and it has to land somewhere else
+  r2_derived="$(cd "$td/a" && bash "$SELF" --lane R2 | sed -n 's/^export PORT=//p')"
+  rm -rf "$td/lanes"/*-R2
+  mkdir -p "$td/lanes/squatter"
+  printf 'WORKTREE=%s\nLANE=squatter\nPORT=%s\n' "$td/z" "$r2_derived" > "$td/lanes/squatter/lane.env"
+  r2="$(cd "$td/a" && bash "$SELF" --lane R2)" || fail "--lane R2 exited non-zero after a planted collision"
+  pr2="$(printf '%s\n' "$r2" | sed -n 's/^export PORT=//p')"
+  [ "$pr2" != "$r2_derived" ] || fail "a port another lane already claims must be stepped over, got $pr2"
+  [ "$pr2" -ge 3100 ] && [ "$pr2" -lt 3900 ] || fail "stepped port $pr2 outside 3100..3899"
+  printf '%s\n' "$r2" | grep -q "already claimed by another lane" || fail "the step must be said out loud"
+  rm -rf "$td/lanes/squatter"
+  rm -rf "$td/lanes"/*-R2
+  echo "lane_env selftest: OK (stable per worktree + distinct ports/dbs across worktrees and lanes + marker written + parity with init.derivePort + non-sqlite hint + a planted collision stepped over and said out loud)"
   exit 0
 fi
 
