@@ -1,7 +1,15 @@
 # vteam vs BMAD — one frozen login spec, one held-out judge
 
 **Result, scored 2026-09-17: BMAD 100 %, vteam 92.3 %. vteam lost, and three of its "done"
-claims were contradicted by the judge.** One run, one sample, published as promised whichever
+claims were contradicted by the judge.**
+
+> **Erratum, 2026-09-18 (VT-28).** The three "contradicted" criteria are **defects in the probes, not in the
+> arm**: the AC-A07/AC-D02 probes take `.first()` of every live region and land on one the arm renders
+> empty by design so later text is announced; the AC-D07 scanner counts hex values that sit inside CSS
+> comments. The arm's own tests for the three pass on a fresh production build, and it tested on
+> `next start`, not `next dev`. Evidence: `evd/VT-28/dev/investigation.md`. Whether to correct the
+> probes and re-score both arms is decision **D18** (a published exam is not changed by the operator
+> after seeing results). The speed and process findings below are unaffected. One run, one sample, published as promised whichever
 way it went. Full scorecard: [docs/benchmark/2026-09-03/SCORECARD.md](benchmark/2026-09-03/SCORECARD.md).
 Every repair made to the judge before scoring, and why: [JUDGE-REPAIRS.md](benchmark/2026-09-03/JUDGE-REPAIRS.md).
 
