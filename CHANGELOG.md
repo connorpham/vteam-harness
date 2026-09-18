@@ -19,6 +19,15 @@ vacuously green in the arm's repo; ceilings on review and challenger rounds; a s
 session ends mid-ticket; per-worktree ports and databases for parallel lanes; a measurement of
 what each lane really loads into context (no lane is near 40k tokens).
 
+### Fixed: the CodeQL pins, and the reason they were stuck (VT-41)
+
+Dependabot opens one pull request per action path, and `github/codeql-action` refuses to run when
+`init` and `analyze` sit on different versions — so two of the three bumps were red by construction
+and all three sat unmerged for three weeks. The three usages now carry one SHA (verified upstream:
+the commit exists and is reachable from `v4.38.0` and `v4`), and `dependabot.yml` groups
+`github/codeql-action*` so the next bump of the family arrives as a single pull request. This
+package ships zero runtime dependencies, which makes the CI actions its whole supply chain.
+
 ### Fixed: two lanes could hash to one port (VT-40)
 
 A lane's port is `3100 + fnv1a(path[#lane]) % 800`. Eight hundred buckets means a collision is a
