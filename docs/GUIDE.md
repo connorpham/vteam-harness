@@ -348,8 +348,11 @@ team:
   coord_budget: 3                                         # peer handoff rounds before the PM steps in
 specs:
   sources: []                                             # the ORIGINAL docs shards are checked against
+ba:
+  challenger_rounds: 1                                    # B3 rounds per draft; a SPEC-tagged finding lifts it
 review:
   reviewers: 2
+  max_rounds: 1                                           # fix rounds per ticket; SECURITY or high-stakes lifts it
   high_stakes_paths: ["prisma/schema.prisma"]             # a diff here gets an extra reviewer
   high_stakes_terms: [wallet, refund, payout]             # your project's risk vocabulary
 docs:

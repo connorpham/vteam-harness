@@ -103,8 +103,12 @@ autonomy:
     - credentials
     - data-deletion
 
+ba:
+  challenger_rounds: 1   # machine-checked by `review_check.py --ba <feature>`; a SPEC-tagged finding lifts it
+
 review:
   reviewers: 2           # machine-enforced: review_check requires cards R1..RN (+1 high-stakes)
+  max_rounds: 1          # fix rounds per ticket (`## Round N` headings); SECURITY or a high-stakes diff lifts it
   high_stakes_paths: []          # e.g. ["prisma/schema.prisma", "src/lib/"]
   high_stakes_terms: []          # project vocabulary that means money/irreversibility
   # external:                    # OPTIONAL — cross-model reviewers, by card id.
