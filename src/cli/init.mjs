@@ -264,8 +264,12 @@ autonomy:
     - credentials
     - data-deletion
 
+ba:
+  challenger_rounds: 1     # B3 rounds per draft; a SPEC-tagged finding (draft contradicts the source) lifts it
+
 review:
   reviewers: 2
+  max_rounds: 1            # fix rounds per ticket; a SECURITY finding or a high-stakes diff lifts it
   high_stakes_paths: []
   high_stakes_terms: []
 

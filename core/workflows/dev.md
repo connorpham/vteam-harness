@@ -321,6 +321,12 @@ brief MUST include `{paths.team}/review-standard.md`**: findings are
 CONFIRMED-with-evidence or QUESTION; APPROVE carries a tried-to-break list; a
 CONFIRMED that doesn't reproduce voids the card and spawns a replacement.
 
+**A brief is a prioritised attack list, not an open invitation.** Open every
+brief with the 3–5 things most likely to be wrong in THIS diff, in order — from
+the T4a self-review, the competencies' Reviewer lens and the high-stakes map.
+"Review this" costs tens of minutes per card and comes back with preference
+findings; a ranked list comes back in minutes with findings that reproduce
+(provenance: the 2026-09-03 benchmark arm learned this on its third ticket).
 Brief reviewers with the SELF-REVIEW results (T4a) + `fidelity.md` if UI —
 reviewers verify measured numbers instead of re-measuring, and focus where the
 machine can't measure. **Paste the `## Reviewer lens` block of every competency
@@ -352,6 +358,21 @@ major findings as A-vs-B comparisons). Record all cards in
 Any REQUEST-CHANGES → fix, re-run the T4 gate, then re-submit to the SAME concern
 (a targeted re-review, not a fresh full pass). Only when ALL required cards say
 APPROVE does the pipeline proceed to T5. Unresolvable disagreement → the user.
+
+**Round ceiling — `review.max_rounds` (init sets 1; read by `review_check.py`,
+not just rendered here).** The initial cards are round 1; each re-submit after
+REQUEST-CHANGES is a further round and is recorded under a `## Round N` heading
+in `review.md`. When the next round would exceed the ceiling, do NOT open it:
+answer every remaining finding in the dossier under **Answered, not fixed** with
+the reason (cosmetic · preference · out of scope → the follow-up ticket key) and
+proceed — the reviewer's card stands as written, the answer stands next to it.
+The ceiling lifts for a finding tagged `SECURITY` (a security defect gets as many
+rounds as it needs) and for a diff that touches `review.high_stakes_paths` or
+matches `review.high_stakes_terms`. A gate rerun (CI red, a flaky suite) is not a
+review round — record it as `## Gate rerun`, not `## Round N`. Knob absent = no
+ceiling, and the green line says so. Provenance: one ticket of the 2026-09-03
+benchmark arm took three rounds and ~2.5 h; the arm cut itself to one fix round
+per ticket mid-run and finished the spec.
 
 **Cross-model reviewers — `review.external.<card>`.** A card is a FILE, so any
 tool that can write a conforming one can hold that seat — and two agents on the

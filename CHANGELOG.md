@@ -42,6 +42,17 @@ for, and links out. The long form moved verbatim to `docs/GUIDE.md` in the repos
 `tests/e2e.mjs` still verifies every count the README claims. The audience question the
 rewrite raises is filed as decision D17, not assumed.
 
+### Changed: review rounds and BA challenger rounds have a ceiling (VT-32)
+
+The 2026-09-03 benchmark arm spent three review rounds (~2.5 h) on one ticket and three
+challenger rounds sharding a frozen, AC-coded spec; nothing said when to stop. `vteam init` now
+writes `review.max_rounds: 1` and `ba.challenger_rounds: 1`, and `review_check.py` counts the
+`## Round N` headings in the dossier against the knob (a `SECURITY`-tagged finding or a
+high-stakes diff lifts it; `--ba <feature>` does the same for the challenger file, lifted by a
+`SPEC` tag). The dev and BA lanes say what to do when the ceiling is hit — answer the finding in
+the dossier, do not open another round — and a brief is now a prioritised attack list. Absent knob
+= no ceiling, printed on the green line, so no existing repository goes red on upgrade.
+
 ## 0.19.0 — 2026-09-17 (bumped 2026-09-11, published after VT-24 and VT-25 landed)
 
 Everything here came from running the lanes on a real second repo and then reviewing
