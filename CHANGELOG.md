@@ -19,6 +19,17 @@ vacuously green in the arm's repo; ceilings on review and challenger rounds; a s
 session ends mid-ticket; per-worktree ports and databases for parallel lanes; a measurement of
 what each lane really loads into context (no lane is near 40k tokens).
 
+### Fixed: two lanes could hash to one port (VT-40)
+
+A lane's port is `3100 + fnv1a(path[#lane]) % 800`. Eight hundred buckets means a collision is a
+coin flip once a worktree runs a few lanes — and a collision IS the failure the helper exists to
+prevent, two agents on one port. CI drew it the day after VT-35 shipped (`reviewer lane R1 derived
+the author's port 3724`), on Linux only, because the end-to-end fixture builds its repo in a fresh
+temp directory every run. The derived port is now a starting point: the helper steps forward to the
+first port no other lane's marker claims, prints that it did, and records where the lane landed. A
+lane never steps over its own marker, so the same worktree and lane derive the same environment
+twice.
+
 ### Fixed: a merged branch is not work in flight (VT-38)
 
 The planner shipped in VT-37 read `git branch` and called every local `feat|fix/<KEY>-*` branch
