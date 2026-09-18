@@ -19,6 +19,25 @@ vacuously green in the arm's repo; ceilings on review and challenger rounds; a s
 session ends mid-ticket; per-worktree ports and databases for parallel lanes; a measurement of
 what each lane really loads into context (no lane is near 40k tokens).
 
+### Added: `graph --plan` — the dispatch order is computed, not reasoned (VT-37)
+
+The graph knew the dependencies and printed them; then the PM lane worked out the order again in
+prose, over every open ticket, every session. Ordering a DAG is Kahn's algorithm.
+`vteam graph --plan` returns the waves (level 0 starts now), the batches inside each wave that are
+already pairwise disjoint by `CODE-SCOPE` and capped at `team.parallel`, the lane each item is
+owed (In Review routes to /qa, never a second /dev pass), what is in flight (a pushed
+`feat|fix/<KEY>-*` branch is running, not dispatchable), what is blocked and by what — a cycle, a
+decision row — the critical path by day-cost, and per item the upstream evidence to read first.
+`/pm` P1 and `/team` consume it and adjudicate only what the plan prints as not its call. Measured
+on this repo: the ordering input was 170,772 bytes ≈ 42,693 tokens of ticket files; the plan is
+9,720 bytes ≈ 2,430 tokens, and it returns the same answer twice. The plan advises; every gate is
+untouched and `graph` still exits 0 in every mode.
+
+Three neighbouring claims were measured and did not survive, and are recorded in
+`evd/VT-37/dev/proof.md` so they are not re-opened: reviewers already run in parallel, caching the
+gate's bookkeeping steps would save 1.4 % of a 90.8 s run (the test suite is 98.6 % of it), and the
+graph was never purely passive.
+
 ### Changed: the review shape follows the RISK of the diff, measured (VT-36)
 
 Every change used to pay the same toll: two fresh reviewer agents, three "tried to break"

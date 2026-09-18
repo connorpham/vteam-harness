@@ -269,6 +269,41 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
   check("gate.sh names its transcript file and the file carries the GATE line",
     !!tr && fs.existsSync(tr[1]) && /GATE: GREEN/.test(fs.readFileSync(tr[1], "utf8")), g0.stdout.slice(-300));
 
+  // VT-37: the graph computes the execution plan the PM lane used to derive in prose
+  {
+    const bl = path.join(dir, "docs", "backlog");
+    fs.mkdirSync(bl, { recursive: true });
+    fs.writeFileSync(path.join(bl, "DEMO-10.md"), "# DEMO-10: base\n- status: To Do\n");
+    fs.writeFileSync(path.join(bl, "DEMO-11.md"), "# DEMO-11: next\n- status: To Do\n- blocked-by: DEMO-10\n");
+    fs.writeFileSync(path.join(bl, "DEMO-12.md"), "# DEMO-12: other\n- status: To Do\n");
+    for (const [k, scope] of [["DEMO-10", "src/a/"], ["DEMO-11", "src/b/"], ["DEMO-12", "src/c/"]]) {
+      fs.mkdirSync(path.join(dir, "evd", k, "dev"), { recursive: true });
+      fs.writeFileSync(path.join(dir, "evd", k, "dev", "tasksheet.md"), `# ${k}\nCODE-SCOPE: ${scope}\n`);
+    }
+    const pl = vteam(dir, "graph", "--plan", "--json");
+    check("graph --plan exits 0 and parses", pl.status === 0 && !!JSON.parse(pl.stdout || "{}").waves,
+      pl.stdout.slice(0, 300) + pl.stderr);
+    const plan = JSON.parse(pl.stdout);
+    const wave = (n) => (plan.waves.find((w) => w.level === n) || { batches: [] }).batches.flat().map((x) => x.key);
+    check("a blocked-by edge becomes a LATER wave, not a blocker",
+      wave(0).includes("DEMO-10") && wave(0).includes("DEMO-12") && wave(1).includes("DEMO-11"),
+      JSON.stringify(plan.waves.map((w) => [w.level, w.batches.flat().map((x) => x.key)])));
+    check("the plan names what it does NOT decide (the lane keeps the judgement calls)",
+      Array.isArray(plan.decided_by_the_lane_not_here) && plan.decided_by_the_lane_not_here.length >= 2,
+      JSON.stringify(plan.decided_by_the_lane_not_here));
+    check("every wave-0 item carries the lane it is owed",
+      plan.waves[0].batches.flat().every((x) => x.next_lane === "dev" || x.next_lane === "qa"),
+      JSON.stringify(plan.waves[0].batches.flat().map((x) => [x.key, x.next_lane])));
+    const human = vteam(dir, "graph", "--plan");
+    check("graph --plan prints a human plan with the critical path",
+      human.status === 0 && /EXECUTION PLAN/.test(human.stdout) && /CRITICAL PATH/.test(human.stdout),
+      human.stdout.slice(0, 300));
+    for (const k of ["DEMO-10", "DEMO-11", "DEMO-12"]) {
+      fs.rmSync(path.join(bl, `${k}.md`), { force: true });
+      fs.rmSync(path.join(dir, "evd", k), { recursive: true, force: true });
+    }
+  }
+
   // VT-36: the risk class is measured from the diff, and a docs-only change needs no
   // reviewer card — the fence stops charging a README typo what it charges a rewrite
   {

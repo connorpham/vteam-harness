@@ -124,6 +124,26 @@ and keeps the beat:
 
 ## P1 — PICK THE WORK
 
+**Do not derive the order. Compute it, then adjudicate what a machine cannot.** Run
+`npx vteam-harness graph --plan` (add `--json` to consume it) FIRST. Ordering a
+dependency graph is Kahn's algorithm — microseconds, no tokens, and the same answer
+twice; deriving it in prose over every open ticket, every session, is the most
+expensive way to get a worse one. The plan returns: **waves** (level 0 starts now,
+level N unblocks after N−1), **batches** inside each wave that are already pairwise
+disjoint by `CODE-SCOPE` and capped at `team.parallel`, the **lane** each item is
+owed (In Review → /qa, never a second /dev pass), what is **in flight** (a pushed
+`feat|fix/<KEY>-*` branch is running, not dispatchable), what is **blocked** and by
+what, the **critical path** by day-cost, and per item the **upstream evidence to read
+first** — its parents' reports, not the repository.
+
+Quote the plan's wave and batch in the desk report. Then adjudicate ONLY what the plan
+says it does not decide, and it prints that list itself: the priority overrides below
+(an unanswered PR comment outranks the sprint), leg (b) — whether a UI ticket's design
+link is a real oracle rather than a URL — and whether an off-plan item deserves a plan
+row at all. If your order differs from the plan's, the desk report says which item moved
+and why; a silent reorder is a pick nobody can check.
+
+
 **Before the order is final, read back the `## Reviewer lens` of every competency you
 loaded and answer each item on today's actual board.** This lane spawns no challenger for
 the ordering — nobody else will ask these — so the lens is the only check the pick gets.
