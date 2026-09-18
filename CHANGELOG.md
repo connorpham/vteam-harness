@@ -17,6 +17,18 @@ A patch on top of 0.19.0 (published 2026-09-17 from `ce2322b`): one gate defect 
 its own CI the same day, the benchmark result the README had promised, and the front page
 that ships in the tarball.
 
+### Added: one worktree, one port, one database, one scratch dir (VT-35)
+
+Benchmark finding E13: the DEV lane and three reviewers ran at once on ONE SQLite file, ONE dev
+server and ONE scratch directory; fixture hooks raced, 19 phantom failures were reported and a
+fabricated CONFIRMED was one tired reviewer away. Worktrees share `vteam.config.yaml`, so
+`app.url` alone put every lane on one server. `lane_env.sh` now derives a lane's `PORT`,
+`APP_URL`, `DATABASE_URL` (sqlite, under a per-lane scratch dir), `VTEAM_SCRATCH` and
+`VTEAM_LANE` from the worktree it runs in — the same port scheme `init` writes, so a plain
+checkout lands where init pointed — and leaves a marker; `app_check` honours `APP_URL`;
+`parallel_check` reds two in-flight worktrees without a lane environment, or two lanes on one
+port or one database. Reviewers run against the lane's own environment, never the author's.
+
 ### Fixed: seven gates that crashed, lied or went vacuously green in a real repo (VT-30)
 
 The benchmark arm's RUNLOG listed 16 environment findings; eight were the framework's own

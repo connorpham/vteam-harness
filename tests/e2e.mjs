@@ -581,6 +581,30 @@ console.log("14. SessionStart doctrine re-injection");
     { cwd: dir, env: { ...ENV, CLAUDE_PROJECT_DIR: dir } });
   check("SessionEnd hook on a clean protected branch writes nothing and still exits 0",
     quiet.status === 0 && !fs.existsSync(stopFile), quiet.stdout + quiet.stderr);
+
+  // ── lane environment (VT-35, field finding E13): worktrees share vteam.config.yaml,
+  // so a lane derives port/database/scratch from the worktree it runs in.
+  check("lane_env.sh installed with the runtime",
+    fs.existsSync(path.join(repo, ".vteam", "scripts", "lane_env.sh")));
+  const lanesRoot = path.join(TMP, "lanes");
+  const le = run("bash", [path.join(dir, ".vteam", "scripts", "lane_env.sh"), "--print"],
+    { cwd: dir, env: { ...ENV, VTEAM_LANES_ROOT: lanesRoot } });
+  const lePort = Number((le.stdout.match(/^export PORT=(\d+)$/m) || [])[1]);
+  const { derivePort } = await import(path.join(PKG, "src", "cli", "init.mjs"));
+  check("lane_env derives the SAME port init wrote for this checkout (one scheme, two writers)",
+    le.status === 0 && lePort === derivePort(dir) && /^export APP_URL="http:\/\/127\.0\.0\.1:\d+"$/m.test(le.stdout),
+    `lane_env: ${le.stdout.slice(0, 200)}${le.stderr} · derivePort=${derivePort(dir)}`);
+  const leR1 = run("bash", [path.join(dir, ".vteam", "scripts", "lane_env.sh"), "--lane", "R1"],
+    { cwd: dir, env: { ...ENV, VTEAM_LANES_ROOT: lanesRoot } });
+  const r1Port = Number((leR1.stdout.match(/^export PORT=(\d+)$/m) || [])[1]);
+  check("a reviewer lane (--lane R1) in the same worktree gets its own port and scratch dir",
+    leR1.status === 0 && r1Port > 0 && r1Port !== lePort && /^export VTEAM_SCRATCH=".*-R1"$/m.test(leR1.stdout),
+    leR1.stdout.slice(0, 300) + leR1.stderr);
+  check("lane_env leaves the marker parallel_check reads (PORT recorded under VTEAM_LANES_ROOT)",
+    fs.existsSync(lanesRoot) && fs.readdirSync(lanesRoot).some((d) =>
+      fs.existsSync(path.join(lanesRoot, d, "lane.env")) &&
+      new RegExp(`^PORT=${lePort}$`, "m").test(fs.readFileSync(path.join(lanesRoot, d, "lane.env"), "utf8"))),
+    fs.existsSync(lanesRoot) ? fs.readdirSync(lanesRoot).join(",") : "no lanes root");
 }
 
 // ── 14c. app: env — scripts installed, Environment block rendered per config ─

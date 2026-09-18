@@ -128,6 +128,14 @@ if [ "${1:-}" = "--selftest" ]; then
   case "$out" in *"start it with: npm run dev"*) ;; *)
     echo "app_check selftest: FAIL (DOWN line must name app.start: $out)"; exit 1 ;; esac
 
+  # VT-35: APP_URL (exported by lane_env.sh) is honoured over the config — with the
+  # config's app.url unset this repo would SKIP; the lane's URL must be probed instead
+  if out="$(APP_URL="http://127.0.0.1:$port" bash "$0" 2>&1)"; then
+    echo "app_check selftest: FAIL (APP_URL pointing at a closed port must red, got: $out)"; exit 1
+  fi
+  case "$out" in *"APP: DOWN http://127.0.0.1:$port"*) ;; *)
+    echo "app_check selftest: FAIL (APP_URL must be the probed target: $out)"; exit 1 ;; esac
+
   # red path: a trailing flag with no value must refuse, not spin the arg loop
   # forever (shift 2 on one remaining arg fails silently under set -u alone)
   if out="$(bash "$0" --wait 2>&1)"; then
@@ -136,7 +144,7 @@ if [ "${1:-}" = "--selftest" ]; then
   case "$out" in *"--wait needs a value"*) ;; *)
     echo "app_check selftest: FAIL (trailing --wait must say why: $out)"; exit 1 ;; esac
 
-  echo "app_check selftest: OK (SKIP on unset url + UP on a live server + health path joined + DOWN red naming app.start + FOREIGN red on a stranger's server + trailing flag refused)"
+  echo "app_check selftest: OK (SKIP on unset url + UP on a live server + health path joined + DOWN red naming app.start + FOREIGN red on a stranger's server + APP_URL from lane_env honoured over config + trailing flag refused)"
   exit 0
 fi
 
@@ -158,7 +166,9 @@ case "$WAIT" in ''|*[!0-9]*)
   echo "app_check: --wait takes a whole number of seconds (got '$WAIT')"; exit 1 ;;
 esac
 
-URL="${URL_OVERRIDE:-$(vteam_cfg app.url "")}"
+# Precedence: --url, then APP_URL (what `eval "$(lane_env.sh)"` exports — a parallel
+# lane's own port, VT-35), then app.url from the shared config.
+URL="${URL_OVERRIDE:-${APP_URL:-$(vteam_cfg app.url "")}}"
 HEALTH="$(vteam_cfg app.health "")"
 START="$(vteam_cfg app.start "")"
 run_check "$URL" "$HEALTH" "$START" "$WAIT"
