@@ -37,5 +37,11 @@ it replaces — so the `# v4` comment beside it stays true.
 And the root cause, closed: `.github/dependabot.yml` now groups `github/codeql-action*`, so
 the next bump of the family arrives as ONE pull request instead of three that fight each other.
 
-## 4. CI
-(filled in below from the combined PR)
+## 4. CI on the combined change (PR #91, commit 22fdffe)
+```
+$ gh pr checks 91
+CodeQL:pass  analyze (javascript-typescript):pass  analyze (python):pass
+e2e (20):pass  e2e (20):pass  e2e (22):pass  e2e (22):pass  gate:pass  gate:pass
+```
+The two `analyze` jobs are the ones that were RED on #69 and #70. Green here, on a change that
+moves `init` and `analyze` together, is the diagnosis confirmed rather than argued.
