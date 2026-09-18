@@ -34,6 +34,15 @@ judge needed before scoring (all applied to both arms, re-calibrated to 91/91 af
 the caveats: one sample, arm-a scored at its stop state, no token cost recorded. VT-28 is open
 on why the arm's own e2e passed what the probes fail — the answer goes in the same page.
 
+### Changed: `init` prefills `app:` for Next.js repos on a checkout-unique port (VT-31)
+
+Benchmark findings E2/E7/E15: the vteam arm spent its first hour discovering that `app.*` was
+empty (every browser step printed `APP: SKIP`), and two arms on one machine both sat on `:3000`,
+so the gate reported the other arm's server as this one's. A repo whose `package.json` declares
+`next` now gets `start: npx next dev -p <port>`, `url`, `health: /` at init, with the port derived
+from the checkout's real path (3100–3899), and init prints which port it pinned. Non-Next repos
+are untouched. e2e 199 → 204 checks.
+
 ### Changed: the front page is a first-run page (VT-26)
 
 The README that ships in this tarball went from 685 lines to 95: the ten-second `audit`

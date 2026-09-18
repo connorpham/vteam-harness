@@ -140,6 +140,14 @@ export async function init(flags) {
   const today = new Date().toISOString().slice(0, 10);
   const codePaths = deriveCodePaths(root);
   const pkgManager = detectPackageManager(root);
+  const nextApp = detectNextApp(root);
+  const appPort = nextApp ? derivePort(root) : null;
+  const app = nextApp
+    ? { start: `npx next dev -p ${appPort}`, url: `http://127.0.0.1:${appPort}`, health: "/" }
+    : { start: "", url: "", health: "" };
+  if (nextApp) {
+    console.log(`✓ app: Next.js detected — dev server pinned to port ${appPort} (derived from this checkout's path, so two clones on one machine never share a port; change app.* in vteam.config.yaml if you need another)`);
+  }
   if (codePaths.length) {
     console.log(`✓ code_paths derived from this repo: [${codePaths.join(", ")}] — review in vteam.config.yaml (the review fence watches ONLY these)`);
   } else {
@@ -202,14 +210,16 @@ stack:
 app:
   # the running application the dev/qa lanes bring up and drive — leave empty
   # on repos with no runnable app (CLIs, libraries): app_check.sh prints SKIP.
+  # A repo whose package.json declares 'next' is prefilled by init with a port
+  # derived from this checkout's path (two clones never share one).
   # start: the dev-server command (lanes run it in a background terminal; gates
   # only probe) · url: where it answers · health: path or full URL (empty =
   # probe url) · open_files: auto|code|cursor|none (/dev opens edited files) ·
   # headed: auto|never (never = unattended shifts — the visible browser drops,
   # screenshots never do)
-  start: ""
-  url: ""
-  health: ""
+  start: "${app.start}"
+  url: "${app.url}"
+  health: "${app.health}"
   open_files: auto
   headed: auto
 
@@ -446,6 +456,30 @@ function detectProfile(root) {
 
   if (has("pyproject.toml") || has("setup.py") || has("requirements.txt")) return "python";
   return "generic";
+}
+
+/** Does package.json declare `next`? Benchmark finding E2 (2026-09-03): a Next app
+ * initialised with an empty app: block gave the lanes nothing to drive — every
+ * browser step printed APP: SKIP and the arm wired app.* by hand an hour in. */
+function detectNextApp(root) {
+  try {
+    const p = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+    return Boolean({ ...(p.dependencies || {}), ...(p.devDependencies || {}) }.next);
+  } catch { return false; }
+}
+
+/** A dev-server port unique to THIS checkout: 3100 + fnv1a(absolute path) % 800.
+ * Benchmark findings E7/E15: two arms on one machine both defaulted to :3000;
+ * app_check reported the OTHER arm's server as UP, and a whole a11y suite
+ * measured a stranger's app before a tap-target number gave it away. */
+export function derivePort(root) {
+  // realpath, so a symlinked checkout (macOS /var → /private/var, a worktree via a link)
+  // gets the same port whichever spelling of the path reached us
+  let abs = path.resolve(root);
+  try { abs = fs.realpathSync.native(abs); } catch { /* keep the resolved spelling */ }
+  let h = 0x811c9dc5;
+  for (const byte of Buffer.from(abs, "utf8")) { h ^= byte; h = Math.imul(h, 0x01000193) >>> 0; }
+  return 3100 + (h % 800);
 }
 
 /** Detect the package manager from the lockfile actually present — a pnpm repo
