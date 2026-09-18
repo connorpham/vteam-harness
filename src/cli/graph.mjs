@@ -601,13 +601,268 @@ export function renderHuman(m) {
   out.push("graph REPORTS, it never fails the build (always exit 0) — it is a mirror of the files above.");
   out.push("The gates that DO fail are dor_check.py (blocked-by not Done), schedule_check.py (plan) and evd_check.py (verdicts).");
   out.push("  --json  machine shape, pinned to the commit   --dot  Graphviz digraph (pipe to `dot -Tsvg`)");
+  out.push("  --plan  the execution plan: Kahn waves, scope-disjoint batches, critical path (--plan --json for machines)");
   return out.join("\n");
+}
+
+// ---- the execution plan ----------------------------------------------------
+// Why this exists (VT-37): the graph knew the dependencies and printed them, and
+// then /pm derived the dispatch ORDER again in prose — seven UNBLOCKED conditions
+// across every open ticket, every session, as LLM reasoning. Ordering a DAG is
+// Kahn's algorithm: microseconds, zero tokens, and the same answer twice. What a
+// machine cannot decide (is this design oracle any good? does this PR comment
+// outrank the sprint?) stays with the lane, and is named as such below.
+//
+// The plan NEVER relaxes a gate. It decides what may start, in what order, and
+// what each agent should read first — nothing else.
+
+/** CODE-SCOPE per ticket, from the tasksheet the DEV lane writes. A ticket with
+ * no declared scope conflicts with EVERYTHING: unknown scope is not empty scope,
+ * and parallel_check reds an overlap that this plan failed to prevent. */
+export function readScopes(root, evdRel) {
+  const scopes = {};
+  for (const d of listDir(path.join(root, evdRel))) {
+    if (!d.isDirectory() || !KEY_RE.test(d.name)) continue;
+    const text = readSmall(path.join(root, evdRel, d.name, "dev", "tasksheet.md"));
+    const m = text && text.match(/^CODE-SCOPE:\s*(.+)$/m);
+    scopes[d.name.toUpperCase()] = m
+      ? m[1].split(/[,\s]+/).map((x) => x.trim().replace(/\/+$/, "")).filter(Boolean)
+      : null;                                   // null = undeclared, not empty
+  }
+  return scopes;
+}
+
+/** Do two scope lists touch? Prefix containment either way — `src/` and
+ * `src/auth/a.ts` are the same file to two agents writing at once. */
+export function scopesOverlap(a, b) {
+  if (!a || !b) return true;                    // undeclared conflicts with all
+  // normalise HERE, not in the caller: `src/` and `src` are one directory, and a
+  // comparison that trusts its caller to have stripped the slash is a comparison
+  // that silently says "disjoint" for the pair that collides most often.
+  const norm = (v) => v.map((x) => String(x).replace(/\/+$/, ""));
+  const A = norm(a), B = norm(b);
+  return A.some((x) => B.some((y) => x === y || x.startsWith(y + "/") || y.startsWith(x + "/")));
+}
+
+/** Branches in flight: `feat|fix/<KEY>-…`. A ticket someone is already pushing is
+ * not ready, it is RUNNING — the old `ready` flag said true for both. */
+export function inFlightKeys(root) {
+  const r = spawnSync("git", ["-C", root, "branch", "--format=%(refname:short)"],
+    { encoding: "utf8" });
+  if (r.status !== 0) return new Set();
+  const keys = new Set();
+  for (const b of (r.stdout || "").split("\n")) {
+    const m = b.trim().match(/^(?:feat|fix)\/([A-Za-z][A-Za-z0-9]*-[0-9]+)-/);
+    if (m) keys.add(m[1].toUpperCase());
+  }
+  return keys;
+}
+
+/** Kahn levels + batches + critical path over the OPEN part of the graph.
+ * Pure: everything it needs arrives as arguments, so the selftest can drive it. */
+export function buildPlan(m, { parallel = 1, scopes = {}, inFlight = new Set(),
+                              evdRel = "evd" } = {}) {
+  const byKey = new Map(m.nodes.map((n) => [n.key, n]));
+  const done = (k) => byKey.get(k)?.status_category === "done";
+  const inCycle = new Set();
+  // the model carries cycles as {path, display}; the selftest drives plain arrays.
+  // Read both rather than trusting one shape — a mis-read here would let a ticket
+  // inside a cycle be dispatched, which is the one thing a cycle must prevent.
+  for (const c of m.findings.cycles || []) {
+    for (const k of (Array.isArray(c) ? c : c.path || [])) inCycle.add(k);
+  }
+
+  const open = m.nodes.filter((n) => n.status_category !== "done" && n.in_backlog);
+  const blocked = [];
+  const schedulable = [];
+  for (const n of open) {
+    const why = [];
+    if (inCycle.has(n.key)) why.push("sits in a dependency cycle — nothing in a cycle can start");
+    for (const b of n.blocked_on || []) {
+      // an edge onto an OPEN ticket is a LEVEL (Kahn puts it in a later wave); an edge
+      // onto a decision row or onto nothing at all is a genuine block, and the two
+      // must not both fire for the same key
+      if (byKey.has(b)) continue;
+      if (/^[QDA][0-9]+$/i.test(b)) why.push(`waits on decision ${b}`);
+      else why.push(`blocked-by ${b}, which is neither a ticket nor a decision row`);
+    }
+    if (why.length) blocked.push({ key: n.key, status: n.status, why });
+    else schedulable.push(n);
+  }
+
+  // Kahn: level = 1 + max(level of every dependency still open)
+  const level = new Map();
+  const deps = (n) => (n.blocked_by || []).filter((k) => byKey.has(k) && !done(k));
+  let changed = true, guard = schedulable.length + 2;
+  for (const n of schedulable) level.set(n.key, 0);
+  while (changed && guard-- > 0) {
+    changed = false;
+    for (const n of schedulable) {
+      const d = deps(n).filter((k) => level.has(k));
+      const want = d.length ? Math.max(...d.map((k) => level.get(k))) + 1 : 0;
+      if (want !== level.get(n.key)) { level.set(n.key, want); changed = true; }
+    }
+  }
+
+  const running = schedulable.filter((n) => inFlight.has(n.key) || n.status === "In Progress");
+  const queueable = schedulable.filter((n) => !running.includes(n));
+
+  const waves = [];
+  const levels = [...new Set(queueable.map((n) => level.get(n.key)))].sort((a, b) => a - b);
+  for (const lv of levels) {
+    const items = queueable.filter((n) => level.get(n.key) === lv).sort((a, b) => byKey2(a.key, b.key));
+    const batches = [];
+    for (const n of items) {
+      // A ticket In Review needs /qa, not /dev, and QA writes only under its own
+      // evidence directory — so a verification never collides with anyone and never
+      // eats a code-writing slot. Dispatching it as DEV work is the classic re-do.
+      const nextLane = n.status_category === "in_review" ? "qa" : "dev";
+      const scope = nextLane === "qa" ? [`${evdRel}/${n.key}`] : (scopes[n.key] ?? null);
+      // compare against the scope each entry ACTUALLY got (a QA item carries its own
+      // evidence dir), never the raw map — which has no row for a QA-lane ticket and
+      // would make every verification conflict with every other item
+      const slot = batches.find((b) => b.length < Math.max(1, parallel)
+        && b.every((o) => !scopesOverlap(scope, o.scope)));
+      const entry = {
+        key: n.key, summary: n.summary, status: n.status, cost: n.cost,
+        next_lane: nextLane,
+        scope, scope_declared: nextLane === "qa" || (scopes[n.key] ?? null) !== null,
+        sprint: n.sprint,
+        needs_plan_row: n.sprint === null,
+        // subgraph scoping: what this agent should read FIRST — the evidence its
+        // upstream tickets produced, not the repository
+        context: (n.blocked_by || []).filter((k) => byKey.has(k))
+          .map((k) => byKey.get(k))
+          .flatMap((u) => [u.evidence?.report_path, u.file].filter(Boolean)),
+      };
+      if (slot) slot.push(entry); else batches.push([entry]);
+    }
+    waves.push({ level: lv, batches });
+  }
+
+  // longest path by day-cost; a missing cost makes the number incomplete, never invented
+  const memo = new Map(); const missing = new Set();
+  const cost = (k) => {
+    const c = byKey.get(k)?.cost;
+    if (c === null || c === undefined) { missing.add(k); return 0; }
+    return c;
+  };
+  const longest = (k, seen = new Set()) => {
+    if (memo.has(k)) return memo.get(k);
+    if (seen.has(k)) return { days: 0, path: [] };
+    seen.add(k);
+    const next = (m.edges || []).filter((e) => e.from === k && byKey.has(e.to)
+      && byKey.get(e.to).status_category !== "done");
+    let best = { days: 0, path: [] };
+    for (const e of next) {
+      const r = longest(e.to, new Set(seen));
+      if (r.days > best.days) best = r;
+    }
+    const r = { days: cost(k) + best.days, path: [k, ...best.path] };
+    memo.set(k, r);
+    return r;
+  };
+  let critical = { days: 0, path: [] };
+  for (const n of schedulable) {
+    const r = longest(n.key);
+    if (r.days > critical.days || (r.days === critical.days && r.path.length > critical.path.length)) {
+      critical = r;
+    }
+  }
+
+  const warnings = [];
+  const undeclared = queueable.filter((n) => n.status_category !== "in_review"
+    && (scopes[n.key] ?? null) === null).map((n) => n.key);
+  if (undeclared.length && parallel > 1) {
+    warnings.push(`no CODE-SCOPE declared for ${undeclared.slice(0, 6).join(", ")}${undeclared.length > 6 ? "…" : ""}`
+      + " — each takes a batch alone, because unknown scope is not empty scope");
+  }
+  const noRow = queueable.filter((n) => n.sprint === null).map((n) => n.key);
+  if (noRow.length) {
+    warnings.push(`no sprint-plan row for ${noRow.slice(0, 6).join(", ")}${noRow.length > 6 ? "…" : ""}`
+      + " — /pm leg (f): add the row WITH a day-cost before dispatching, or the capacity is spent off the books");
+  }
+  if (missing.size) {
+    warnings.push(`the critical path is INCOMPLETE: no day-cost for ${[...missing].slice(0, 6).join(", ")}`
+      + " — the number below counts only the tickets that have one");
+  }
+  return {
+    generated_at_commit: m.generated_at_commit,
+    parallel,
+    waves,
+    in_flight: running.map((n) => ({ key: n.key, status: n.status, held_by_branch: inFlight.has(n.key) })),
+    blocked,
+    critical_path: { days: Number(critical.days.toFixed(2)), path: critical.path, complete: missing.size === 0 },
+    stats: {
+      schedulable: queueable.length, running: running.length, blocked: blocked.length,
+      waves: waves.length,
+      first_wave_agents: waves[0] ? waves[0].batches.length : 0,
+    },
+    warnings,
+    decided_by_the_lane_not_here: [
+      "priority overrides: an unanswered PR comment outranks the sprint (/pm P1 priority 0)",
+      "leg (b): whether a UI ticket's design link is a real oracle — a machine sees a URL, not a design",
+      "whether an off-plan item is worth a plan row at all",
+    ],
+  };
+}
+
+function byKey2(a, b) { return String(a).localeCompare(String(b), "en", { numeric: true }); }
+
+export function renderPlan(p) {
+  const L = [];
+  L.push(`EXECUTION PLAN  ·  commit ${String(p.generated_at_commit).slice(0, 8)}  ·  parallel ${p.parallel}`);
+  L.push(`${p.stats.schedulable} schedulable · ${p.stats.running} in flight · ${p.stats.blocked} blocked · ${p.stats.waves} wave(s)`);
+  L.push("");
+  if (!p.waves.length) L.push("  (nothing schedulable)");
+  for (const w of p.waves) {
+    L.push(`── WAVE ${w.level}${w.level === 0 ? "  (start now)" : `  (unblocks after wave ${w.level - 1})`}`);
+    w.batches.forEach((b, i) => {
+      L.push(`   batch ${i + 1}: ${b.map((x) => x.key).join(", ")}`);
+      for (const x of b) {
+        const flags = [x.scope_declared ? null : "no CODE-SCOPE", x.needs_plan_row ? "no plan row" : null]
+          .filter(Boolean).join(" · ");
+        L.push(`     ${x.key}  /${x.next_lane}  ${String(x.summary ?? "").slice(0, 52)}${flags ? `   [${flags}]` : ""}`);
+        if (x.context.length) L.push(`        read first: ${x.context.slice(0, 3).join(" · ")}`);
+      }
+    });
+    L.push("");
+  }
+  if (p.in_flight.length) {
+    L.push(`── IN FLIGHT (not re-dispatchable)`);
+    for (const f of p.in_flight) L.push(`   ${f.key}  ${f.status}${f.held_by_branch ? " · branch pushed" : ""}`);
+    L.push("");
+  }
+  if (p.blocked.length) {
+    L.push(`── BLOCKED`);
+    for (const b of p.blocked) L.push(`   ${b.key}  ${b.why.join(" · ")}`);
+    L.push("");
+  }
+  L.push(`── CRITICAL PATH  ${p.critical_path.days} day(s)${p.critical_path.complete ? "" : "  (INCOMPLETE — see warnings)"}`);
+  L.push(`   ${p.critical_path.path.join(" → ") || "(none)"}`);
+  if (p.warnings.length) {
+    L.push("");
+    for (const w of p.warnings) L.push(`⚠️  ${w}`);
+  }
+  L.push("");
+  L.push("This plan decides ORDER and BATCHES. It never relaxes a gate, and it does not decide:");
+  for (const d of p.decided_by_the_lane_not_here) L.push(`   · ${d}`);
+  return L.join("\n");
 }
 
 // ---- command ---------------------------------------------------------------
 export async function graph(flags = {}) {
   const root = repoRoot();
   const m = buildGraph(root);
+  if (flags.plan) {
+    const cfg = loadConfig(root);
+    const parallel = Number(cfgGet(cfg, "team.parallel", 1)) || 1;
+    const evdRel = String(cfgGet(cfg, "paths.evidence", "evd"));
+    const p = buildPlan(m, { parallel, scopes: readScopes(root, evdRel),
+      inFlight: inFlightKeys(root), evdRel });
+    console.log(flags.json ? JSON.stringify(p, null, 2) : renderPlan(p));
+    return;
+  }
   if (flags.json) console.log(JSON.stringify(toJson(m), null, 2));
   else if (flags.dot) process.stdout.write(toDot(m));
   else console.log(renderHuman(m));
@@ -747,6 +1002,14 @@ function selftest() {
       Array.isArray(parsed.findings.cycles) && Array.isArray(parsed.findings.done_without_verdict),
       "--json contract: {generated_at_commit, nodes, edges, findings{dangling,cycles,done_without_verdict}}");
     assert(parsed.generated_at_commit === m.generated_at_commit, "--json must carry the commit");
+    // --plan through the CLI, while this fixture's config is still valid
+    const planCli = runCli(repo, "--plan");
+    assert(planCli.status === 0 && /EXECUTION PLAN/.test(planCli.stdout), `--plan must exit 0: ${planCli.stderr}`);
+    assert(/decides ORDER and BATCHES/.test(planCli.stdout) && /it does not decide/.test(planCli.stdout),
+      "--plan must state what it does NOT decide — the lane keeps the judgement calls");
+    const planJson = runCli(repo, "--plan", "--json");
+    assert(planJson.status === 0 && JSON.parse(planJson.stdout).waves, "--plan --json must parse");
+
     const j2 = runCli(repo, "--json");
     assert(j1.stdout === j2.stdout, "--json must be byte-stable across runs (sorted, no timestamp)");
     assert(JSON.stringify(parsed.nodes.map((n) => n.key)) ===
@@ -876,7 +1139,87 @@ function selftest() {
     assert(/digraph vteam_graph \{/.test(runCli(empty, "--dot").stdout), "empty --dot must still be a valid digraph");
     reds++;
 
-    console.log(`graph selftest: OK (gate parity: ${gateVerdict}; 6 nodes/5 edges; ready set exactly {GRA-2}; dangling GRA-3→GHOST-9; cycle GRA-4→GRA-5→GRA-4; done_without_verdict GRA-6; plan 4h→0.5d; ledger actors An/Binh/Chi; --json byte-stable + sorted; --dot ${dotVerdict}; ${reds} mutations red — malformed ticket + stray file warned, bad plan item/cost warned, self-block = 1-cycle, 60-node dense DAG proven cycle-free in ${ms}ms, jira provider honest with 0 faked edges, bad config degraded, empty repo empty; exit 0 in every mode)`);
+    // ---- the execution plan (VT-37): Kahn waves, scope-disjoint batches ------
+    // buildPlan is pure, so it is driven directly rather than through a fixture repo.
+    const mkNode = (key, extra = {}) => ({
+      key, summary: key, status: "To Do", status_category: "todo", in_backlog: true,
+      blocked_by: [], blocked_on: [], cost: null, sprint: "sprint-1", file: `docs/backlog/${key}.md`,
+      evidence: null, ...extra,
+    });
+    const mkModel = (nodes, edges = [], cycles = []) => ({
+      generated_at_commit: "deadbeef", nodes, edges, findings: { cycles, dangling: [] },
+    });
+
+    // a chain A→B→C is three waves, never one
+    const chain = mkModel(
+      [mkNode("P-1"), mkNode("P-2", { blocked_by: ["P-1"], blocked_on: ["P-1"] }),
+       mkNode("P-3", { blocked_by: ["P-2"], blocked_on: ["P-2"] })],
+      [{ from: "P-1", to: "P-2" }, { from: "P-2", to: "P-3" }]);
+    const pc = buildPlan(chain, { parallel: 4, scopes: { "P-1": ["src/a"], "P-2": ["src/b"], "P-3": ["src/c"] } });
+    assert(pc.waves.map((w) => w.level).join(",") === "0,1,2", `chain must be 3 waves: ${JSON.stringify(pc.waves.map((w) => w.level))}`);
+    assert(pc.waves[0].batches[0][0].key === "P-1", "wave 0 is the tail of the chain");
+
+    // a dependency that is already DONE is not a level
+    const doneDep = mkModel([mkNode("P-0", { status_category: "done", status: "Done" }),
+      mkNode("P-9", { blocked_by: ["P-0"], blocked_on: ["P-0"] })]);
+    const pd = buildPlan(doneDep, { parallel: 2, scopes: { "P-9": ["src/x"] } });
+    assert(pd.waves.length === 1 && pd.waves[0].level === 0, "a Done dependency must not push a level");
+
+    // parallel: disjoint scopes share a batch, overlapping scopes do not
+    const two = mkModel([mkNode("P-4"), mkNode("P-5")]);
+    const disjoint = buildPlan(two, { parallel: 2, scopes: { "P-4": ["src/a"], "P-5": ["src/b"] } });
+    assert(disjoint.waves[0].batches.length === 1 && disjoint.waves[0].batches[0].length === 2,
+      "two disjoint scopes belong in ONE batch at parallel 2");
+    const overlap = buildPlan(two, { parallel: 2, scopes: { "P-4": ["src/"], "P-5": ["src/auth/a.ts"] } });
+    assert(overlap.waves[0].batches.length === 2,
+      "`src/` and `src/auth/a.ts` are the same file to two agents — never one batch");
+    const undeclared = buildPlan(two, { parallel: 2, scopes: { "P-4": ["src/a"] } });
+    assert(undeclared.waves[0].batches.length === 2 && undeclared.warnings.some((w) => /no CODE-SCOPE/.test(w)),
+      "an undeclared scope conflicts with everything, loudly");
+    assert(buildPlan(two, { parallel: 1, scopes: { "P-4": ["src/a"], "P-5": ["src/b"] } }).waves[0].batches.length === 2,
+      "team.parallel is a ceiling, not a suggestion");
+
+    // an In Review ticket is QA work: its own lane, its own evidence dir, no code slot
+    const rev = mkModel([mkNode("P-6", { status: "In Review", status_category: "in_review" }), mkNode("P-7")]);
+    const pr = buildPlan(rev, { parallel: 2, scopes: { "P-7": ["src/a"] }, evdRel: "evd" });
+    const qa = pr.waves[0].batches.flat().find((x) => x.key === "P-6");
+    assert(qa && qa.next_lane === "qa" && qa.scope[0] === "evd/P-6",
+      `In Review must route to /qa with its own evidence scope: ${JSON.stringify(qa)}`);
+    assert(pr.waves[0].batches.length === 1, "QA verification never collides with a DEV ticket");
+
+    // in flight = running, not ready (the old `ready` flag said true for both)
+    const flight = buildPlan(mkModel([mkNode("P-8"), mkNode("P-9")]),
+      { parallel: 2, scopes: { "P-8": ["a"], "P-9": ["b"] }, inFlight: new Set(["P-8"]) });
+    assert(flight.in_flight.length === 1 && flight.in_flight[0].key === "P-8"
+      && !flight.waves[0].batches.flat().some((x) => x.key === "P-8"),
+      "a ticket with a branch pushed is running, never dispatchable again");
+
+    // a cycle and a decision block never enter a wave, and say why
+    const cyc = buildPlan(mkModel([mkNode("P-A", { blocked_on: ["P-B"] }), mkNode("P-B", { blocked_on: ["P-A"] })],
+      [], [["P-A", "P-B"]]), { parallel: 2 });
+    assert(cyc.waves.length === 0 && cyc.blocked.length === 2
+      && cyc.blocked.every((b) => /cycle/.test(b.why.join(" "))), "a cycle blocks both ends, with the reason");
+    const dec = buildPlan(mkModel([mkNode("P-C", { blocked_on: ["D17"] })]), { parallel: 1 });
+    assert(dec.blocked.length === 1 && /decision D17/.test(dec.blocked[0].why[0]),
+      `a ticket waiting on a decision is blocked, not ready: ${JSON.stringify(dec.blocked)}`);
+
+    // the critical path is the LONGEST path by day-cost, and never invented
+    const costed = mkModel(
+      [mkNode("C-1", { cost: 1 }), mkNode("C-2", { blocked_by: ["C-1"], blocked_on: ["C-1"], cost: 3 }),
+       mkNode("C-3", { blocked_by: ["C-1"], blocked_on: ["C-1"], cost: 0.5 })],
+      [{ from: "C-1", to: "C-2" }, { from: "C-1", to: "C-3" }]);
+    const pcp = buildPlan(costed, { parallel: 3, scopes: { "C-1": ["a"], "C-2": ["b"], "C-3": ["c"] } });
+    assert(pcp.critical_path.days === 4 && pcp.critical_path.path.join(">") === "C-1>C-2"
+      && pcp.critical_path.complete, `critical path must be C-1>C-2 = 4d: ${JSON.stringify(pcp.critical_path)}`);
+    const partial = buildPlan(mkModel([mkNode("C-4", { cost: null })]), { parallel: 1, scopes: { "C-4": ["a"] } });
+    assert(!partial.critical_path.complete && partial.warnings.some((w) => /INCOMPLETE/.test(w)),
+      "a missing day-cost makes the number incomplete — it is never guessed");
+
+    // the plan is a mirror too: same input, same bytes
+    assert(JSON.stringify(buildPlan(chain, { parallel: 4 })) === JSON.stringify(buildPlan(chain, { parallel: 4 })),
+      "--plan must be byte-stable on one commit");
+
+    console.log(`graph selftest: OK (plan: chain→3 waves, done-dep flat, scope-disjoint batching, parallel ceiling, QA lane split, in-flight excluded, cycle+decision blocked, critical path exact and honestly incomplete; gate parity: ${gateVerdict}; 6 nodes/5 edges; ready set exactly {GRA-2}; dangling GRA-3→GHOST-9; cycle GRA-4→GRA-5→GRA-4; done_without_verdict GRA-6; plan 4h→0.5d; ledger actors An/Binh/Chi; --json byte-stable + sorted; --dot ${dotVerdict}; ${reds} mutations red — malformed ticket + stray file warned, bad plan item/cost warned, self-block = 1-cycle, 60-node dense DAG proven cycle-free in ${ms}ms, jira provider honest with 0 faked edges, bad config degraded, empty repo empty; exit 0 in every mode)`);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -889,7 +1232,8 @@ if (isMain) {
   try {
     const argv = process.argv.slice(2);
     if (argv.includes("--selftest") || argv.includes("selftest")) selftest();
-    else await graph({ json: argv.includes("--json"), dot: argv.includes("--dot") });
+    else await graph({ json: argv.includes("--json"), dot: argv.includes("--dot"),
+      plan: argv.includes("--plan") });
   } catch (e) {
     console.error(`graph: ${e.message}`);
     process.exit(1);

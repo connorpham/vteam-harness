@@ -64,6 +64,12 @@ The default 5 is /team's OWN cap, deliberately higher than /pm's `run n=3`
 because /team is "a full workday" — an intentional override, not a
 contradiction.
 
+**The dispatch order is computed, not reasoned.** `npx vteam-harness graph --plan`
+returns the waves, the scope-disjoint batches capped at `team.parallel`, the lane each
+item is owed, what is already in flight, and the critical path. A workday walks that
+plan; the lane spends its judgement on the things the plan prints as NOT its call.
+
+
 **The main track — the PM as coordinator:** /pm P1 priority order — QA debt →
 the sprint's next DEV ticket(s) → BA's next ticket batch → the SA ADR whose turn
 it is. How DEV runs is set by `team.parallel` (config; default **1**):
