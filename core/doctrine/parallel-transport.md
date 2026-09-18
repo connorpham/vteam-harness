@@ -56,13 +56,13 @@ ledger row, report, any contract it produced — as TEXT to the PM. The PM write
 `coordination.md` + the ledger and merges serially. Same guards, slower channel,
 no live ask/reply.
 
-## Three rules a split worktree makes non-negotiable
+## Four rules a split worktree makes non-negotiable
 
-Learned in the first real two-worker run (2026-09-09): both workers hit the same
-class of failure within minutes. In one working tree these rules are invisible; in
-separate worktrees each one is the difference between a green run and a structural
-red. The gates now enforce all three — this section says WHY, so nobody "fixes"
-them back.
+Learned in the first real two-worker run (2026-09-09) and the first benchmark run
+(2026-09-04): workers hit the same class of failure within minutes. In one working
+tree these rules are invisible; in separate worktrees each one is the difference
+between a green run and a structural red. The gates now enforce all four — this
+section says WHY, so nobody "fixes" them back.
 
 **1. In parallel mode the tasksheet is the FIRST commit.** A worker's own
 `{paths.evidence}/<TICKET>/dev/tasksheet.md` lives in its own worktree, and a
@@ -103,6 +103,31 @@ human clicks "trust"). It is idempotent, backs the pre-existing config up once t
 `~/.claude.json.vteam-bak`, writes via a temp file + rename so the config is never
 torn, refuses a path that does not exist, and refuses a config it cannot parse
 instead of replacing it. Trust the path, then `worker-start`.
+
+**4. One worktree, one port, one database, one scratch directory.** In the
+benchmark arm's ZK-2 round (field finding E13) the DEV lane and three reviewers ran
+concurrently on ONE SQLite file, ONE dev server and ONE scratch directory. The
+suites' fixture-restoring hooks raced each other; the reviewers reported 3, 2 and 14
+failures that did not reproduce, one reviewer's eslint reddened on another's
+scratch file, and only the review standard's "re-run before you believe it" kept a
+fabricated CONFIRMED out of the dossier. Worktrees share `vteam.config.yaml`, so
+`app.url` cannot separate them. The lane environment is DERIVED from the worktree:
+
+```bash
+eval "$(bash .vteam/scripts/lane_env.sh)"            # the DEV lane of this worktree
+eval "$(bash .vteam/scripts/lane_env.sh --lane R1)"  # a reviewer: same tree, own env
+# exports PORT, APP_URL, DATABASE_URL (sqlite: an absolute file under the lane's
+# scratch dir), VTEAM_SCRATCH, VTEAM_LANE — then migrate/seed THAT database:
+npx prisma migrate deploy && npm run db:seed        # or the profile's equivalent
+```
+
+The port is the same `3100 + fnv1a(realpath) % 800` that `vteam init` writes into
+`app.url`, so a plain checkout's DEV lane lands where init pointed and every other
+worktree or lane lands on its own. `app_check.sh` probes `APP_URL` when it is set;
+the helper also writes a marker (`$TMPDIR/vteam-lanes/<slug>/lane.env`) that
+`parallel_check` reads: two in-flight worktrees without a lane environment, or two
+lanes on one port or one database, are a RED, not a hope. Reviewers run against the
+lane's own environment, never the author's.
 
 ## Serial integration, re-gated (unchanged from VT-5)
 

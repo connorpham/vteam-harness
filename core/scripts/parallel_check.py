@@ -44,7 +44,11 @@ RED when:
     distinguishing "no such line" from "tasksheet not committed on that branch"
     and from "only bookkeeping paths declared", because the remedies differ;
   · any two in-flight scopes intersect on CODE paths (a path in one equals or
-    nests under a path in the other).
+    nests under a path in the other);
+  · two or more in-flight branches are checked out in worktrees and one has no
+    lane environment (the `lane_env.sh` marker), or two markers claim one port or
+    one database (VT-35 — field finding E13: four lanes on one SQLite file and one
+    dev server produced 19 phantom failures and nearly a fabricated CONFIRMED).
 
 Usage: parallel_check.py [--root <dir>]
 Exit 0 = safe (or off); 1 = exactly which branches collide.
@@ -54,6 +58,7 @@ fixture for the sibling tasksheet; merged branches not in flight).
 """
 from __future__ import annotations
 
+import os
 import posixpath
 import re
 import subprocess
@@ -231,7 +236,9 @@ def main() -> int:
     pattern = str(c.cfg("git.branch_pattern", r"^(feat|fix)/{key}-[0-9]+-"))
     ev = str(c.cfg("paths.evidence", "evd"))
 
-    scope_map, sources = discover(c.root, key, pattern, protected, ev, with_sources=True)
+    branches: dict[str, str] = {}
+    scope_map, sources = discover(c.root, key, pattern, protected, ev, with_sources=True,
+                                  branches=branches)
     # bookkeeping homes are shared by design → never edit territory (see
     # split_bookkeeping). A scope left EMPTY by the split still has a line, so
     # mark it for find_conflicts' message instead of blaming a missing line.
@@ -246,6 +253,7 @@ def main() -> int:
         errs.append(f"{len(scope_map)} DEV branches in flight but team.parallel={parallel} "
                     f"— over the concurrency cap ({', '.join(sorted(scope_map))})")
     errs.extend(find_conflicts(scope_map, sources, ev))
+    errs.extend(check_lane_envs(c.root, branches))
 
     if errs:
         print(f"❌ parallel_check: {len(errs)} problems in the in-flight set")
@@ -352,9 +360,84 @@ def has_landed(root: Path, protected: str, branch: str, merged: set) -> bool:
     return want <= have
 
 
-def discover(root, key, pattern, protected, ev, with_sources: bool = False):
+def worktree_branches(root: Path) -> dict[str, Path]:
+    """{branch: worktree path} for every worktree of this repository — the checkout
+    running the gate included (`git worktree list --porcelain`)."""
+    out: dict[str, Path] = {}
+    path: Path | None = None
+    for line in sh(Path(root), "git", "worktree", "list", "--porcelain").splitlines():
+        if line.startswith("worktree "):
+            path = Path(line[len("worktree "):])
+        elif line.startswith("branch refs/heads/") and path is not None:
+            out[line[len("branch refs/heads/"):]] = path
+    return out
+
+
+def default_lanes_root() -> Path:
+    """Where lane_env.sh writes its markers: $VTEAM_LANES_ROOT, else $TMPDIR/vteam-lanes."""
+    env = os.environ.get("VTEAM_LANES_ROOT")
+    if env:
+        return Path(env.rstrip("/"))
+    return Path(os.environ.get("TMPDIR") or "/tmp") / "vteam-lanes"
+
+
+def lane_marker(lanes_root: Path, worktree: Path, lane: str = "main") -> Path:
+    """The marker lane_env.sh writes for <worktree>/<lane>: same fnv1a over the
+    realpath (+ `#lane`) as the helper and as init's derivePort, so the gate and the
+    helper cannot disagree about which file is whose."""
+    real = worktree.resolve()
+    key = str(real) if lane == "main" else f"{real}#{lane}"
+    h = 0x811c9dc5
+    for b in key.encode("utf-8"):
+        h ^= b
+        h = (h * 0x01000193) & 0xFFFFFFFF
+    slug = f"{real.name}-{h:08x}" + ("" if lane == "main" else f"-{lane}")
+    return Path(lanes_root) / slug / "lane.env"
+
+
+def check_lane_envs(root: Path, branches: dict[str, str],
+                    lanes_root: Path | None = None) -> list[str]:
+    """VT-35 (E13): when two or more in-flight branches are checked out in worktrees,
+    each worktree must have sourced lane_env.sh — its marker exists — and no two
+    markers may claim one port or one database. A single in-flight worktree is
+    sequential work: nothing to prove, nothing to red."""
+    lanes_root = lanes_root or default_lanes_root()
+    wts = worktree_branches(Path(root))
+    live = {t: wts[b] for t, b in branches.items() if b in wts}
+    if len(live) < 2:
+        return []
+    errs: list[str] = []
+    seen_port: dict[str, str] = {}
+    seen_db: dict[str, str] = {}
+    for t, wt in sorted(live.items()):
+        m = lane_marker(lanes_root, wt)
+        if not m.is_file():
+            errs.append(f"{t}: worktree {wt} has no lane environment — run "
+                        f"`eval \"$(bash .vteam/scripts/lane_env.sh)\"` there before starting "
+                        f"its server, tests or reviewers (E13: one worktree, one port, one "
+                        f"database, one scratch dir)")
+            continue
+        kv = dict(line.split("=", 1) for line in
+                  m.read_text(encoding="utf-8", errors="replace").splitlines() if "=" in line)
+        port, db = kv.get("PORT", "").strip(), kv.get("DATABASE_URL", "").strip()
+        if port in seen_port:
+            errs.append(f"{t} and {seen_port[port]}: same port {port} in their lane "
+                        f"environments — two lanes would measure ONE server (E13)")
+        elif port:
+            seen_port[port] = t
+        if db and db in seen_db:
+            errs.append(f"{t} and {seen_db[db]}: same database {db} — their fixture hooks "
+                        f"race each other (E13)")
+        elif db:
+            seen_db[db] = t
+    return errs
+
+
+def discover(root, key, pattern, protected, ev, with_sources: bool = False,
+             branches: dict | None = None):
     """Local branches matching the grammar → {TICKET: scope paths}
-    (+ {TICKET: where the tasksheet was read from} when with_sources)."""
+    (+ {TICKET: where the tasksheet was read from} when with_sources;
+    `branches`, when given, is filled with {TICKET: branch name})."""
     rx = re.compile(pattern.replace("{key}", re.escape(key)))
     keyrx = re.compile(rf"({re.escape(key)}-\d+)", re.I)
     out: dict[str, list[str]] = {}
@@ -383,6 +466,8 @@ def discover(root, key, pattern, protected, ev, with_sources: bool = False):
         if not m:
             continue
         ticket = m.group(1).upper()
+        if branches is not None:
+            branches[ticket] = br
         text, src = tasksheet_text(Path(root), ev, ticket, br)
         out[ticket] = parse_scope(text)
         sources[ticket] = src
@@ -613,6 +698,58 @@ def _selftest() -> None:
         found = discover(r, "VT", pat, "main", "evd")
         assert "VT-7" in found, f"work added after a squash is in flight again: {found}"
 
+    # --- lane isolation (VT-35, field finding E13): two in-flight worktrees must ---
+    # --- not share one port / one database — the lane_env.sh marker proves it  ---
+    with tempfile.TemporaryDirectory() as tmp:
+        r = Path(tmp) / "repo"
+        r.mkdir()
+        lanes = Path(tmp) / "lanes"
+
+        def g(*a, cwd=r):
+            subprocess.run(["git", *a], cwd=cwd, capture_output=True, text=True, check=True)
+
+        g("init", "-q", "-b", "main")
+        g("config", "user.email", "t@t")
+        g("config", "user.name", "t")
+        (r / "README").write_text("x")
+        g("add", "-A")
+        g("commit", "-qm", "init")
+        for n, scope in (("1", "src/a/"), ("2", "src/b/")):
+            g("checkout", "-qb", f"feat/VT-{n}-lane")
+            (r / f"evd/VT-{n}/dev").mkdir(parents=True)
+            (r / f"evd/VT-{n}/dev/tasksheet.md").write_text(f"CODE-SCOPE: {scope}\n")
+            g("add", "-A")
+            g("commit", "-qm", f"tasksheet VT-{n}")
+            g("checkout", "-q", "main")
+        wt1, wt2 = Path(tmp) / "wt1", Path(tmp) / "wt2"
+        g("worktree", "add", "-q", str(wt1), "feat/VT-1-lane")
+        g("worktree", "add", "-q", str(wt2), "feat/VT-2-lane")
+        wts = worktree_branches(r)
+        assert wts.get("feat/VT-1-lane") and wts.get("feat/VT-2-lane"), f"fixture: both branches must be checked out: {wts}"
+        branches = {"VT-1": "feat/VT-1-lane", "VT-2": "feat/VT-2-lane"}
+        # RED: two worktrees, no lane environment anywhere — that is exactly E13
+        e = check_lane_envs(r, branches, lanes)
+        assert len(e) == 2 and all("no lane environment" in x for x in e), \
+            f"two in-flight worktrees without lane_env markers must both red:\n{e}"
+        # GREEN: each worktree sourced lane_env.sh (markers written under the same root)
+        helper = Path(__file__).resolve().parent / "lane_env.sh"
+        env = {**os.environ, "VTEAM_LANES_ROOT": str(lanes)}
+        for wt in (wt1, wt2):
+            p = subprocess.run(["bash", str(helper)], cwd=wt, env=env, capture_output=True, text=True)
+            assert p.returncode == 0, f"lane_env.sh failed in {wt}:\n{p.stdout}{p.stderr}"
+        assert check_lane_envs(r, branches, lanes) == [], \
+            f"two worktrees each with their own lane env must pass:\n{check_lane_envs(r, branches, lanes)}"
+        # RED: the markers exist but claim ONE port — the collision E13 is about
+        m1 = lane_marker(lanes, wt1)
+        m2 = lane_marker(lanes, wt2)
+        m2.write_text(m1.read_text(encoding="utf-8").replace(f"WORKTREE={m1.read_text().splitlines()[0][9:]}", f"WORKTREE={wt2.resolve()}"), encoding="utf-8")
+        e = check_lane_envs(r, branches, lanes)
+        assert any("same port" in x for x in e), f"two lanes on one port must red:\n{e}"
+        # a single in-flight worktree is sequential work: nothing to prove
+        assert check_lane_envs(r, {"VT-1": "feat/VT-1-lane"}, lanes) == []
+        g("worktree", "remove", "--force", str(wt1))
+        g("worktree", "remove", "--force", str(wt2))
+
     print("parallel_check selftest: OK (parse + nest/equal/disjoint + `.`/`..`/`./` "
           "canonicalised + whole-repo scope collides with everyone; conflicts: "
           "disjoint green, overlap red, missing-scope red, over-cap comparison; "
@@ -621,7 +758,9 @@ def _selftest() -> None:
           "swallowing the repo; worktree: sibling tasksheet read from git, own branch "
           "read from the working tree, uncommitted one named; landed: merged branch — "
           "even '+'-decorated in a worktree — and squash-merged branch not in flight, "
-          "while a NOT-YET-DIVERGED branch and post-squash work still are)")
+          "while a NOT-YET-DIVERGED branch and post-squash work still are; lane "
+          "isolation: two in-flight worktrees without lane_env markers red, each with "
+          "its own env green, one shared port red, a single worktree exempt)")
 
 
 if __name__ == "__main__":

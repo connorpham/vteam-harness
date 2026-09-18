@@ -96,6 +96,16 @@ it is. How DEV runs is set by `team.parallel` (config; default **1**):
      in-flight, and the three rules a split worktree makes non-negotiable —
      commit the tasksheet first, bookkeeping paths are never CODE-SCOPE,
      pre-trust a new worktree — are in `docs/team/parallel-transport.md`.
+  4. **One worktree, one port, one database, one scratch dir.** Worktrees share
+     `vteam.config.yaml`, so `app.url` alone puts every lane on one server. The
+     first thing a lane does in its worktree — before a dev server, a test suite
+     or a reviewer — is `eval "$(bash .vteam/scripts/lane_env.sh)"`; a reviewer
+     in the same tree takes `--lane R1` (R2, R3). `app_check` then probes the
+     lane's `APP_URL`, Prisma reads the lane's `DATABASE_URL`, scratch files go
+     under `VTEAM_SCRATCH`. Reviewers run against the lane's own environment,
+     never the author's. `parallel_check` reds two in-flight worktrees without a
+     lane environment, or two lanes on one port or one database (field finding
+     E13: four lanes on one SQLite file produced 19 phantom failures).
   `team.parallel` is the concurrency ceiling; `team.size` stays the headcount for
   actor accounting on the ledger/board.
 
