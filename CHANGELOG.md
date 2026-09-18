@@ -17,6 +17,20 @@ A patch on top of 0.19.0 (published 2026-09-17 from `ce2322b`): one gate defect 
 its own CI the same day, the benchmark result the README had promised, and the front page
 that ships in the tarball.
 
+### Fixed: seven gates that crashed, lied or went vacuously green in a real repo (VT-30)
+
+The benchmark arm's RUNLOG listed 16 environment findings; eight were the framework's own
+gates misbehaving in an ordinary Next.js repo. `preflight` no longer REDs a local-only repo
+for having no origin (it names the local-merge rule instead). `verbatim_gate` recognises
+unbolded and `AC-A01`-shaped codes and goes RED — never vacuously green — when sources are
+configured but no coded row is found (the testbed's gate turned out to have been vacuous
+all trial). `token_check` scans `git.code_paths` instead of a hardcoded `src/` and no longer
+crashes on an App-Router layout. `app_check` looks up who listens on the port and reports a
+stranger's server as `APP: FOREIGN` (a whole a11y suite was nearly claimed on one). `gate.sh`
+tees its transcript to a file it names. `graph_check` requires a ledger row for every ticket
+in review or done. `/verify` principle 6 says a red-proof against a built server needs a
+build on both sides of the revert.
+
 ### Fixed: the gate's first step made PR clones shallow (VT-29)
 
 `docs_shrink_check` fetched the PR base with `--depth=1`. Into a full clone that writes
