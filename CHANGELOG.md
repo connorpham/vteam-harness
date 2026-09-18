@@ -17,6 +17,20 @@ A patch on top of 0.19.0 (published 2026-09-17 from `ce2322b`): one gate defect 
 its own CI the same day, the benchmark result the README had promised, and the front page
 that ships in the tarball.
 
+### Fixed: seven gates that crashed, lied or went vacuously green in a real repo (VT-30)
+
+The benchmark arm's RUNLOG listed 16 environment findings; eight were the framework's own
+gates misbehaving in an ordinary Next.js repo. `preflight` no longer REDs a local-only repo
+for having no origin (it names the local-merge rule instead). `verbatim_gate` recognises
+unbolded and `AC-A01`-shaped codes and goes RED — never vacuously green — when sources are
+configured but no coded row is found (the testbed's gate turned out to have been vacuous
+all trial). `token_check` scans `git.code_paths` instead of a hardcoded `src/` and no longer
+crashes on an App-Router layout. `app_check` looks up who listens on the port and reports a
+stranger's server as `APP: FOREIGN` (a whole a11y suite was nearly claimed on one). `gate.sh`
+tees its transcript to a file it names. `graph_check` requires a ledger row for every ticket
+in review or done. `/verify` principle 6 says a red-proof against a built server needs a
+build on both sides of the revert.
+
 ### Fixed: the gate's first step made PR clones shallow (VT-29)
 
 `docs_shrink_check` fetched the PR base with `--depth=1`. Into a full clone that writes
@@ -33,6 +47,15 @@ AC-D07). Published as promised in `docs/BENCHMARK.md` with the scorecard, the fi
 judge needed before scoring (all applied to both arms, re-calibrated to 91/91 afterwards), and
 the caveats: one sample, arm-a scored at its stop state, no token cost recorded. VT-28 is open
 on why the arm's own e2e passed what the probes fail — the answer goes in the same page.
+
+### Changed: `init` prefills `app:` for Next.js repos on a checkout-unique port (VT-31)
+
+Benchmark findings E2/E7/E15: the vteam arm spent its first hour discovering that `app.*` was
+empty (every browser step printed `APP: SKIP`), and two arms on one machine both sat on `:3000`,
+so the gate reported the other arm's server as this one's. A repo whose `package.json` declares
+`next` now gets `start: npx next dev -p <port>`, `url`, `health: /` at init, with the port derived
+from the checkout's real path (3100–3899), and init prints which port it pinned. Non-Next repos
+are untouched. e2e 199 → 204 checks.
 
 ### Changed: the front page is a first-run page (VT-26)
 

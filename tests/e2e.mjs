@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { discoverSelftests } from "../src/cli/doctor.mjs";
+import { derivePort } from "../src/cli/init.mjs";
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = path.join(PKG, "bin", "vteam.mjs");
@@ -259,6 +260,21 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
   check("gate.py --help prints usage and runs NO step (preflight probed with it and ran the whole gate)",
     help.status === 0 && !/▶ /.test(help.stdout) && /Usage: gate\.py/.test(help.stdout), help.stdout.slice(0, 300));
 
+  // E10: the gate's transcript also lands in a file, so a backgrounded run can never
+  // block on an undrained pipe and a RED can be re-read after the terminal scrolled
+  const tr = g0.stdout.match(/📝 transcript: (\S+)/);
+  check("gate.sh names its transcript file and the file carries the GATE line",
+    !!tr && fs.existsSync(tr[1]) && /GATE: GREEN/.test(fs.readFileSync(tr[1], "utf8")), g0.stdout.slice(-300));
+
+  // E1: a repo with NO origin remote is a legitimate local-only shape — preflight
+  // says how push/PR change (local --no-ff merge, review_check by hand), it does not RED
+  run("git", ["-C", dir, "remote", "remove", "origin"]);
+  const pf = run("bash", [path.join(dir, ".vteam", "scripts", "preflight.sh")], { cwd: dir });
+  check("preflight on a local-only repo (no origin) is GREEN and names the local-merge rule",
+    pf.status === 0 && /⚠️\s+Git\s+no origin remote — local-only repo/.test(pf.stdout) && /PREFLIGHT: GREEN/.test(pf.stdout),
+    pf.stdout.slice(-900) + pf.stderr.slice(-300));
+  run("git", ["-C", dir, "remote", "add", "origin", path.join(TMP, "t5b-origin.git")]);
+
   // (a) provider follows the config: markdown → github after init
   const cfgF = path.join(dir, "vteam.config.yaml");
   fs.writeFileSync(cfgF, fs.readFileSync(cfgF, "utf8").replace("provider: markdown", "provider: github"));
@@ -336,6 +352,25 @@ console.log("5c. detectProfile needs `next`; copilot/windsurf frontmatter is quo
   const rB = vteam(withNext, "init", "--yes", "--tools", "claude-code");
   check("prisma WITH next detects `nextjs-prisma`",
     rB.status === 0 && /profile: nextjs-prisma$/m.test(fs.readFileSync(path.join(withNext, "vteam.config.yaml"), "utf8")));
+  // VT-31 (benchmark E2/E7/E15): a Next app gets a RUNNABLE app: block, on a port no other
+  // checkout on the machine shares — the arm that started with an empty block wired it by
+  // hand an hour in, and two arms on :3000 had the gate measure each other's server.
+  const cfgNext = fs.readFileSync(path.join(withNext, "vteam.config.yaml"), "utf8");
+  const port = derivePort(withNext);
+  check("Next repo: init prefills app.url with the port derived from the checkout path",
+    port >= 3100 && port < 3900 && new RegExp(`^  url: "http://127\\.0\\.0\\.1:${port}"$`, "m").test(cfgNext),
+    cfgNext.match(/^app:[\s\S]*?headed:.*$/m)?.[0]);
+  check("Next repo: app.start runs next on that same port and app.health probes /",
+    new RegExp(`^  start: "npx next dev -p ${port}"$`, "m").test(cfgNext) && /^  health: "\/"$/m.test(cfgNext),
+    cfgNext.match(/^app:[\s\S]*?headed:.*$/m)?.[0]);
+  check("init tells the owner which port was pinned and why",
+    new RegExp(`pinned to port ${port}`).test(rB.stdout) && /never share a port/.test(rB.stdout), rB.stdout);
+  check("the port is a function of the path — three checkouts, three ports (deterministic fixture)",
+    new Set(["/tmp/arm-a", "/tmp/arm-b", "/tmp/arm-c"].map(derivePort)).size === 3);
+  check("a repo WITHOUT next keeps the empty app: block exactly as before",
+    /^  start: ""$/m.test(fs.readFileSync(path.join(noNext, "vteam.config.yaml"), "utf8")) &&
+    /^  url: ""$/m.test(fs.readFileSync(path.join(noNext, "vteam.config.yaml"), "utf8")) &&
+    !/pinned to port/.test(rA.stdout));
   // the typegen step declares its skip on a repo where next is absent
   const gy = fs.readFileSync(path.join(PKG, "profiles", "nextjs-prisma", "gates.yaml"), "utf8");
   check("nextjs-prisma typegen probes for `next` (declared skip, not a red)",
@@ -714,6 +749,9 @@ console.log("17. graph — the work graph made visible");
   fs.mkdirSync(path.join(repo, "evd", "DEMO-1"), { recursive: true });
   fs.writeFileSync(path.join(repo, "evd", "DEMO-1", "REPORT.md"),
     "# Verification report DEMO-1 — PASS\nCOMMIT: deadbeef\nVERIFIED-AT: 2026-01-02T10:00:00+00:00\n");
+  // E14: a done ticket must have been dispatched — the ledger row is part of the record
+  fs.appendFileSync(path.join(repo, "docs", "pm", "log.md"),
+    "| 2026-01-02 | dev | e2e | DEMO-1 — auth | done · tok ≈ 1k | PR #1 |\n");
   fs.writeFileSync(path.join(bl, "DEMO-2.md"), "# DEMO-2: api\n- status: To Do\n- blocked-by: DEMO-1\n");
   fs.writeFileSync(path.join(bl, "DEMO-3.md"), "# DEMO-3: ui\n- status: To Do\n- blocked-by: DEMO-2, GHOST-9\n");
 
