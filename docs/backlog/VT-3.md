@@ -1,6 +1,6 @@
 # VT-3: Competencies — the craft layer the roles were missing
 
-- status: In Progress
+- status: In Review
 - assignee: Connor Pham
 - estimate: 1d
 - labels: doctrine, no UI

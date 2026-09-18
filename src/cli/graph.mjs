@@ -646,13 +646,27 @@ export function scopesOverlap(a, b) {
 
 /** Branches in flight: `feat|fix/<KEY>-…`. A ticket someone is already pushing is
  * not ready, it is RUNNING — the old `ready` flag said true for both. */
-export function inFlightKeys(root) {
-  const r = spawnSync("git", ["-C", root, "branch", "--format=%(refname:short)"],
-    { encoding: "utf8" });
-  if (r.status !== 0) return new Set();
+export function inFlightKeys(root, protectedBranch = "main") {
+  // --no-merged: a branch whose tip is ALREADY on the protected branch is history,
+  // not work. The first version listed every local branch, so 32 of this repo's 33
+  // merged branches counted as "running" and the plan reported 21 tickets in flight
+  // when the true number was 1. Nobody deletes branches after a merge, and a planner
+  // that treats leftovers as work hides the whole team's capacity.
+  // -a: a teammate's PUSHED branch is in flight too, and CI checkouts hold the
+  // remote refs rather than local ones — without it this reads "nothing is running"
+  // on every CI machine and "only mine is running" on every developer's.
+  let r = spawnSync("git", ["-C", root, "branch", "-a", "--no-merged", protectedBranch,
+    "--format=%(refname:short)"], { encoding: "utf8" });
+  if (r.status !== 0) {
+    // no such protected branch locally (fresh clone, detached CI): fall back to every
+    // branch rather than to none — over-reporting in flight is the safe direction
+    r = spawnSync("git", ["-C", root, "branch", "--format=%(refname:short)"], { encoding: "utf8" });
+    if (r.status !== 0) return new Set();
+  }
   const keys = new Set();
   for (const b of (r.stdout || "").split("\n")) {
-    const m = b.trim().match(/^(?:feat|fix)\/([A-Za-z][A-Za-z0-9]*-[0-9]+)-/);
+    const m = b.trim().replace(/^remotes\/[^/]+\//, "")
+      .match(/^(?:feat|fix)\/([A-Za-z][A-Za-z0-9]*-[0-9]+)-/);
     if (m) keys.add(m[1].toUpperCase());
   }
   return keys;
@@ -704,7 +718,18 @@ export function buildPlan(m, { parallel = 1, scopes = {}, inFlight = new Set(),
     }
   }
 
-  const running = schedulable.filter((n) => inFlight.has(n.key) || n.status === "In Progress");
+  // RUNNING = an unmerged branch exists. A status of In Progress with no such branch
+  // is not work in flight: it is work that shipped (or stopped) while the status was
+  // never moved. Counting it as running is how a board quietly loses capacity — this
+  // repo carried nine of them, every one with a merged branch and a ledger row.
+  const running = schedulable.filter((n) => inFlight.has(n.key));
+  const staleWip = schedulable.filter((n) => !inFlight.has(n.key) && n.status === "In Progress")
+    .map((n) => ({
+      key: n.key, status: n.status,
+      why: "status says In Progress but no unmerged feat|fix branch exists — the work "
+        + "shipped or stopped and the status never moved; set it to the state it is "
+        + "actually in (In Review for shipped code, Blocked with a reason, or closed)",
+    }));
   const queueable = schedulable.filter((n) => !running.includes(n));
 
   const waves = [];
@@ -790,11 +815,13 @@ export function buildPlan(m, { parallel = 1, scopes = {}, inFlight = new Set(),
     generated_at_commit: m.generated_at_commit,
     parallel,
     waves,
-    in_flight: running.map((n) => ({ key: n.key, status: n.status, held_by_branch: inFlight.has(n.key) })),
+    in_flight: running.map((n) => ({ key: n.key, status: n.status, held_by_branch: true })),
+    stale_wip: staleWip,
     blocked,
     critical_path: { days: Number(critical.days.toFixed(2)), path: critical.path, complete: missing.size === 0 },
     stats: {
       schedulable: queueable.length, running: running.length, blocked: blocked.length,
+      stale_wip: staleWip.length,
       waves: waves.length,
       first_wave_agents: waves[0] ? waves[0].batches.length : 0,
     },
@@ -812,7 +839,8 @@ function byKey2(a, b) { return String(a).localeCompare(String(b), "en", { numeri
 export function renderPlan(p) {
   const L = [];
   L.push(`EXECUTION PLAN  ·  commit ${String(p.generated_at_commit).slice(0, 8)}  ·  parallel ${p.parallel}`);
-  L.push(`${p.stats.schedulable} schedulable · ${p.stats.running} in flight · ${p.stats.blocked} blocked · ${p.stats.waves} wave(s)`);
+  L.push(`${p.stats.schedulable} schedulable · ${p.stats.running} in flight · ${p.stats.blocked} blocked`
+    + `${p.stats.stale_wip ? ` · ${p.stats.stale_wip} stale WIP` : ""} · ${p.stats.waves} wave(s)`);
   L.push("");
   if (!p.waves.length) L.push("  (nothing schedulable)");
   for (const w of p.waves) {
@@ -831,6 +859,12 @@ export function renderPlan(p) {
   if (p.in_flight.length) {
     L.push(`── IN FLIGHT (not re-dispatchable)`);
     for (const f of p.in_flight) L.push(`   ${f.key}  ${f.status}${f.held_by_branch ? " · branch pushed" : ""}`);
+    L.push("");
+  }
+  if (p.stale_wip.length) {
+    L.push(`── STALE WORK IN PROGRESS (status says one thing, the branches say another)`);
+    for (const w of p.stale_wip) L.push(`   ${w.key}  ${w.status} · no unmerged branch`);
+    L.push(`   → these are counted as schedulable, not as running. Move each to the state it is in.`);
     L.push("");
   }
   if (p.blocked.length) {
@@ -858,8 +892,9 @@ export async function graph(flags = {}) {
     const cfg = loadConfig(root);
     const parallel = Number(cfgGet(cfg, "team.parallel", 1)) || 1;
     const evdRel = String(cfgGet(cfg, "paths.evidence", "evd"));
+    const protectedBranch = String(cfgGet(cfg, "git.protected_branch", "main"));
     const p = buildPlan(m, { parallel, scopes: readScopes(root, evdRel),
-      inFlight: inFlightKeys(root), evdRel });
+      inFlight: inFlightKeys(root, protectedBranch), evdRel });
     console.log(flags.json ? JSON.stringify(p, null, 2) : renderPlan(p));
     return;
   }
@@ -1186,6 +1221,21 @@ function selftest() {
     assert(qa && qa.next_lane === "qa" && qa.scope[0] === "evd/P-6",
       `In Review must route to /qa with its own evidence scope: ${JSON.stringify(qa)}`);
     assert(pr.waves[0].batches.length === 1, "QA verification never collides with a DEV ticket");
+
+    // VT-38: a MERGED branch is history, not work. Leftover branches made this repo
+    // report 21 tickets in flight when the true number was 1, and In Progress with no
+    // unmerged branch is status drift, not running work — it stays schedulable and
+    // says so rather than quietly eating capacity.
+    const drift = buildPlan(mkModel([mkNode("P-D", { status: "In Progress", status_category: "in_progress" }),
+      mkNode("P-E")]), { parallel: 2, scopes: { "P-D": ["a"], "P-E": ["b"] }, inFlight: new Set() });
+    assert(drift.in_flight.length === 0 && drift.stale_wip.length === 1
+      && drift.stale_wip[0].key === "P-D" && /never moved/.test(drift.stale_wip[0].why),
+      `In Progress with no unmerged branch is drift, not flight: ${JSON.stringify(drift.stale_wip)}`);
+    assert(drift.waves[0].batches.flat().some((x) => x.key === "P-D"),
+      "a drifted ticket stays schedulable — it is work nobody is doing, not work in hand");
+    assert(buildPlan(mkModel([mkNode("P-D", { status: "In Progress", status_category: "in_progress" })]),
+      { parallel: 1, scopes: { "P-D": ["a"] }, inFlight: new Set(["P-D"]) }).in_flight.length === 1,
+      "with an unmerged branch the SAME ticket is in flight");
 
     // in flight = running, not ready (the old `ready` flag said true for both)
     const flight = buildPlan(mkModel([mkNode("P-8"), mkNode("P-9")]),

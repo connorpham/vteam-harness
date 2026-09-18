@@ -1,6 +1,6 @@
 # VT-7: /team parallel uses Orca orchestration as the real coordination transport
 
-- status: In Progress
+- status: In Review
 - assignee: Connor Pham
 - estimate: 0.5d
 - labels: workflow, no UI

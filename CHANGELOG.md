@@ -19,6 +19,23 @@ vacuously green in the arm's repo; ceilings on review and challenger rounds; a s
 session ends mid-ticket; per-worktree ports and databases for parallel lanes; a measurement of
 what each lane really loads into context (no lane is near 40k tokens).
 
+### Fixed: a merged branch is not work in flight (VT-38)
+
+The planner shipped in VT-37 read `git branch` and called every local `feat|fix/<KEY>-*` branch
+work in hand. Nobody deletes branches after a merge, so 32 of this repo's 33 were history and the
+plan reported **21 tickets in flight when one was running** — a planner that miscounts capacity
+tells the lane everything is busy, and the lane believes it. In flight now means an UNMERGED
+branch, local or pushed (`-a --no-merged`), with a fall back to listing every branch when the
+protected branch is absent, so a fresh clone over-reports rather than concluding nothing runs.
+
+The other half of the same lie: a ticket saying In Progress with nothing running. The plan reports
+those under STALE WORK IN PROGRESS and `graph_check` warns about them — a warning, never a failure,
+because it is a fact about the board rather than about the change under review, and a ticket
+waiting on something is blocked, not drifting. Nine such tickets in this repo were then corrected
+against their evidence, and the tenth was not: VT-2 shipped with no dispatch row, and the only
+retroactive row the ledger grammar accepts would have carried an invented token count, so the
+question went to the decision queue instead.
+
 ### Added: `graph --plan` — the dispatch order is computed, not reasoned (VT-37)
 
 The graph knew the dependencies and printed them; then the PM lane worked out the order again in
