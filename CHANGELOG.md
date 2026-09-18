@@ -11,13 +11,13 @@ does not match `package.json`.
 
 ---
 
-## 0.19.0 — 2026-09-11
+## 0.19.1 — 2026-09-18
 
-Everything here came from running the lanes on a real second repo and then reviewing
-the result. Nothing in it was designed from the armchair, and several entries are
-corrections to things 0.18.0 shipped.
+A patch on top of 0.19.0 (published 2026-09-17 from `ce2322b`): one gate defect found by
+its own CI the same day, the benchmark result the README had promised, and the front page
+that ships in the tarball.
 
-### Fixed before publish (2026-09-17): the gate's first step made PR clones shallow (VT-29)
+### Fixed: the gate's first step made PR clones shallow (VT-29)
 
 `docs_shrink_check` fetched the PR base with `--depth=1`. Into a full clone that writes
 `.git/shallow` with the base tip as a boundary, so six steps later `graph_check` read the
@@ -25,7 +25,7 @@ base-tip commit as a root and flagged it for "touching" every file in the tree �
 deterministic false RED on every stacked ticket branch. The fetch no longer limits depth,
 and the selftest now proves a full clone stays full through PR mode.
 
-### Added before publish (2026-09-17): the first benchmark result — a loss (VT-27)
+### Added: the first benchmark result — a loss (VT-27)
 
 The vteam-vs-BMAD run from 2026-09-03 was finally judged. **BMAD 91/91, vteam 84/91 (92.3 %),
 and three vteam "done" claims were contradicted by the held-out probes** (AC-A07, AC-D02,
@@ -33,6 +33,20 @@ AC-D07). Published as promised in `docs/BENCHMARK.md` with the scorecard, the fi
 judge needed before scoring (all applied to both arms, re-calibrated to 91/91 afterwards), and
 the caveats: one sample, arm-a scored at its stop state, no token cost recorded. VT-28 is open
 on why the arm's own e2e passed what the probes fail — the answer goes in the same page.
+
+### Changed: the front page is a first-run page (VT-26)
+
+The README that ships in this tarball went from 685 lines to 95: the ten-second `audit`
+transcript first, install in two commands, a real-transcript demo, who it is for and not
+for, and links out. The long form moved verbatim to `docs/GUIDE.md` in the repository.
+`tests/e2e.mjs` still verifies every count the README claims. The audience question the
+rewrite raises is filed as decision D17, not assumed.
+
+## 0.19.0 — 2026-09-17 (bumped 2026-09-11, published after VT-24 and VT-25 landed)
+
+Everything here came from running the lanes on a real second repo and then reviewing
+the result. Nothing in it was designed from the armchair, and several entries are
+corrections to things 0.18.0 shipped.
 
 ### Added before publish (2026-09-17): the line-by-line code review (VT-24)
 
