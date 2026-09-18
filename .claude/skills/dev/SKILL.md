@@ -498,8 +498,8 @@ for two weeks. Before the session ends with work in flight, do BOTH:
    days) keeps `In Progress`; anything else (blocked on an answer, a budget cut, a
    dead end) sets the status to `Blocked` with a one-line reason and, when the reason is
    a question, a `blocked-by: Qn` edge onto the decision queue.
-   `graph_check` reds a STOP-STATE.md older than 7 days on a ticket that is neither Done
-   nor Blocked — silent abandonment, not a hand-off.
+   `graph_check` reds a STOP-STATE.md older than 7 days on a ticket that is neither Done,
+   In Review (handed off) nor Blocked — silent abandonment, not a hand-off.
 
 ## Definition of Done
 - [ ] T0: ticket announced; assignee = configured person (or user overrode)

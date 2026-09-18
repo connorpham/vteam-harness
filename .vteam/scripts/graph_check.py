@@ -296,8 +296,8 @@ def check_stop_states(tickets: dict[str, dict], evd_dir: Path,
                       now: _dt.datetime | None = None,
                       max_days: int = STOP_STATE_MAX_DAYS) -> list[str]:
     """A STOP-STATE.md (written by stop_state.sh when a session ends mid-ticket) is a
-    hand-off note. Left for more than `max_days` on a ticket that is neither Done nor
-    Blocked it is silent abandonment: the benchmark arm's tree sat for two weeks with
+    hand-off note. Left for more than `max_days` on a ticket that is neither Done, In
+    Review (handed off) nor Blocked it is silent abandonment: the benchmark arm's tree sat for two weeks with
     the ticket still 'In Progress' and nobody's name on the stop. The `recorded:` line
     dates it; a file without one is dated by its mtime, so a hand-written note cannot
     stay young forever."""
@@ -307,7 +307,9 @@ def check_stop_states(tickets: dict[str, dict], evd_dir: Path,
         stop = evd_dir / k / "dev" / "STOP-STATE.md"
         if not stop.is_file():
             continue
-        if v["status_category"] == "done":
+        # Done is closed; In Review is HANDED OFF — the PR and the report carry the
+        # work, and a reviewer taking a fortnight is not the author abandoning it.
+        if v["status_category"] in ("done", "in_review"):
             continue
         m = STATUS_PAT.search(v.get("text", ""))
         status = m.group(1) if m else "?"
@@ -669,6 +671,14 @@ def _selftest():
         ticket(root, "PROJ-11", "Blocked")
         r = run_gate(root)
         assert r.returncode == 0, f"Blocked (with the stop state as the reason) must pass:\n{r.stdout}"
+        # In Review = handed off: the PR carries the work while a reviewer takes their time
+        t11 = root / "docs" / "backlog" / "PROJ-11.md"
+        t11.write_text(t11.read_text(encoding="utf-8").replace("- status: Blocked", "- status: In Review"), encoding="utf-8")
+        log11 = root / "docs" / "pm" / "log.md"
+        log11.write_text(log11.read_text(encoding="utf-8") +
+                         "| 2026-01-06 | DEV | An | PROJ-11 | done · tok ≈ 1k | PR #11 |\n", encoding="utf-8")
+        r = run_gate(root)
+        assert r.returncode == 0, f"In Review with an old stop state is a hand-off, not abandonment:\n{r.stdout}"
         ticket(root, "PROJ-11", "In Progress")
         stop.write_text(stop.read_text(encoding="utf-8").replace(
             "2026-01-01T00:00:00Z", _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
@@ -789,7 +799,7 @@ def _selftest():
     print("graph_check selftest: OK (coherent graph green + 11 reds + 4 new greens: dangling, "
           "cycle, done-sans-verdict, done-with-FAIL, identical repeat, loop "
           "budget, out-of-scope commit, stale stop state by recorded: line and by "
-          "mtime (Blocked and a fresh stop state pass) — + loud skips: undeclared scope, "
+          "mtime (Blocked, In Review and a fresh stop state pass) — + loud skips: undeclared scope, "
           "remote tracker — + attribution, 17 positive / 12 negative: leading key "
           "attributed (bare/`type:`-prefixed/`feat(KEY):`/multi-scope "
           "`feat(a,KEY):`/`[KEY]`/`Revert \"…\"`), prose mention + longer key + "

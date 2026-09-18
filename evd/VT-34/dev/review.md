@@ -28,3 +28,10 @@ Tried to break:
 - lowercase branch keys: `feat/proj-1-x` derives `PROJ-1` (the `tr` at core/scripts/stop_state.sh:31 also upper-cases `VTEAM_TICKET=proj-1`, asserted by case 6), matching `KEY_RE`'s upper-case tickets so the evidence dir name equals the backlog key.
 
 Traces: tests/e2e.mjs:536, tests/e2e.mjs:547, adapters/claude-code.mjs:114, core/scripts/stop_state.sh:31, core/workflows/dev.md:451, `node tests/e2e.mjs`, `grep -n "git commit\|git add\|status:" core/scripts/stop_state.sh`
+
+## Follow-up by the merging session (2026-09-18, not a review round)
+While merging main into this branch the stale-stop-state rule was narrowed: a ticket **In Review**
+is handed off (its PR and report carry the work), so a reviewer taking longer than seven days must
+not read as the author abandoning it. `check_stop_states` now skips `in_review` as well as `done`
+and `Blocked`; the selftest gained the In Review case (old stop state + In Review + ledger row →
+green) and `core/workflows/dev.md` says the same. Selftest OK after the change.
