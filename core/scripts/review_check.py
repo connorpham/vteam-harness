@@ -24,6 +24,11 @@ Checks {paths.evidence}/<TICKET>/dev/review.md:
      reviewer) is REQUIRED, and it must compare options ("option" / "A vs B") —
      an extra reviewer that only praises did no work.
 
+  6. Risk class (VT-36): `change_class.py` reads the diff and returns docs /
+     surface / logic / high-stakes; the class picks the SHAPE (review_shape) —
+     no cards for docs, one card with one bullet for surface, the configured
+     reviewers otherwise. The class comes from the diff, never from the dossier
+     or the agent. `review.proportional: false` restores the uniform fence.
   5. Round ceiling (VT-32): the initial cards are round 1, every `## Round N`
      heading in the dossier is a further fix round. rounds > `review.max_rounds`
      → RED, unless the diff is high-stakes (rule 4) or a finding is tagged
@@ -46,6 +51,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import change_class  # noqa: E402 — the risk class is measured, not declared
 from ctx import Ctx  # noqa: E402
 
 CARD_HEAD = re.compile(r"^#{2,4}\s.*\b(R\d+)\b", re.M)
@@ -130,7 +137,7 @@ def parse_cards(text: str) -> dict[str, list[str]]:
     return cards
 
 
-def card_is_valid_approve(card: str) -> tuple[bool, list[str]]:
+def card_is_valid_approve(card: str, min_tried: int = MIN_TRIED_BULLETS) -> tuple[bool, list[str]]:
     probs = []
     if re.search(r"REQUEST[- ]CHANGES", card):
         return False, ["card verdict is REQUEST-CHANGES (round not closed)"]
@@ -140,8 +147,8 @@ def card_is_valid_approve(card: str) -> tuple[bool, list[str]]:
     if not m:
         probs.append("APPROVE without a 'tried to break' section — invalid card "
                      "(review-standard §1)")
-    elif len(BULLET.findall(m.group(2))) < MIN_TRIED_BULLETS:
-        probs.append(f"'tried to break' has <{MIN_TRIED_BULLETS} bullets — that's not trying")
+    elif len(BULLET.findall(m.group(2))) < min_tried:
+        probs.append(f"'tried to break' has <{min_tried} bullets — that's not trying")
     n_cmd, n_loc = len(EVIDENCE_CMD.findall(card)), len(EVIDENCE_LOC.findall(card))
     if n_cmd + n_loc < MIN_TRACES:
         probs.append(f"card has <{MIN_TRACES} verifiable traces (`command` / file:line) — "
@@ -157,8 +164,34 @@ def required_cards(n_reviewers: int, need_extra: bool) -> list[str]:
     return [f"R{i}" for i in range(1, n_reviewers + (2 if need_extra else 1))]
 
 
+def review_shape(cls: str, n_reviewers: int) -> tuple[list[str], str | None, int]:
+    """Risk class → the shape of the evidence: (required cards, the architecture card,
+    minimum 'tried to break' bullets).
+
+    Why the shape moves at all (VT-36): the fence still does not measure SIZE, and no
+    agent gets to call its own change small — `change_class.py` measures the RISK from
+    the diff. But charging a README typo the same two-reviewer, three-bullets-each toll
+    as a payment rewrite does not buy safety; it buys INVENTED bullets, because on a
+    text change there is nothing to try. Cards that get written to satisfy a counter
+    stop being evidence, and then they stop being read.
+
+      docs        no executable file moved → no dossier. The gate, the ledger and the
+                  evidence pack still apply; only the reviewer agents are spared.
+      surface     one card, one bullet — but a real one: a string can be a shell
+                  command, a selector, an i18n key a test asserts on.
+      logic       `review.reviewers` cards, three bullets each. Unchanged.
+      high-stakes one card more, and it must compare options. Unchanged."""
+    if cls == "docs":
+        return [], None, 0
+    if cls == "surface":
+        return ["R1"], None, 1
+    need_extra = cls == "high-stakes"
+    return (required_cards(n_reviewers, need_extra),
+            f"R{n_reviewers + 1}" if need_extra else None, MIN_TRIED_BULLETS)
+
+
 def card_gaps(cards: dict[str, list[str]], required: list[str],
-              hs_card: str | None) -> list[str]:
+              hs_card: str | None, min_tried: int = MIN_TRIED_BULLETS) -> list[str]:
     """Missing/invalid cards against the required list. hs_card names the extra
     high-stakes (architecture) card, or None when the diff doesn't need one."""
     errs: list[str] = []
@@ -170,7 +203,7 @@ def card_gaps(cards: dict[str, list[str]], required: list[str],
             continue
         ok_any, probs_last = False, []
         for card in cards[r]:
-            ok, probs = card_is_valid_approve(card)
+            ok, probs = card_is_valid_approve(card, min_tried)
             if ok:
                 ok_any = True
                 break
@@ -241,6 +274,31 @@ def main() -> int:
 
     ev = str(c.cfg("paths.evidence", "evd"))
     relpath = f"{ev}/{ticket}/dev/review.md"
+
+    # WHAT KIND of change is this? change_class.py measures it FROM THE DIFF — the
+    # agent never declares it and the dossier never claims it (VT-36). `docs` spares
+    # the reviewer agents entirely; `surface` asks for one card with one real bullet;
+    # `logic` and `high-stakes` are exactly the fence that was here before.
+    proportional = str(c.cfg("review.proportional", True)).strip().lower() \
+        not in ("false", "0", "no", "off")
+    try:
+        surface_max = int(str(c.cfg("review.surface_max_lines", 40)))
+    except ValueError:
+        print(f"❌ review_check: review.surface_max_lines "
+              f"{c.cfg('review.surface_max_lines')!r} is not a number")
+        return 1
+    cls, why = change_class.classify(c.root, args.base, args.sha, hs_paths, hs_terms,
+                                     ev, surface_max)
+    if not proportional and cls != "high-stakes":
+        cls = "logic"          # one config line puts the uniform fence back
+    class_line = f"change class `{cls}`" + (f" — {why[0]}" if why else "")
+    required, hs_card, min_tried = review_shape(cls, n_rev)
+    if not required:
+        print(f"✅ review_check: {ticket} — {class_line}. No reviewer card required: no "
+              f"executable file moved in this diff. The verification gate, the evidence "
+              f"pack and the ledger row are untouched by this; only the reviewer agents "
+              f"are spared. Restore the uniform fence with `review.proportional: false`.")
+        return 0
     if args.sha == "WORKTREE":
         review = c.root / relpath
         if not review.is_file():
@@ -259,19 +317,9 @@ def main() -> int:
     cards = parse_cards(text)
 
     errs: list[str] = []
-    changed = changed_files(c.root, args.base, args.sha)
-    need_r3 = any(any(f.startswith(p) for p in hs_paths) for f in changed) if hs_paths else False
-    if not need_r3 and hs_terms:
-        # content trigger: money/irreversible flows live where they live, not
-        # where the path map says — the trigger follows the diff CONTENT
-        ref = "HEAD" if args.sha == "WORKTREE" else args.sha
-        code, diff_text = sh(c.root, "git", "diff", f"{args.base}...{ref}")
-        if code != 0:
-            code, diff_text = sh(c.root, "git", "diff", args.base, ref)
-        if code == 0 and re.search("|".join(re.escape(t) for t in hs_terms), diff_text or "", re.I):
-            need_r3 = True
-    required = required_cards(n_rev, need_r3)
-    hs_card = f"R{n_rev + 1}" if need_r3 else None
+    # high-stakes is one of the classes now: the path and content triggers moved into
+    # change_class.classify, so one reader decides what this diff is.
+    need_r3 = cls == "high-stakes"
 
     for ref in re.findall(r"\b([\w./-]+\.(?:ts|tsx|js|jsx|mjs|py|sh|go|rs|java|kt|rb|php|prisma|sql)):\d+", text):
         if not (c.root / ref).is_file():
@@ -281,7 +329,7 @@ def main() -> int:
         errs.append("APPROVE-WITH-QUESTIONS present but no 'Answered QUESTIONS' "
                     "block — reviewer questions never evaporate silently")
 
-    errs.extend(card_gaps(cards, required, hs_card))
+    errs.extend(card_gaps(cards, required, hs_card, min_tried))
     max_rounds = read_ceiling(c, "review.max_rounds")
     errs.extend(round_gaps(text, max_rounds or 0, need_r3, "review.max_rounds"))
     ceiling_note = (" · review.max_rounds not set — no ceiling on fix rounds (init sets 1)"
@@ -294,6 +342,7 @@ def main() -> int:
         return 1
     print(f"✅ review_check: {ticket} — dossier complete ({', '.join(required)}"
           f"{'' if need_r3 else f'; R{n_rev + 1} (high-stakes) not required for this diff'})"
+          f" · {class_line}"
           f"{ceiling_note}")
     return 0
 
@@ -320,6 +369,28 @@ Traces: src/auth.ts:42
         assert not ok, f"mutation {name!r} should have gone red"
     cards = parse_cards(good + "\n### R2 challenger\nAPPROVE\n")
     assert set(cards) == {"R1", "R2"}, cards
+
+    # VT-36: the RISK CLASS picks the shape. docs spares the cards; surface asks for
+    # one real bullet; logic and high-stakes are the fence exactly as it was.
+    assert review_shape("docs", 2) == ([], None, 0)
+    assert review_shape("surface", 2) == (["R1"], None, 1)
+    assert review_shape("logic", 2) == (["R1", "R2"], None, MIN_TRIED_BULLETS)
+    assert review_shape("high-stakes", 2) == (["R1", "R2", "R3"], "R3", MIN_TRIED_BULLETS)
+    assert review_shape("logic", 3) == (["R1", "R2", "R3"], None, MIN_TRIED_BULLETS), \
+        "the class must not override review.reviewers"
+    one_bullet = """## R1 — copy review
+APPROVE
+Tried to break:
+- grepped the old string out of the built bundle, not just the source: `npm run build && grep -r "Submit" .next` — no hit left; the assertion that named it is src/auth.ts:42
+Traces: src/auth.ts:42
+"""
+    ok, probs = card_is_valid_approve(one_bullet, 1)
+    assert ok, probs
+    ok, probs = card_is_valid_approve(one_bullet, MIN_TRIED_BULLETS)
+    assert not ok, "a logic-class change still needs three bullets"
+    # …and a surface card still has to carry traces: one bullet is not no evidence
+    ok, probs = card_is_valid_approve("## R1\nAPPROVE\nTried to break:\n- looked at it\n", 1)
+    assert not ok and any("traces" in x for x in probs), probs
 
     # H6: review.reviewers drives the required list — it is READ, not prose.
     # A two-card dossier under reviewers=3 must RED on the missing R3…

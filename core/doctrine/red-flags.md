@@ -14,7 +14,7 @@ is already no. If it's genuinely not here, that is a decision-queue question
 | # | The excuse | The rule | The gate that catches it |
 |---|---|---|---|
 | 1 | "The test is flaky anyway." | /verify runs its steps in the fixed cheapest-first order; a skipped step DECLARES itself and why — silent skips are failures. Flaky = a finding to report, not a step to drop. | `gate.sh` (profile manifest owns the step list) — exit ≠ 0 blocks done |
-| 2 | "This change is too small to need review." | The fence does not measure size. Code reaches the protected branch only with a committed review dossier behind it. | `review_check` at the pre-push hook; the only bypass is a named hatch (`ALLOW_PUSH_NOREVIEW=1`) appended to `{paths.pm}/hatch-log.md` |
+| 2 | "This change is too small to need review." | The fence does not measure size, and it never takes your word for it: `change_class.py` measures the RISK from the diff. A docs-only diff (no executable file moved) needs no reviewer card; a `surface` diff (string bodies, comments and JSX text only, under `review.surface_max_lines`) needs one card with one REAL bullet; everything else is the full fence, and every doubt — an added file, a config value, a template literal, an unparsable file — resolves upward. The excuse is still an excuse: what changed is that a machine, not the author, answers it. | `review_check` at the pre-push hook reads the class and prints it on every verdict; the only bypass is still a named hatch (`ALLOW_PUSH_NOREVIEW=1`), still logged |
 | 3 | "I'll add evidence after merging." | Evidence exists BEFORE the verdict — files a stranger can open, not intentions. A claim without recorded output is not a claim. | `evd_check` red without manifest + screenshots that open and are readable; `evd_ui_check` additionally reds blank/error-page screenshots (pixel analysis) |
 | 4 | "The gate is misconfigured — bypassing it." | Agents do not adjudicate gates. A gate believed wrong gets a red `--selftest` proving it, or it stands. Bypass = named hatch + hatch-log entry; the secret scan has no hatch at all. | `doctor` (every selftest, discovered — 19 today); pre-push hatch logging; `gates.yaml` is a trust boundary the agent doesn't edit |
 | 5 | "It passed locally." | Local memory is not a record. The verify gate's exact result lines are recorded, and CI re-runs them where nobody's shell history can vouch for anything. | /verify recorded results + CI workflow; `review_check` voids cards whose findings trace to nothing executed |
@@ -32,6 +32,12 @@ Two standing corollaries:
   prose version of each rule was measured being skipped (see `provenance.md`). New
   excuse observed in the wild → it goes in this table, and the framework review
   (ops §6) decides whether it needs a new gate or an existing one's mutation added.
+- **Proportionality is measured, never claimed.** Row 2 is the only rule whose
+  *shape* moves with the change, and it moves on a machine's reading of the diff.
+  The reason is empirical: on a one-line copy change there is nothing to try, so
+  "tried to break" bullets get invented, and a card written to satisfy a counter
+  has stopped being evidence. Cheap evidence that is real beats expensive evidence
+  that is theatre. The gate, the evidence pack and the ledger row never move.
 - **This table binds humans too.** The owner can waive a wait-for-human gate through
   the autonomy ladder (ops §3) — with a paper trail. Nobody, human or agent, waives
   a quality gate: those never relax at any autonomy level.

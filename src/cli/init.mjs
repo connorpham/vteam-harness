@@ -280,6 +280,11 @@ ba:
 review:
   reviewers: 2
   max_rounds: 1            # fix rounds per ticket; a SECURITY finding or a high-stakes diff lifts it
+  proportional: true       # the diff's RISK class (docs/surface/logic/high-stakes),
+                           # measured by change_class.py, picks the review shape:
+                           # docs = no card, surface = one card with one real bullet.
+                           # false = every change pays the same toll, as before 0.19.2.
+  surface_max_lines: 40    # above this many changed lines, volume is its own risk
   high_stakes_paths: []
   high_stakes_terms: []
 

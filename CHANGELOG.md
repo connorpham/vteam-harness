@@ -19,6 +19,21 @@ vacuously green in the arm's repo; ceilings on review and challenger rounds; a s
 session ends mid-ticket; per-worktree ports and databases for parallel lanes; a measurement of
 what each lane really loads into context (no lane is near 40k tokens).
 
+### Changed: the review shape follows the RISK of the diff, measured (VT-36)
+
+Every change used to pay the same toll: two fresh reviewer agents, three "tried to break"
+bullets each. On a one-line copy change there is nothing to try, so the bullets got invented —
+and a card written to satisfy a counter has stopped being evidence. `change_class.py` now reads
+the diff and returns `docs`, `surface`, `logic` or `high-stakes`; `review_check` picks the shape
+from that class and prints it on every verdict. A diff where no executable file moved needs no
+reviewer card. A diff where only string bodies, comments and JSX text moved, under
+`review.surface_max_lines`, needs one card with one real bullet. Everything else is exactly the
+fence that was there before, and every doubt — an added file, a renamed one, a config value, a
+template literal, an unparsable file — resolves upward. The class comes from the diff: no agent
+declares it and no dossier claims it. `review.proportional: false` restores the uniform fence in
+one line. Measured on this repo's own history: 12 of the last 40 commits are `docs` class, and
+none that touched code moved downward.
+
 ### Added: one worktree, one port, one database, one scratch dir (VT-35)
 
 Benchmark finding E13: the DEV lane and three reviewers ran at once on ONE SQLite file, ONE dev
