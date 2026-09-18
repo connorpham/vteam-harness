@@ -262,6 +262,16 @@ team:
   parallel: 1
   coord_budget: 3
 
+ledger:
+  # The ledger's "tok ≈" is an ESTIMATE the agent types; "usage --sync" publishes
+  # the MEASURED session-log numbers. cost_check compares them PER DAY (a session
+  # log never knows which ticket a token belonged to) and is advisory: an estimate
+  # crossing this factor is a finding about the estimate, never a number to edit.
+  cost_tolerance_factor: 10
+  # ledger rows this many days newer than the newest measured row = the measured
+  # record stopped being kept, which is the louder finding of the two
+  usage_max_stale_days: 7
+
 autonomy:
   level: ${autonomy}
   # agent may merge its own green PR — only honored at level: full; flip to

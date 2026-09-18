@@ -19,6 +19,25 @@ vacuously green in the arm's repo; ceilings on review and challenger rounds; a s
 session ends mid-ticket; per-worktree ports and databases for parallel lanes; a measurement of
 what each lane really loads into context (no lane is near 40k tokens).
 
+### Added: the ledger's `tok ≈` is audited against measured usage (VT-39)
+
+Every dispatch row ends `done · tok ≈ <N>k`, typed by the agent from memory — the one column of
+testimony left in a framework whose argument is evidence over claims. `usage --sync` has been
+publishing MEASURED session-log numbers into `{paths.pm}/usage/<actor>.md` all along, and nothing
+put the two side by side. The new advisory gate step `cost` compares them PER DAY — a session log
+knows the day and the model, never which ticket a token belonged to, so no per-ticket number is
+derivable and none is produced. It warns past `ledger.cost_tolerance_factor` (default 10×) naming
+the date, both numbers and the ratio, and — the louder finding — says when the measured record has
+stopped being kept at all, past `ledger.usage_max_stale_days` (default 7). Advisory everywhere: an
+estimate and a measurement differ by construction, and a gate that reds on that teaches people to
+inflate the estimate. A divergence is a finding about the estimate; the doctrine says plainly that a
+ledger row is never edited to match the measurement. A repo that has never synced gets one quiet
+line and exit 0.
+
+Run on this repo it found the thing it was written for: the measured record stopped on 2026-08-24
+while the ledger ran to 2026-09-18, and on the only two days that were measured the estimates were
+~13× low. The rows stay as written.
+
 ### Added: `graph --plan` — the dispatch order is computed, not reasoned (VT-37)
 
 The graph knew the dependencies and printed them; then the PM lane worked out the order again in

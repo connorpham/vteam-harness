@@ -382,6 +382,19 @@ capacity). Then exactly 3 sections, plain language:
    truth. Any 🚩 it prints (a done day with no recorded session; a heavy AI day
    with no ledger row) goes on the desk report.
 
+   **The `tok ≈` column is an estimate, and `cost_check` (advisory gate step
+   `cost`) audits it against the measured record PER DAY** — a session log knows
+   the day and the model, never which ticket a token belonged to, so no per-ticket
+   number is derivable and none is produced. Two findings, both advisory: an
+   estimate more than `ledger.cost_tolerance_factor`× from the measurement, and —
+   the louder one — ledger rows more than `ledger.usage_max_stale_days` newer than
+   the newest measured row, which means nobody is running the sync any more and
+   every cost number in the repo has quietly gone back to self-reported. **Never
+   edit a ledger row to match the measurement.** A divergence is a finding about
+   how the estimate was made; rewriting history to silence the check destroys the
+   only signal it carries. Fix the next estimate, and say in the desk report that
+   the previous one was out by the factor the check named.
+
 Before printing: update the ledger (+1 row per dispatched item). **Token
 accounting:** each row closes with `· tok ≈ <N>k` (main-loop estimate + subagent
 totals from task notifications). After ~10 tickets the desk report can say
