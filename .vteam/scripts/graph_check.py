@@ -44,6 +44,7 @@ Selftest: graph_check.py --selftest  (green fixture + 7 mutations that must red
 """
 from __future__ import annotations
 
+import datetime as _dt
 import re
 import subprocess
 import sys
@@ -286,6 +287,46 @@ def check_graph(tickets: dict[str, dict], evd_dir: Path,
     return errs
 
 
+STOP_STATE_MAX_DAYS = 7
+RECORDED_PAT = re.compile(r"^-\s*recorded:\s*(\d{4}-\d{2}-\d{2})", re.M)
+STATUS_PAT = re.compile(r"^-\s*status:\s*(.+?)\s*$", re.M)
+
+
+def check_stop_states(tickets: dict[str, dict], evd_dir: Path,
+                      now: _dt.datetime | None = None,
+                      max_days: int = STOP_STATE_MAX_DAYS) -> list[str]:
+    """A STOP-STATE.md (written by stop_state.sh when a session ends mid-ticket) is a
+    hand-off note. Left for more than `max_days` on a ticket that is neither Done nor
+    Blocked it is silent abandonment: the benchmark arm's tree sat for two weeks with
+    the ticket still 'In Progress' and nobody's name on the stop. The `recorded:` line
+    dates it; a file without one is dated by its mtime, so a hand-written note cannot
+    stay young forever."""
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    errs = []
+    for k, v in sorted(tickets.items()):
+        stop = evd_dir / k / "dev" / "STOP-STATE.md"
+        if not stop.is_file():
+            continue
+        if v["status_category"] == "done":
+            continue
+        m = STATUS_PAT.search(v.get("text", ""))
+        status = m.group(1) if m else "?"
+        if status.strip().lower() == "blocked":
+            continue
+        rec = RECORDED_PAT.search(stop.read_text(encoding="utf-8", errors="replace"))
+        if rec:
+            when = _dt.datetime.strptime(rec.group(1), "%Y-%m-%d").replace(tzinfo=_dt.timezone.utc)
+        else:
+            when = _dt.datetime.fromtimestamp(stop.stat().st_mtime, _dt.timezone.utc)
+        age = (now - when).days
+        if age > max_days:
+            errs.append(f"{k}: STOP-STATE.md recorded {when.date()} ({age} days ago) and the "
+                        f"ticket is still {status!r} — a stop state older than {max_days} days "
+                        f"is silent abandonment: finish it, set the ticket to Blocked with a "
+                        f"one-line reason, or close it (workflows/dev.md, Stopping mid-ticket)")
+    return errs
+
+
 def check_ledger(text: str, budget: int) -> list[str]:
     errs, seen, per_day = [], Counter(), Counter()
     shape = None
@@ -371,6 +412,7 @@ def main() -> int:
         tickets = read_backlog(c)
         errs += check_graph(tickets, evd_dir, read_decisions(c),
                             str(c.cfg('paths.pm', 'docs/pm')))
+        errs += check_stop_states(tickets, evd_dir)
         keys = sorted(tickets)
     else:
         notes.append(f"tracker={provider}: blocked-by edges and statuses live in "
@@ -579,6 +621,35 @@ def _selftest():
         r = run_gate(root)
         assert r.returncode == 0, f"PASS verdict should clear it:\n{r.stdout}"
 
+        # --- stale stop state (VT-34): a STOP-STATE.md older than 7 days on a ticket that
+        # is neither Done nor Blocked is silent abandonment — the benchmark arm's tree sat
+        # like that for two weeks with the ticket still "In Progress".
+        ticket(root, "PROJ-11", "In Progress")
+        stop = root / "evd" / "PROJ-11" / "dev" / "STOP-STATE.md"
+        stop.parent.mkdir(parents=True, exist_ok=True)
+        stop.write_text("# STOP-STATE — PROJ-11\n\n- recorded: 2026-01-01T00:00:00Z\n"
+                        "- branch: feat/PROJ-11-x\n- uncommitted: 3 files\n", encoding="utf-8")
+        r = run_gate(root)
+        assert r.returncode == 1 and "silent abandonment" in r.stdout and "PROJ-11" in r.stdout, \
+            f"a 7-day-old stop state on an open ticket must red:\n{r.stdout}"
+        ticket(root, "PROJ-11", "Blocked")
+        r = run_gate(root)
+        assert r.returncode == 0, f"Blocked (with the stop state as the reason) must pass:\n{r.stdout}"
+        ticket(root, "PROJ-11", "In Progress")
+        stop.write_text(stop.read_text(encoding="utf-8").replace(
+            "2026-01-01T00:00:00Z", _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
+            encoding="utf-8")
+        r = run_gate(root)
+        assert r.returncode == 0, f"a fresh stop state is a hand-off, not abandonment:\n{r.stdout}"
+        stop.write_text("# STOP-STATE — PROJ-11\n\n- branch: feat/PROJ-11-x\n", encoding="utf-8")
+        old = _dt.datetime(2026, 1, 1, tzinfo=_dt.timezone.utc).timestamp()
+        os.utime(stop, (old, old))
+        r = run_gate(root)
+        assert r.returncode == 1 and "silent abandonment" in r.stdout, \
+            f"no recorded: line → the file's mtime decides, and an old mtime must red:\n{r.stdout}"
+        (root / "docs" / "backlog" / "PROJ-11.md").unlink()
+        stop.unlink()
+
         # m4: identical repeated dispatch (MAST 1.3)
         log = root / "docs" / "pm" / "log.md"
         base = log.read_text(encoding="utf-8")
@@ -681,10 +752,10 @@ def _selftest():
         assert r.returncode == 0, \
             f"a commit under the CONFIGURED evidence dir must not read as derailment:\n{r.stdout}"
 
-    print("graph_check selftest: OK (coherent graph green + 9 reds + 2 new greens: dangling, "
-
+    print("graph_check selftest: OK (coherent graph green + 11 reds + 4 new greens: dangling, "
           "cycle, done-sans-verdict, done-with-FAIL, identical repeat, loop "
-          "budget, out-of-scope commit — + loud skips: undeclared scope, "
+          "budget, out-of-scope commit, stale stop state by recorded: line and by "
+          "mtime (Blocked and a fresh stop state pass) — + loud skips: undeclared scope, "
           "remote tracker — + attribution, 17 positive / 12 negative: leading key "
           "attributed (bare/`type:`-prefixed/`feat(KEY):`/multi-scope "
           "`feat(a,KEY):`/`[KEY]`/`Revert \"…\"`), prose mention + longer key + "
