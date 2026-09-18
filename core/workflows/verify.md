@@ -34,6 +34,9 @@ the gate below is green and the exact output lines are quoted back.
    it red in the right place, reverting — and pasting that red evidence into the PR
    body. A gate that has never been red does not exist (see provenance: two
    always-green gates shipped before this rule).
+   When the server under test serves a BUILD (`next start`, a compiled binary),
+   rebuild on BOTH sides of the revert — otherwise the red-proof measures the
+   previous build and proves nothing (field finding E16).
 
 ## R0 — BOOTSTRAP (only what's missing)
 

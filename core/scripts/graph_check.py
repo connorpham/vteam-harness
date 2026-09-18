@@ -414,6 +414,22 @@ def main() -> int:
                             str(c.cfg('paths.pm', 'docs/pm')))
         errs += check_stop_states(tickets, evd_dir)
         keys = sorted(tickets)
+        # Field finding E14: a commit ANNOUNCED a ledger row it never wrote, so a
+        # ticket sat in review with no dispatch row at all — the record is not the
+        # work. A ticket that claims review or done must appear in the ledger at
+        # least once; a won't-fix closed by a decision (`closed-by:`) was never
+        # dispatched and is exempt.
+        log_path = c.path("pm") / "log.md"
+        log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
+        for k, v in tickets.items():
+            if v["status_category"] not in ("done", "in_review"):
+                continue
+            if re.search(r"^[-*]?\s*closed-by\s*:", v["text"], re.M | re.I):
+                continue
+            if not re.search(rf"\b{re.escape(k)}\b", log_text):
+                errs.append(f"{k}: status is {v['status_category'].replace('_', ' ')} but the "
+                            f"dispatch ledger has no row naming it — the record is not the work "
+                            f"(field finding E14): append the row to {log_path.relative_to(c.root)}")
     else:
         notes.append(f"tracker={provider}: blocked-by edges and statuses live in "
                      f"the tracker — edge/closure checks NOT run here (loud skip, "
@@ -550,6 +566,19 @@ def _selftest():
         r = run_gate(root)
         assert r.returncode == 0, f"clean graph should pass:\n{r.stdout}{r.stderr}"
 
+        # m0 (E14): a ticket in review with no ledger row is a claim without a record
+        ticket(root, "PROJ-9", "In Review")
+        r = run_gate(root)
+        assert r.returncode == 1 and "dispatch ledger has no row naming it" in r.stdout, \
+            f"in-review ticket without a ledger row must RED:\n{r.stdout}"
+        log9 = root / "docs" / "pm" / "log.md"
+        log9.write_text(log9.read_text(encoding="utf-8") +
+                        "| 2026-01-04 | DEV | An | PROJ-9 | done · tok ≈ 1k | PR #9 |\n",
+                        encoding="utf-8")
+        r = run_gate(root)
+        assert r.returncode == 0, f"with the row it must pass again:\n{r.stdout}"
+        (root / "docs" / "backlog" / "PROJ-9.md").unlink()
+
         # m1: dangling edge — neither a ticket nor a decision
         ticket(root, "PROJ-3", "To Do", blocked_by="GHOST-9")
         r = run_gate(root)
@@ -609,8 +638,13 @@ def _selftest():
         (root / "docs" / "backlog" / "PROJ-4.md").unlink()
         (root / "docs" / "backlog" / "PROJ-5.md").unlink()
 
-        # m3: done without a verdict (MAST 1.2)
+        # m3: done without a verdict (MAST 1.2) — dispatched (ledger row present), so
+        # the E14 record rule stays quiet and only the missing verdict speaks
         ticket(root, "PROJ-6", "Done")
+        log6 = root / "docs" / "pm" / "log.md"
+        log6.write_text(log6.read_text(encoding="utf-8") +
+                        "| 2026-01-03 | DEV | An | PROJ-6 | done · tok ≈ 1k | PR #6 |\n",
+                        encoding="utf-8")
         r = run_gate(root)
         assert r.returncode == 1 and "MAST 1.2" in r.stdout, r.stdout
         # …and a FAIL verdict on a done ticket is also a closure mismatch

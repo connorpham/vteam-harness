@@ -199,6 +199,22 @@ per the AC) — an AC no TC can be sketched from mechanically is a failed AC,
 return it. Record both cards in `{paths.specs}/reviews/<feature>-backlog.md`.
 Fix the draft per real findings; disagreement → the owner.
 
+**Round ceiling — `ba.challenger_rounds` (init sets 1; counted by
+`python3 .vteam/scripts/review_check.py --ba <feature>` on the reviews file,
+run it before B4).** One challenger round per draft: fix the draft per the
+card's real findings, record what changed under the card, and go to B4 — do not
+re-spawn the challenger for the fixed draft. A further round is recorded under a
+`## Round N` heading and is legitimate only for a finding tagged `SPEC` (the
+draft contradicts the source document); a wording or preference finding is
+answered under the card, not re-reviewed. Knob absent = no ceiling, said loudly.
+**Already-coded spec → no challenger round for the shard.** When every
+requirement row in `specs.sources` already carries a requirement code (the
+tables `verbatim_gate.py` byte-compares), the shard is a copy, not an
+interpretation: verbatim_gate GREEN is its review; spend the single challenger
+round on the STORY draft only. Provenance: the 2026-09-03 benchmark arm ran
+three challenger rounds over a frozen 39-criterion spec — 2 h 05 min before a
+backlog existed, 4 h 29 min before the first feature commit.
+
 ## B4 — CREATE TICKETS (full autonomy; `dry-run` still stops at the draft)
 
 1. Summary backlog table (1 row/story) + gap list written into the draft file.

@@ -17,6 +17,20 @@ A patch on top of 0.19.0 (published 2026-09-17 from `ce2322b`): one gate defect 
 its own CI the same day, the benchmark result the README had promised, and the front page
 that ships in the tarball.
 
+### Fixed: seven gates that crashed, lied or went vacuously green in a real repo (VT-30)
+
+The benchmark arm's RUNLOG listed 16 environment findings; eight were the framework's own
+gates misbehaving in an ordinary Next.js repo. `preflight` no longer REDs a local-only repo
+for having no origin (it names the local-merge rule instead). `verbatim_gate` recognises
+unbolded and `AC-A01`-shaped codes and goes RED — never vacuously green — when sources are
+configured but no coded row is found (the testbed's gate turned out to have been vacuous
+all trial). `token_check` scans `git.code_paths` instead of a hardcoded `src/` and no longer
+crashes on an App-Router layout. `app_check` looks up who listens on the port and reports a
+stranger's server as `APP: FOREIGN` (a whole a11y suite was nearly claimed on one). `gate.sh`
+tees its transcript to a file it names. `graph_check` requires a ledger row for every ticket
+in review or done. `/verify` principle 6 says a red-proof against a built server needs a
+build on both sides of the revert.
+
 ### Fixed: the gate's first step made PR clones shallow (VT-29)
 
 `docs_shrink_check` fetched the PR base with `--depth=1`. Into a full clone that writes
@@ -34,6 +48,15 @@ judge needed before scoring (all applied to both arms, re-calibrated to 91/91 af
 the caveats: one sample, arm-a scored at its stop state, no token cost recorded. VT-28 is open
 on why the arm's own e2e passed what the probes fail — the answer goes in the same page.
 
+### Changed: `init` prefills `app:` for Next.js repos on a checkout-unique port (VT-31)
+
+Benchmark findings E2/E7/E15: the vteam arm spent its first hour discovering that `app.*` was
+empty (every browser step printed `APP: SKIP`), and two arms on one machine both sat on `:3000`,
+so the gate reported the other arm's server as this one's. A repo whose `package.json` declares
+`next` now gets `start: npx next dev -p <port>`, `url`, `health: /` at init, with the port derived
+from the checkout's real path (3100–3899), and init prints which port it pinned. Non-Next repos
+are untouched. e2e 199 → 204 checks.
+
 ### Changed: the front page is a first-run page (VT-26)
 
 The README that ships in this tarball went from 685 lines to 95: the ten-second `audit`
@@ -41,6 +64,17 @@ transcript first, install in two commands, a real-transcript demo, who it is for
 for, and links out. The long form moved verbatim to `docs/GUIDE.md` in the repository.
 `tests/e2e.mjs` still verifies every count the README claims. The audience question the
 rewrite raises is filed as decision D17, not assumed.
+
+### Changed: review rounds and BA challenger rounds have a ceiling (VT-32)
+
+The 2026-09-03 benchmark arm spent three review rounds (~2.5 h) on one ticket and three
+challenger rounds sharding a frozen, AC-coded spec; nothing said when to stop. `vteam init` now
+writes `review.max_rounds: 1` and `ba.challenger_rounds: 1`, and `review_check.py` counts the
+`## Round N` headings in the dossier against the knob (a `SECURITY`-tagged finding or a
+high-stakes diff lifts it; `--ba <feature>` does the same for the challenger file, lifted by a
+`SPEC` tag). The dev and BA lanes say what to do when the ceiling is hit — answer the finding in
+the dossier, do not open another round — and a brief is now a prioritised attack list. Absent knob
+= no ceiling, printed on the green line, so no existing repository goes red on upgrade.
 
 ### Added: a session that ends mid-ticket leaves a stop state behind (VT-34)
 

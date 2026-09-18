@@ -24,9 +24,18 @@ Checks {paths.evidence}/<TICKET>/dev/review.md:
      reviewer) is REQUIRED, and it must compare options ("option" / "A vs B") —
      an extra reviewer that only praises did no work.
 
+  5. Round ceiling (VT-32): the initial cards are round 1, every `## Round N`
+     heading in the dossier is a further fix round. rounds > `review.max_rounds`
+     → RED, unless the diff is high-stakes (rule 4) or a finding is tagged
+     SECURITY. Knob absent = no ceiling, said on the green line (init sets 1).
+     `--ba <feature>` applies the same count to
+     {paths.specs}/reviews/<feature>-backlog.md against `ba.challenger_rounds`
+     (lift tag: SPEC — the draft contradicts the source).
+
 Usage: review_check.py <TICKET | branch-name> [--base origin/<protected>] [--sha <commit>|WORKTREE]
+       review_check.py --ba <feature>
 Exit 0 = dossier complete; 1 = exactly what's missing.
-Selftest: --selftest (valid card green + 5 mutations red).
+Selftest: --selftest (valid card green + 5 mutations red + round ceiling).
 """
 from __future__ import annotations
 
@@ -50,6 +59,43 @@ TRIED = re.compile(r"(tried[\s-]to[\s-]break|TRIED[\s-]TO[\s-]BREAK)(.*)", re.S 
 # Card thresholds — the machine's HOUSE OF RECORD (review-standard.md describes
 # what is checked; the exact numbers live here and only here — audit M13):
 MIN_TRIED_BULLETS = 3   # "tried to break" bullets per card
+ROUND_HEAD = re.compile(r"^#{2,4}\s*Round\s+(\d+)\b", re.M | re.I)
+LIFT_TAG = {"review.max_rounds": "SECURITY", "ba.challenger_rounds": "SPEC"}
+
+
+def count_rounds(text: str) -> int:
+    """The initial cards are round 1; every `## Round N` heading records a further
+    round (VT-32). Counted by the highest N, so one re-review recorded once is one round."""
+    return max([1] + [int(n) for n in ROUND_HEAD.findall(text)])
+
+
+def round_gaps(text: str, ceiling: int, lifted: bool, knob: str) -> list[str]:
+    """ceiling ≤ 0 = no ceiling (knob absent). `lifted` = the diff is high-stakes.
+    A finding carrying the knob's lift tag — SECURITY for review rounds, SPEC (the
+    draft contradicts the source) for BA challenger rounds — lifts it too: a security
+    defect gets as many rounds as it needs; a cosmetic or preference finding does not."""
+    tag = LIFT_TAG.get(knob, "SECURITY")
+    if ceiling <= 0 or lifted or re.search(rf"\b{tag}\b", text):
+        return []
+    rounds = count_rounds(text)
+    if rounds <= ceiling:
+        return []
+    return [f"{rounds} rounds recorded (`## Round N` headings) but {knob} is {ceiling} — "
+            f"answer the remaining finding in the dossier (answered, not fixed: why), do not "
+            f"open another round; a {tag}-tagged finding lifts the ceiling"]
+
+
+def read_ceiling(c, knob: str):
+    """None = knob absent (no ceiling, said loudly); int otherwise; exits on garbage."""
+    v = c.cfg(knob, None)
+    if v is None:
+        return None
+    try:
+        return int(str(v))
+    except ValueError:
+        print(f"❌ review_check: {knob} {v!r} is not a number")
+        sys.exit(1)
+
 MIN_TRACES = 2          # `command` / file:line traces per card
 MIN_FILE_LINE = 1       # …of which at least this many must be file:line
 
@@ -139,6 +185,30 @@ def card_gaps(cards: dict[str, list[str]], required: list[str],
 
 def main() -> int:
     c = Ctx()
+    if "--ba" in sys.argv:
+        # BA challenger rounds: {paths.specs}/reviews/<feature>-backlog.md, read from the
+        # worktree (the BA lane commits it with the draft) — VT-32.
+        i = sys.argv.index("--ba")
+        feature = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        if not feature:
+            print("❌ review_check: --ba needs a feature name (the <feature>-backlog.md file)")
+            return 1
+        specs = str(c.cfg("paths.specs", "docs/specs"))
+        rel = f"{specs}/reviews/{feature}-backlog.md"
+        f = c.root / rel
+        if not f.is_file():
+            print(f"❌ review_check: {rel} missing — B3 records the challenger card there")
+            return 1
+        ceiling = read_ceiling(c, "ba.challenger_rounds")
+        text = f.read_text(encoding="utf-8", errors="replace")
+        gaps = round_gaps(text, ceiling or 0, False, "ba.challenger_rounds")
+        if gaps:
+            print(f"❌ review_check: {feature} — {gaps[0]}")
+            return 1
+        print(f"✅ review_check: {feature} — {count_rounds(text)} challenger round(s)"
+              + (" (ba.challenger_rounds not set — no ceiling; init sets 1)" if ceiling is None
+                 else f" within ba.challenger_rounds={ceiling}"))
+        return 0
     key = str(c.cfg("project.key"))
     protected = str(c.cfg("git.protected_branch", "main"))
     hs_paths = c.cfg("review.high_stakes_paths", [])
@@ -212,6 +282,10 @@ def main() -> int:
                     "block — reviewer questions never evaporate silently")
 
     errs.extend(card_gaps(cards, required, hs_card))
+    max_rounds = read_ceiling(c, "review.max_rounds")
+    errs.extend(round_gaps(text, max_rounds or 0, need_r3, "review.max_rounds"))
+    ceiling_note = (" · review.max_rounds not set — no ceiling on fix rounds (init sets 1)"
+                    if max_rounds is None else f" · {count_rounds(text)} round(s) within max_rounds={max_rounds}")
 
     if errs:
         print(f"❌ review_check: {ticket} — {len(errs)} gaps")
@@ -219,7 +293,8 @@ def main() -> int:
             print(f"   - {e}")
         return 1
     print(f"✅ review_check: {ticket} — dossier complete ({', '.join(required)}"
-          f"{'' if need_r3 else f'; R{n_rev + 1} (high-stakes) not required for this diff'})")
+          f"{'' if need_r3 else f'; R{n_rev + 1} (high-stakes) not required for this diff'})"
+          f"{ceiling_note}")
     return 0
 
 
@@ -264,8 +339,20 @@ Traces: src/auth.ts:42
     r3 = good.replace("## R1 — spec reviewer", "## R3 — architecture")
     gaps = card_gaps(parse_cards(two_valid + "\n" + r3), required_cards(2, True), "R3")
     assert any("compares no options" in g for g in gaps), gaps
+    # VT-32: the round ceiling is READ from config and COUNTED from the dossier.
+    two_rounds = two_valid + "\n## Round 2 — re-review after REQUEST-CHANGES\nAPPROVE\n"
+    assert count_rounds(two_valid) == 1 and count_rounds(two_rounds) == 2
+    assert round_gaps(two_rounds, 1, False, "review.max_rounds"), \
+        "2 rounds under max_rounds=1 must RED"
+    assert not round_gaps(two_valid, 1, False, "review.max_rounds"), "1 round under max_rounds=1 is fine"
+    assert not round_gaps(two_rounds, 0, False, "review.max_rounds"), "0/absent = no ceiling"
+    assert not round_gaps(two_rounds, 1, True, "review.max_rounds"), "a high-stakes diff lifts the ceiling"
+    assert not round_gaps(two_rounds.replace("APPROVE\n", "CONFIRMED SECURITY: forged Origin accepted\nAPPROVE\n", 1), 1, False, "review.max_rounds"), \
+        "a SECURITY-tagged finding lifts the ceiling"
+    assert round_gaps(two_rounds.replace("Round 2", "Round 3"), 2, False, "ba.challenger_rounds"), \
+        "Round N counts by N, not by heading count"
     print("review_check selftest: OK (valid card green + 4 mutations red + parser "
-          "+ reviewers=3 dossier red)")
+          "+ reviewers=3 dossier red + round ceiling read/counted/lifted)")
 
 
 if __name__ == "__main__":

@@ -55,19 +55,31 @@ esac
 # 3. Git + hosting CLI — push code, open PRs
 # The printed URL strips userinfo (user:token@) — remotes cloned with embedded
 # PATs are common in CI, and this script promises to never print tokens.
-git remote get-url origin >/dev/null 2>&1 \
-  && ok "Git: remote origin $(git remote get-url origin | sed -E 's#(://)[^/@]+@#\1#')" \
-  || miss "Git" "no origin remote"
+if git remote get-url origin >/dev/null 2>&1; then
+  ok "Git: remote origin $(git remote get-url origin | sed -E 's#(://)[^/@]+@#\1#')"
+  HAS_ORIGIN=1
+else
+  # Field finding E1: a local-only repo (benchmark arm, air-gapped trial, bare local
+  # remote) is a legitimate shape, not a broken install. Push/PR become a local
+  # --no-ff merge and the pre-push review gate is run by hand — say so, loudly,
+  # instead of turning the whole preflight RED before any work has started.
+  printf "⚠️  %-14s %s\n" "Git" "no origin remote — local-only repo: /dev T5/T6 become a local --no-ff merge; run \`python3 .vteam/scripts/review_check.py --sha WORKTREE\` by hand before each merge"
+  HAS_ORIGIN=0
+fi
 HOOKS=$(git config core.hooksPath || true)
 if [ "$(python3 .vteam/scripts/lib/ctx.py git.hooks 2>/dev/null || echo managed)" = "managed" ]; then
   [ "$HOOKS" = ".githooks" ] && ok "Hooks: core.hooksPath = .githooks" \
     || miss "Hooks" "run once per clone: git config core.hooksPath .githooks (silent hooks turn law into prose)"
 fi
-if command -v gh >/dev/null 2>&1; then
-  gh auth status >/dev/null 2>&1 && ok "GitHub CLI: signed in (PRs possible)" \
-    || miss "GitHub CLI" "run: gh auth login"
+if [ "$HAS_ORIGIN" = 1 ]; then
+  if command -v gh >/dev/null 2>&1; then
+    gh auth status >/dev/null 2>&1 && ok "GitHub CLI: signed in (PRs possible)" \
+      || miss "GitHub CLI" "run: gh auth login"
+  else
+    printf "⚠️  %-14s %s\n" "Hosting CLI" "gh not installed — PRs must be opened another way"
+  fi
 else
-  printf "⚠️  %-14s %s\n" "Hosting CLI" "gh not installed — PRs must be opened another way"
+  printf "⚠️  %-14s %s\n" "Hosting CLI" "skipped — no origin remote, nothing to push to"
 fi
 
 # 4. Database — only when the project declares a check (profiles may not need one)
