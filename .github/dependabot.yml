@@ -6,3 +6,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # One PR for the whole codeql-action family. Dependabot's default is one PR per
+    # path, and github/codeql-action REFUSES to run when init and analyze are on
+    # different versions — so three separate PRs meant two of them were red by
+    # construction and all three sat unmerged for three weeks. Grouping is the fix;
+    # bumping the pins by hand was only the symptom.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
