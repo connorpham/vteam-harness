@@ -36,7 +36,7 @@ Every ❌ is a claim an agent can make today without proof. That score is the wh
 
 ```bash
 npx vteam-harness init --yes   # the team, the gates, the push fence — validated before the first byte is written
-npx vteam-harness doctor       # every selftest (34 today) + provider preflight — GREEN, or it names what is missing
+npx vteam-harness doctor       # every selftest (35 today) + provider preflight — GREEN, or it names what is missing
 ```
 
 Then open your agent tool and type `/team` for a workday, or `/dev PROJ-12` for one ticket. Works with **Claude Code, Cursor, Windsurf, Codex, Copilot** — same gates, rendered for each. Needs git, Node ≥ 20, Python 3.9+ (`audit` needs only Node).
@@ -53,7 +53,7 @@ Three things, all real transcripts (no mockups — [more in the guide](docs/GUID
 
 - **Done is an exit code.** A gate exits non-zero; the push is refused; the hatch that lets you through writes a line in a log. There is nothing to argue with.
 - **A verdict dies when the code moves.** QA passed a ticket, one commit landed on top — the pass expired by itself and the ticket came back.
-- **Every gate proves it can fail.** Each of the 34 checks ships a `--selftest` that feeds it a violating input and watches it go red. A gate that has never been red does not exist.
+- **Every gate proves it can fail.** Each of the 35 checks ships a `--selftest` that feeds it a violating input and watches it go red. A gate that has never been red does not exist.
 
 ## Who it is for — and who it is not
 
@@ -67,7 +67,7 @@ Three things, all real transcripts (no mockups — [more in the guide](docs/GUID
 
 ## Proof, not promises
 
-- `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **206 checks** (the suite's last check verifies this number against itself) plus a 17-fixture parser-conformance suite and a 10-row ledger-grammar fence. CI runs it on every push, on Linux and macOS.
+- `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **214 checks** (the suite's last check verifies this number against itself) plus a 17-fixture parser-conformance suite and a 10-row ledger-grammar fence. CI runs it on every push, on Linux and macOS.
 - **It has been run on itself.** A line-by-line read of all 64 framework files (18,602 lines) on 2026-09-17 found 13 defects — including three gates the workflows named and no profile ran. Every fix carries a test that was red before it and a mutation probe that reds when it is reverted: [`evd/VT-24/dev/`](evd/VT-24/dev/), [`evd/VT-25/dev/`](evd/VT-25/dev/).
 - **It has been run on a second repo.** A full `/team` day on a pnpm/Turborepo Next 15 + Prisma app — four tickets merged, four QA verdicts with challengers — and every gap that day found is a ticket here, not a footnote.
 - **It was measured against BMAD** on one frozen login spec with a held-out 39-probe judge, and **lost: BMAD 100 %, vteam 92.3 %** (the three "contradicted" claims turned out to be probe defects, see the erratum; the speed findings stand).

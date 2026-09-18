@@ -469,6 +469,25 @@ Given/When/Then scenarios in plain words (`{paths.team}/bdd-report.md`;
    over accumulation (§0): machine-checkable → into a gate; unconditional → into
    this workflow; recurring env pattern → known-issues — then delete from KB.
 
+## Stopping mid-ticket (budget hit, owner interrupt, context lost, end of day)
+
+A stop is not a failure. An UNRECORDED stop is: the 2026-09-03 benchmark run ended with 11
+uncommitted files, a red unit suite and no closing entry, and the ticket sat "In Progress"
+for two weeks. Before the session ends with work in flight, do BOTH:
+
+1. **Leave the tree explainable** — either commit WIP with a `wip(<TICKET>): <what is
+   half-done>` message on the ticket branch, or leave the tree dirty; either way run
+   `bash .vteam/scripts/stop_state.sh` (Claude Code runs it for you from the SessionEnd
+   hook). It writes `{paths.evidence}/<TICKET>/dev/STOP-STATE.md` — branch, HEAD, the
+   uncommitted files, the last gate line — and appends a `- stop-state:` line to the
+   task-sheet. Never leave a stop that only `git status` can describe.
+2. **Name the state on the ticket** — a normal hand-off (you or a teammate resume within
+   days) keeps `In Progress`; anything else (blocked on an answer, a budget cut, a
+   dead end) sets the status to `Blocked` with a one-line reason and, when the reason is
+   a question, a `blocked-by: Qn` edge onto the decision queue.
+   `graph_check` reds a STOP-STATE.md older than 7 days on a ticket that is neither Done,
+   In Review (handed off) nor Blocked — silent abandonment, not a hand-off.
+
 ## Definition of Done
 - [ ] T0: ticket announced; assignee = configured person (or user overrode)
 - [ ] T0: `dor_check.py <TICKET>` GREEN (or a waiver commented on the ticket —

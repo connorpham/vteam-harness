@@ -76,6 +76,19 @@ high-stakes diff lifts it; `--ba <feature>` does the same for the challenger fil
 the dossier, do not open another round — and a brief is now a prioritised attack list. Absent knob
 = no ceiling, printed on the green line, so no existing repository goes red on upgrade.
 
+### Added: a session that ends mid-ticket leaves a stop state behind (VT-34)
+
+The benchmark arm stopped with 11 uncommitted files, a red unit suite and no closing entry;
+two weeks later the stop had to be reconstructed from `git status`. `stop_state.sh` now writes
+`{paths.evidence}/<KEY>/dev/STOP-STATE.md` (branch, HEAD, uncommitted files, last gate line)
+whenever a session ends on a `feat|fix/<KEY>-…` branch with work in flight, and keeps exactly
+one `- stop-state:` line on the task-sheet. Claude Code runs it from a `SessionEnd` hook the
+adapter installs next to the SessionStart one (merged into `.claude/settings.json`, user hooks
+untouched). The dev workflow gains "Stopping mid-ticket": WIP commit or dirty tree, but always
+the stop state, and `Blocked` with a reason when it is not a hand-off. `graph_check` reds a
+stop state older than 7 days on a ticket that is neither Done nor Blocked — silent
+abandonment. 35 selftests, 207 e2e checks.
+
 ## 0.19.0 — 2026-09-17 (bumped 2026-09-11, published after VT-24 and VT-25 landed)
 
 Everything here came from running the lanes on a real second repo and then reviewing

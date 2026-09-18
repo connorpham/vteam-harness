@@ -312,8 +312,9 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
     (".vteam/scripts/old_owned.py" in mf2.files), JSON.stringify(Object.keys(mf2.files).filter((k) => /old_/.test(k))));
 
   // (c) packaged agents + hook live in the manifest and obey it
-  check("manifest records the packaged agents and the SessionStart hook",
-    ".claude/agents/backend-specialist.md" in mf2.files && ".claude/hooks/vteam-session-start.sh" in mf2.files);
+  check("manifest records the packaged agents and both hooks (SessionStart + SessionEnd)",
+    ".claude/agents/backend-specialist.md" in mf2.files && ".claude/hooks/vteam-session-start.sh" in mf2.files &&
+    ".claude/hooks/vteam-session-end.sh" in mf2.files, Object.keys(mf2.files).filter((f) => f.includes("hooks")).join(","));
   const agent = path.join(dir, ".claude", "agents", "backend-specialist.md");
   const pkgAgent = fs.readFileSync(path.join(PKG, "core", "agents", "backend-specialist.md"), "utf8");
   // simulate "the package changed": pretend the framework last wrote a different body
@@ -545,6 +546,41 @@ console.log("14. SessionStart doctrine re-injection");
     { cwd: dir, env: { ...ENV, CLAUDE_PROJECT_DIR: dir } });
   check("hook script runs and injects the non-negotiables", hk.status === 0 &&
     /gate|evidence|done/i.test(hk.stdout), hk.stdout + hk.stderr);
+
+  // ── SessionEnd stop-state record (VT-34): the benchmark arm ended with 11 uncommitted
+  // files and no note; a session that ends mid-ticket now leaves STOP-STATE.md behind.
+  check("t1 got the session-end hook script",
+    fs.existsSync(path.join(repo, ".claude", "hooks", "vteam-session-end.sh")));
+  check("t1 settings.json carries the SessionEnd entry",
+    Array.isArray(s.hooks?.SessionEnd) && s.hooks.SessionEnd.some((e) =>
+      e.hooks?.some((h) => String(h.command).includes("vteam-session-end"))),
+    JSON.stringify(s.hooks?.SessionEnd));
+  check("SessionEnd entry merged alongside the user's hooks too",
+    Array.isArray(merged.hooks?.SessionEnd) && merged.hooks.SessionEnd.length === 1 &&
+    Array.isArray(merged.hooks?.PreToolUse), JSON.stringify(merged.hooks));
+  check("stop_state.sh installed with the runtime",
+    fs.existsSync(path.join(repo, ".vteam", "scripts", "stop_state.sh")));
+  // the hook, run the way Claude Code runs it, on a ticket branch with work in flight
+  const g = (...a) => run("git", a, { cwd: dir }); // freshRepo already init'd main + identity
+  g("add", "-A"); g("commit", "-qm", "init");
+  g("checkout", "-q", "-b", "feat/DEMO-1-half-done");
+  fs.writeFileSync(path.join(dir, "half.txt"), "half done\n");
+  const end = run("bash", [path.join(dir, ".claude", "hooks", "vteam-session-end.sh")],
+    { cwd: dir, env: { ...ENV, CLAUDE_PROJECT_DIR: dir } });
+  const stopFile = path.join(dir, "evd", "DEMO-1", "dev", "STOP-STATE.md");
+  check("SessionEnd hook exits 0 and records the stop state of the ticket in flight",
+    end.status === 0 && fs.existsSync(stopFile), end.stdout + end.stderr);
+  const stopText = fs.existsSync(stopFile) ? fs.readFileSync(stopFile, "utf8") : "";
+  check("STOP-STATE.md names the branch, the uncommitted file and a recorded: timestamp",
+    /^- branch: feat\/DEMO-1-half-done$/m.test(stopText) && /^- uncommitted: 1 files$/m.test(stopText) &&
+    /^- recorded: \d{4}-\d{2}-\d{2}T/m.test(stopText) && /half\.txt/.test(stopText), stopText.slice(0, 400));
+  // and on the protected branch with a clean tree it records nothing (no noise on every exit)
+  g("checkout", "-q", "--", "."); fs.rmSync(path.join(dir, "half.txt"), { force: true }); g("checkout", "-q", "main");
+  fs.rmSync(path.join(dir, "evd", "DEMO-1"), { recursive: true, force: true });
+  const quiet = run("bash", [path.join(dir, ".claude", "hooks", "vteam-session-end.sh")],
+    { cwd: dir, env: { ...ENV, CLAUDE_PROJECT_DIR: dir } });
+  check("SessionEnd hook on a clean protected branch writes nothing and still exits 0",
+    quiet.status === 0 && !fs.existsSync(stopFile), quiet.stdout + quiet.stderr);
 }
 
 // ── 14c. app: env — scripts installed, Environment block rendered per config ─
