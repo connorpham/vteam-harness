@@ -259,6 +259,21 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
   check("gate.py --help prints usage and runs NO step (preflight probed with it and ran the whole gate)",
     help.status === 0 && !/▶ /.test(help.stdout) && /Usage: gate\.py/.test(help.stdout), help.stdout.slice(0, 300));
 
+  // E10: the gate's transcript also lands in a file, so a backgrounded run can never
+  // block on an undrained pipe and a RED can be re-read after the terminal scrolled
+  const tr = g0.stdout.match(/📝 transcript: (\S+)/);
+  check("gate.sh names its transcript file and the file carries the GATE line",
+    !!tr && fs.existsSync(tr[1]) && /GATE: GREEN/.test(fs.readFileSync(tr[1], "utf8")), g0.stdout.slice(-300));
+
+  // E1: a repo with NO origin remote is a legitimate local-only shape — preflight
+  // says how push/PR change (local --no-ff merge, review_check by hand), it does not RED
+  run("git", ["-C", dir, "remote", "remove", "origin"]);
+  const pf = run("bash", [path.join(dir, ".vteam", "scripts", "preflight.sh")], { cwd: dir });
+  check("preflight on a local-only repo (no origin) is GREEN and names the local-merge rule",
+    pf.status === 0 && /⚠️\s+Git\s+no origin remote — local-only repo/.test(pf.stdout) && /PREFLIGHT: GREEN/.test(pf.stdout),
+    pf.stdout.slice(-900) + pf.stderr.slice(-300));
+  run("git", ["-C", dir, "remote", "add", "origin", path.join(TMP, "t5b-origin.git")]);
+
   // (a) provider follows the config: markdown → github after init
   const cfgF = path.join(dir, "vteam.config.yaml");
   fs.writeFileSync(cfgF, fs.readFileSync(cfgF, "utf8").replace("provider: markdown", "provider: github"));
@@ -714,6 +729,9 @@ console.log("17. graph — the work graph made visible");
   fs.mkdirSync(path.join(repo, "evd", "DEMO-1"), { recursive: true });
   fs.writeFileSync(path.join(repo, "evd", "DEMO-1", "REPORT.md"),
     "# Verification report DEMO-1 — PASS\nCOMMIT: deadbeef\nVERIFIED-AT: 2026-01-02T10:00:00+00:00\n");
+  // E14: a done ticket must have been dispatched — the ledger row is part of the record
+  fs.appendFileSync(path.join(repo, "docs", "pm", "log.md"),
+    "| 2026-01-02 | dev | e2e | DEMO-1 — auth | done · tok ≈ 1k | PR #1 |\n");
   fs.writeFileSync(path.join(bl, "DEMO-2.md"), "# DEMO-2: api\n- status: To Do\n- blocked-by: DEMO-1\n");
   fs.writeFileSync(path.join(bl, "DEMO-3.md"), "# DEMO-3: ui\n- status: To Do\n- blocked-by: DEMO-2, GHOST-9\n");
 

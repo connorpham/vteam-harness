@@ -35,6 +35,26 @@ export function classesIn(txt) {
   return [...txt.matchAll(CLASS_RE)].map((m) => m[1]);
 }
 
+/** The directories to scan: `git.code_paths` from vteam.config.yaml, default `src`.
+ * Field finding E5: this script hardcoded `src/` and CRASHED with ENOENT on an
+ * App-Router layout (`app/`, `lib/`), so no green gate was reachable at all.
+ * Missing directories are skipped, never thrown on. */
+export function pickRoots(root, paths) {
+  return paths
+    .map((p) => join(root, String(p).replace(/\/+$/, "")))
+    .filter((p) => existsSync(p) && statSync(p).isDirectory());
+}
+function codeRoots() {
+  let paths = ["src"];
+  try {
+    const raw = execSync("python3 .vteam/scripts/lib/ctx.py git.code_paths",
+      { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const quoted = raw.match(/'([^']+)'/g);
+    if (quoted && quoted.length) paths = quoted.map((q) => q.slice(1, -1));
+  } catch { /* no config on the path → the historical default */ }
+  return { paths, roots: pickRoots(ROOT, paths) };
+}
+
 function files(dir, pat) {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);
@@ -65,7 +85,17 @@ function selfCheck() {
 
 selfCheck();
 if (process.argv.includes("--selftest")) {
-  console.log("token_check selftest: OK (extractor matrix green)");
+  // E5: a layout without src/ must yield the dirs that DO exist, and never throw
+  const { mkdtempSync, mkdirSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const t = mkdtempSync(join(tmpdir(), "tokchk-"));
+  try {
+    mkdirSync(join(t, "app"));
+    const got = pickRoots(t, ["src/", "app", "lib"]).map((p) => p.slice(t.length + 1));
+    if (got.join(",") !== "app") throw new Error(`pickRoots: expected [app], got [${got}]`);
+    if (pickRoots(t, ["src"]).length !== 0) throw new Error("pickRoots: a missing src/ must be skipped, not returned");
+  } finally { rmSync(t, { recursive: true, force: true }); }
+  console.log("token_check selftest: OK (extractor matrix green + code_paths roots skip missing dirs)");
   process.exit(0);
 }
 
@@ -82,7 +112,12 @@ const CSS = cssFiles.map((n) => readFileSync(join(DIST, n), "utf8")).join("\n");
 // gate without rebuilding once produced a false green on the exact original bug.
 const newest = (dir, pat) => Math.max(...files(dir, pat).map((f) => statSync(f).mtimeMs), 0);
 const cssMs = Math.max(...cssFiles.map((n) => statSync(join(DIST, n)).mtimeMs), 0);
-const srcMs = newest(join(ROOT, "src"), /\.(?:[jt]sx?|mjs|css)$/);
+const { paths: CODE_PATHS, roots: ROOTS } = codeRoots();
+if (!ROOTS.length) {
+  console.log(`❌ token_check: none of git.code_paths [${CODE_PATHS.join(", ")}] exists under ${ROOT} — set git.code_paths in vteam.config.yaml to the directories that hold this app's components`);
+  process.exit(1);
+}
+const srcMs = Math.max(...ROOTS.map((r) => newest(r, /\.(?:[jt]sx?|mjs|css)$/)));
 if (cssMs < srcMs) {
   console.log("❌ built CSS is older than the source — run `next build`, then measure.");
   console.log(`   CSS: ${new Date(cssMs).toISOString()}  ·  src: ${new Date(srcMs).toISOString()}`);
@@ -106,7 +141,7 @@ function hasRule(cls) {
 }
 
 const missing = new Set();
-for (const f of files(join(ROOT, "src"), /\.(?:[jt]sx?|mjs)$/)) {
+for (const f of ROOTS.flatMap((r) => files(r, /\.(?:[jt]sx?|mjs)$/))) {
   for (const cls of classesIn(readFileSync(f, "utf8"))) {
     if (!hasRule(cls)) missing.add(`${f.replace(ROOT + "/", "")}: ${cls}`);
   }
@@ -119,4 +154,4 @@ if (missing.size) {
   console.log("Known limit: dynamically composed classes (`text-${x}`) can't be scanned.");
   process.exit(1);
 }
-console.log("✅ every Tailwind class in src/ emits a real CSS rule");
+console.log(`✅ every Tailwind class in ${ROOTS.map((r) => r.slice(ROOT.length + 1) + "/").join(", ")} emits a real CSS rule`);

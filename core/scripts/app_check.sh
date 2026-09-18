@@ -19,7 +19,39 @@
 #   APP: UP <url> (HTTP <code>)      exit 0
 #   APP: DOWN <target> after <n>s — start it with: <app.start>   exit 1
 #   APP: SKIP — app.url not set …    exit 0 (a repo with no web app must not red)
+#   APP: FOREIGN <url> — port <p> is served by pid <n> running in <dir> …   exit 1
+#                                    (a stranger's app answered; E7/E15)
 set -u
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+canon() { (cd "$1" 2>/dev/null && pwd -P); }
+
+# Field findings E7 and E15: a STRANGER'S server on the configured port answered
+# 200 — once another benchmark arm, once a leftover process — and a whole a11y
+# suite was nearly claimed on it. Before saying UP, find who LISTENS on the port
+# and where it runs from. A listener whose cwd is outside this repo (or one of
+# its worktrees) is FOREIGN: worse than DOWN, because every measurement would be
+# of someone else's app. Owner unknown (no lsof, container, remote host) → UP.
+owner_check() { # <url> → 0 = ours or unknowable, 1 = foreign (line printed)
+  local url="$1" host port pid cwd root wt
+  root="$(canon "${APP_CHECK_ROOT:-$ROOT}")"
+  host="${url#*://}"; host="${host%%/*}"; port="${host##*:}"; host="${host%%:*}"
+  [ "$port" = "$host" ] && case "$url" in https://*) port=443 ;; *) port=80 ;; esac
+  case "$host" in 127.0.0.1|localhost|0.0.0.0|::1) ;; *) return 0 ;; esac
+  command -v lsof >/dev/null 2>&1 || return 0
+  pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -1)"
+  [ -n "$pid" ] || return 0
+  if [ -r "/proc/$pid/cwd" ]; then cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null)"
+  else cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"; fi
+  [ -n "$cwd" ] || return 0
+  cwd="$(canon "$cwd")"; [ -n "$cwd" ] || return 0
+  for wt in "$root" $(git -C "$root" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p'); do
+    wt="$(canon "$wt")"; [ -n "$wt" ] || continue
+    case "$cwd/" in "$wt"/*) return 0 ;; esac
+  done
+  echo "APP: FOREIGN $url — port $port is served by pid $pid running in $cwd, not this repo ($root). Every measurement would be of someone else's app: stop it, or move app.url to a free port"
+  return 1
+}
 
 probe() { # <target> <wait_s> → sets CODE; 0 = 2xx/3xx within budget
   local target="$1" budget="$2" waited=0
@@ -43,6 +75,7 @@ run_check() { # <url> <health> <start> <wait_s> — the whole check, selftest-ca
     *)                  target="${url%/}/${health#/}" ;;
   esac
   if probe "$target" "$wait_s"; then
+    owner_check "$url" || return 1
     echo "APP: UP $url (HTTP $CODE)"
     return 0
   fi
@@ -72,13 +105,20 @@ if [ "${1:-}" = "--selftest" ]; then
     sleep 0.1
   done
   [ -n "$port" ] || { echo "app_check selftest: FAIL (http.server never reported its port)"; exit 1; }
-  out="$(run_check "http://127.0.0.1:$port" "" "npm run dev" 4)" \
+  out="$(APP_CHECK_ROOT="$td" run_check "http://127.0.0.1:$port" "" "npm run dev" 4)" \
     || { echo "app_check selftest: FAIL (live server should be UP): $out"; exit 1; }
   case "$out" in "APP: UP http://127.0.0.1:$port (HTTP 2"*) ;; *)
     echo "app_check selftest: FAIL (UP line malformed: $out)"; exit 1 ;; esac
   # …and a health PATH joins onto the url ('/' serves the dir listing → 200)
-  out="$(run_check "http://127.0.0.1:$port" "/" "npm run dev" 0)" \
+  out="$(APP_CHECK_ROOT="$td" run_check "http://127.0.0.1:$port" "/" "npm run dev" 0)" \
     || { echo "app_check selftest: FAIL (health path probe): $out"; exit 1; }
+  # red path (E7/E15): the SAME live server, but this repo lives elsewhere → FOREIGN, exit 1
+  mkdir -p "$td/elsewhere"
+  if out="$(APP_CHECK_ROOT="$td/elsewhere" run_check "http://127.0.0.1:$port" "" "npm run dev" 0)"; then
+    echo "app_check selftest: FAIL (a stranger's server must be FOREIGN, got: $out)"; exit 1
+  fi
+  case "$out" in "APP: FOREIGN http://127.0.0.1:$port"*"pid $srv_pid"*) ;; *)
+    echo "app_check selftest: FAIL (FOREIGN line must name the port and pid: $out)"; exit 1 ;; esac
   kill "$srv_pid" 2>/dev/null; wait "$srv_pid" 2>/dev/null; srv_pid=""
 
   # red path: the port is now closed → DOWN, exit 1, unblock path names app.start
@@ -96,7 +136,7 @@ if [ "${1:-}" = "--selftest" ]; then
   case "$out" in *"--wait needs a value"*) ;; *)
     echo "app_check selftest: FAIL (trailing --wait must say why: $out)"; exit 1 ;; esac
 
-  echo "app_check selftest: OK (SKIP on unset url + UP on a live server + health path joined + DOWN red naming app.start + trailing flag refused)"
+  echo "app_check selftest: OK (SKIP on unset url + UP on a live server + health path joined + DOWN red naming app.start + FOREIGN red on a stranger's server + trailing flag refused)"
   exit 0
 fi
 

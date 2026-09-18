@@ -26,7 +26,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from ctx import Ctx  # noqa: E402
 
-ROW = re.compile(r"^\| \*\*([A-Z][A-Z0-9]*(?:-[A-Z]{2,4})?-\d+)\*\* \|")
+# A coded row: `| CODE |` or `| **CODE** |`, CODE like REQ-AUTH-12, TB-5 or AC-A01.
+# Field finding E4: the first regex demanded bold and a purely numeric tail, so a
+# spec with unbolded `AC-A01` ids produced ZERO truth rows and the gate passed
+# vacuously for a whole benchmark run.
+ROW = re.compile(r"^\|\s*(?:\*\*)?([A-Z][A-Z0-9]*(?:-[A-Z]{2,4})?-[A-Z]{0,2}\d+)(?:\*\*)?\s*\|")
 SKIP_NAMES = {"INDEX.md", "changes.md"}
 BA_NOTES = re.compile(r"^##.*BA NOTES", re.I)
 
@@ -96,6 +100,12 @@ def main() -> int:
                      f"sources at the original documents instead")
         sources.append(p)
     truth, dupes = build_truth(sources)
+    if not truth:
+        print(f"❌ verbatim_gate: {len(sources)} source document(s) configured but NO coded "
+              f"requirement rows recognised — the gate would pass vacuously (field finding E4).\n"
+              f"   A coded row starts `| CODE |` or `| **CODE** |` with CODE like REQ-AUTH-12, "
+              f"AC-A01, TB-5. Sources: {', '.join(str(x) for x in sources)}")
+        return 1
     problems, checked, files = [], 0, 0
     for f in sorted(shard_dir.glob("*.md")):
         if f.name in SKIP_NAMES or f.name.endswith("-draft.md") or "-plan" in f.name:
@@ -128,7 +138,26 @@ def _selftest():
     assert unknown, "unknown code should red"
     notes, n2 = check_shard("s.md", "## §9 BA NOTES\n| **FR-AUT-01** | reworded freely |", truth)
     assert not notes and n2 == 0, "BA NOTES section must be exempt"
-    print("verbatim_gate selftest: OK (match green + drift/ghost red + notes exempt)")
+    # E4: unbolded and letter-prefixed ids are coded rows too; bold still matches
+    assert ROW.match("| AC-A01 | 2 | `GET /login` renders |").group(1) == "AC-A01"
+    assert ROW.match("| **FR-AUT-01** | Sign in | High |").group(1) == "FR-AUT-01"
+    assert ROW.match("| TB-5 | thing |").group(1) == "TB-5"
+    assert ROW.match("| Priority | Requirement |") is None
+    # E4: sources configured but no coded row anywhere → RED, never a vacuous green
+    import subprocess, tempfile
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        (root / "vteam.config.yaml").write_text(
+            "version: 1\npaths:\n  specs: docs/specs\nspecs:\n  sources: [SPEC.md]\n", encoding="utf-8")
+        (root / "SPEC.md").write_text("# Spec\n\nProse only, no coded table.\n", encoding="utf-8")
+        (root / "docs" / "specs").mkdir(parents=True)
+        r = subprocess.run([sys.executable, str(Path(__file__).resolve())], cwd=root,
+                           capture_output=True, text=True)
+        assert r.returncode == 1 and "NO coded requirement rows recognised" in r.stdout, \
+            f"configured-but-vacuous must RED:\n{r.stdout}{r.stderr}"
+    print("verbatim_gate selftest: OK (match green + drift/ghost red + notes exempt "
+          "+ unbolded/AC-A01 codes + configured-but-vacuous red)")
 
 
 if __name__ == "__main__":
