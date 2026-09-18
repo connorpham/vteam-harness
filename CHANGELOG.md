@@ -11,11 +11,13 @@ does not match `package.json`.
 
 ---
 
-## 0.19.1 — 2026-09-18
+## 0.19.2 — 2026-09-18
 
-A patch on top of 0.19.0 (published 2026-09-17 from `ce2322b`): one gate defect found by
-its own CI the same day, the benchmark result the README had promised, and the front page
-that ships in the tarball.
+Everything the BMAD benchmark taught, turned into code the same week (bumped 2026-09-18; the
+date is corrected to the npm publish date on release). Seven gates that crashed, lied or went
+vacuously green in the arm's repo; ceilings on review and challenger rounds; a stop state when a
+session ends mid-ticket; per-worktree ports and databases for parallel lanes; a measurement of
+what each lane really loads into context (no lane is near 40k tokens).
 
 ### Added: one worktree, one port, one database, one scratch dir (VT-35)
 
@@ -43,23 +45,6 @@ tees its transcript to a file it names. `graph_check` requires a ledger row for 
 in review or done. `/verify` principle 6 says a red-proof against a built server needs a
 build on both sides of the revert.
 
-### Fixed: the gate's first step made PR clones shallow (VT-29)
-
-`docs_shrink_check` fetched the PR base with `--depth=1`. Into a full clone that writes
-`.git/shallow` with the base tip as a boundary, so six steps later `graph_check` read the
-base-tip commit as a root and flagged it for "touching" every file in the tree — a
-deterministic false RED on every stacked ticket branch. The fetch no longer limits depth,
-and the selftest now proves a full clone stays full through PR mode.
-
-### Added: the first benchmark result — a loss (VT-27)
-
-The vteam-vs-BMAD run from 2026-09-03 was finally judged. **BMAD 91/91, vteam 84/91 (92.3 %),
-and three vteam "done" claims were contradicted by the held-out probes** (AC-A07, AC-D02,
-AC-D07). Published as promised in `docs/BENCHMARK.md` with the scorecard, the five repairs the
-judge needed before scoring (all applied to both arms, re-calibrated to 91/91 afterwards), and
-the caveats: one sample, arm-a scored at its stop state, no token cost recorded. VT-28 is open
-on why the arm's own e2e passed what the probes fail — the answer goes in the same page.
-
 ### Changed: `init` prefills `app:` for Next.js repos on a checkout-unique port (VT-31)
 
 Benchmark findings E2/E7/E15: the vteam arm spent its first hour discovering that `app.*` was
@@ -68,14 +53,6 @@ so the gate reported the other arm's server as this one's. A repo whose `package
 `next` now gets `start: npx next dev -p <port>`, `url`, `health: /` at init, with the port derived
 from the checkout's real path (3100–3899), and init prints which port it pinned. Non-Next repos
 are untouched. e2e 199 → 204 checks.
-
-### Changed: the front page is a first-run page (VT-26)
-
-The README that ships in this tarball went from 685 lines to 95: the ten-second `audit`
-transcript first, install in two commands, a real-transcript demo, who it is for and not
-for, and links out. The long form moved verbatim to `docs/GUIDE.md` in the repository.
-`tests/e2e.mjs` still verifies every count the README claims. The audience question the
-rewrite raises is filed as decision D17, not assumed.
 
 ### Changed: review rounds and BA challenger rounds have a ceiling (VT-32)
 
@@ -112,6 +89,37 @@ untouched). The dev workflow gains "Stopping mid-ticket": WIP commit or dirty tr
 the stop state, and `Blocked` with a reason when it is not a hand-off. `graph_check` reds a
 stop state older than 7 days on a ticket that is neither Done nor Blocked — silent
 abandonment. 35 selftests, 207 e2e checks.
+
+## 0.19.1 — 2026-09-18 (published 2026-09-18 from `870b64c`)
+
+A patch on top of 0.19.0 (published 2026-09-17 from `ce2322b`): one gate defect found by
+its own CI the same day, the benchmark result the README had promised, and the front page
+that ships in the tarball.
+
+### Fixed: the gate's first step made PR clones shallow (VT-29)
+
+`docs_shrink_check` fetched the PR base with `--depth=1`. Into a full clone that writes
+`.git/shallow` with the base tip as a boundary, so six steps later `graph_check` read the
+base-tip commit as a root and flagged it for "touching" every file in the tree — a
+deterministic false RED on every stacked ticket branch. The fetch no longer limits depth,
+and the selftest now proves a full clone stays full through PR mode.
+
+### Added: the first benchmark result — a loss (VT-27)
+
+The vteam-vs-BMAD run from 2026-09-03 was finally judged. **BMAD 91/91, vteam 84/91 (92.3 %),
+and three vteam "done" claims were contradicted by the held-out probes** (AC-A07, AC-D02,
+AC-D07). Published as promised in `docs/BENCHMARK.md` with the scorecard, the five repairs the
+judge needed before scoring (all applied to both arms, re-calibrated to 91/91 afterwards), and
+the caveats: one sample, arm-a scored at its stop state, no token cost recorded. VT-28 is open
+on why the arm's own e2e passed what the probes fail — the answer goes in the same page.
+
+### Changed: the front page is a first-run page (VT-26)
+
+The README that ships in this tarball went from 685 lines to 95: the ten-second `audit`
+transcript first, install in two commands, a real-transcript demo, who it is for and not
+for, and links out. The long form moved verbatim to `docs/GUIDE.md` in the repository.
+`tests/e2e.mjs` still verifies every count the README claims. The audience question the
+rewrite raises is filed as decision D17, not assumed.
 
 ## 0.19.0 — 2026-09-17 (bumped 2026-09-11, published after VT-24 and VT-25 landed)
 
