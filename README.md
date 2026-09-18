@@ -67,7 +67,7 @@ Three things, all real transcripts (no mockups — [more in the guide](docs/GUID
 
 ## Proof, not promises
 
-- `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **234 checks** (the suite's last check verifies this number against itself) plus a 17-fixture parser-conformance suite and a 10-row ledger-grammar fence. CI runs it on every push, on Linux and macOS.
+- `npm test` runs [tests/e2e.mjs](tests/e2e.mjs) — **236 checks** (the suite's last check verifies this number against itself) plus a 17-fixture parser-conformance suite and a 10-row ledger-grammar fence. CI runs it on every push, on Linux and macOS.
 - **It has been run on itself.** A line-by-line read of all 64 framework files (18,602 lines) on 2026-09-17 found 13 defects — including three gates the workflows named and no profile ran. Every fix carries a test that was red before it and a mutation probe that reds when it is reverted: [`evd/VT-24/dev/`](evd/VT-24/dev/), [`evd/VT-25/dev/`](evd/VT-25/dev/).
 - **It has been run on a second repo.** A full `/team` day on a pnpm/Turborepo Next 15 + Prisma app — four tickets merged, four QA verdicts with challengers — and every gap that day found is a ticket here, not a footnote.
 - **It was measured against BMAD** on one frozen login spec with a held-out 39-probe judge, and **lost: BMAD 100 %, vteam 92.3 %** (the three "contradicted" claims turned out to be probe defects, see the erratum; the speed findings stand).
