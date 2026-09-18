@@ -4,8 +4,13 @@ Every file here is a **draft the owner posts**, never an agent. This index recor
 which channels are open, which are gated, and the date each gate opens — so the
 sequence is decided by arithmetic instead of enthusiasm.
 
-Status as of **2026-08-18**: repo first commit on `main` 2026-08-17, 2 stars,
-`vteam-harness@0.3.0` live on npm, CI green.
+Status as of **2026-09-17**: repo first commit on `main` 2026-08-17 (31 days), 6 stars,
+0 forks, 0 issues from outside; `vteam-harness@0.18.0` live on npm, 0.19.0 merged and
+waiting on the owner's `npm login` + OTP; CI green on Linux and macOS. The demo asset
+the sequence below waited for now exists: [`docs/assets/fence-demo.svg`](../assets/fence-demo.svg)
+(animated SVG of real transcripts — audit F → init → two refused pushes → audit A), on the
+README. A fourth draft joined: [the dogfood review post](dogfood-review-post.md).
+
 
 ## Channel gates
 
@@ -13,7 +18,9 @@ Status as of **2026-08-18**: repo first commit on `main` 2026-08-17, 2 stars,
 |---|---|---|---|
 | [Anthropic plugin directory](plugin-directory-submission.md) | none (public repo + `validate` + manifest quality) | **open** — pre-flight verified green | **now** |
 | [awesome-claude-skills](https://github.com/travisvn/awesome-claude-skills) (skills section) | ≥10 stars | 2/10 | at 10 stars |
-| [awesome-claude-code](awesome-claude-code-submission.md) | ≥14 days old **or** ≥100 stars | attempt 1 auto-closed 2026-08-18 | **on/after 2026-08-31** |
+| [dogfood review post](dogfood-review-post.md) — "I ran my framework on itself and found 13 defects" | none | draft ready 2026-09-17 | post first: it is the one story with receipts in this repo |
+| [awesome-claude-code](awesome-claude-code-submission.md) | ≥14 days old **or** ≥100 stars | attempt 1 auto-closed 2026-08-18; **arithmetic satisfied since 2026-08-31** | resubmit now (the 2026-08-31 attempt never happened)
+** |
 | [HN essay](hn-essay-outline.md) · [Reddit](reddit-post.md) · [X thread](x-thread.md) | none, but they spend attention once | held | after the demo GIF exists |
 
 The two directory gates are why the original week-1 plan needed re-sequencing: one
