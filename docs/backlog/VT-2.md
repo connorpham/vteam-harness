@@ -45,3 +45,11 @@ first, then drives a REAL Chrome window through the journey like a human QA.
 
 ### 2026-09-01 Connor Pham
 claimed 2026-09-01T00:00:00Z · branch feat/VT-2-live-dev-qa-env
+
+## Record gap (found 2026-09-18 by the VT-38 status-drift rule)
+The code merged as PR #55 (commit `ce01db3`) on 2026-08-24 and NO dispatch row was
+ever written, so this ticket cannot move to In Review without tripping the rule that
+says work in review must appear in the ledger. A retroactive row cannot be honest
+either: the ledger grammar requires `tok ≈ N[k]` and nobody measured this work, so the
+only way to write the row today is to invent a number. That gap is the decision queue's
+newest row, not this ticket's to settle.

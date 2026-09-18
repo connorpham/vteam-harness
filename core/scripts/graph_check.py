@@ -421,6 +421,40 @@ def main() -> int:
         # work. A ticket that claims review or done must appear in the ledger at
         # least once; a won't-fix closed by a decision (`closed-by:`) was never
         # dispatched and is exempt.
+        # Status drift (VT-38): In Progress means somebody is working on it. With no
+        # unmerged feat|fix branch anywhere — local or pushed — nobody is: the work
+        # shipped or stopped and the status never moved. Reported, never failed: it is
+        # a condition about the board, not about the change under review, and the fix
+        # is a human deciding which state the ticket is really in.
+        unmerged = subprocess.run(
+            ["git", "-C", str(c.root), "branch", "-a", "--no-merged",
+             str(c.cfg("git.protected_branch", "main")), "--format=%(refname:short)"],
+            capture_output=True, text=True)
+        if unmerged.returncode != 0:
+            # no such protected branch yet (a fresh repo, a CI checkout that fetched
+            # only the PR ref): fall back to every branch rather than to none, so the
+            # answer is "everything looks live" instead of "nothing does"
+            unmerged = subprocess.run(
+                ["git", "-C", str(c.root), "branch", "-a", "--format=%(refname:short)"],
+                capture_output=True, text=True)
+        if unmerged.returncode == 0:
+            live = set()
+            for b in unmerged.stdout.splitlines():
+                m = re.match(r"^(?:remotes/[^/]+/)?(?:feat|fix)/([A-Za-z][A-Za-z0-9]*-[0-9]+)-",
+                             b.strip())
+                if m:
+                    live.add(m.group(1).upper())
+            # a ticket WAITING on something (another ticket, a decision row) is blocked,
+            # not drifting — it has a reason to sit still and the graph already shows it
+            drifted = [k for k, v in sorted(tickets.items())
+                       if re.search(r"^-\s*status:\s*In Progress\s*$", v["text"], re.M | re.I)
+                       and k not in live and not v["blocked_by"]]
+            if drifted:
+                notes.append(f"status drift: {', '.join(drifted[:8])}"
+                             f"{'…' if len(drifted) > 8 else ''} say In Progress with no unmerged "
+                             f"feat|fix branch — the work shipped or stopped and the status never "
+                             f"moved (a board that counts these as running hides its own capacity)")
+
         log_path = c.path("pm") / "log.md"
         log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
         for k, v in tickets.items():
@@ -567,6 +601,18 @@ def _selftest():
             encoding="utf-8")
         r = run_gate(root)
         assert r.returncode == 0, f"clean graph should pass:\n{r.stdout}{r.stderr}"
+
+        # m0b (VT-38): In Progress with no unmerged branch is status drift — reported,
+        # never failed, and never for a ticket that is waiting on something
+        ticket(root, "PROJ-12", "In Progress")
+        r = run_gate(root)
+        assert r.returncode == 0 and "status drift: PROJ-12" in r.stdout, \
+            f"an In Progress ticket with no branch must be REPORTED, not failed:\n{r.stdout}"
+        ticket(root, "PROJ-12", "In Progress", blocked_by="PROJ-1")
+        r = run_gate(root)
+        assert r.returncode == 0 and "status drift" not in r.stdout, \
+            f"a ticket waiting on another is blocked, not drifting:\n{r.stdout}"
+        (root / "docs" / "backlog" / "PROJ-12.md").unlink()
 
         # m0 (E14): a ticket in review with no ledger row is a claim without a record
         ticket(root, "PROJ-9", "In Review")
@@ -799,7 +845,7 @@ def _selftest():
     print("graph_check selftest: OK (coherent graph green + 11 reds + 4 new greens: dangling, "
           "cycle, done-sans-verdict, done-with-FAIL, identical repeat, loop "
           "budget, out-of-scope commit, stale stop state by recorded: line and by "
-          "mtime (Blocked, In Review and a fresh stop state pass) — + loud skips: undeclared scope, "
+          "mtime (Blocked, In Review and a fresh stop state pass) + status drift reported and exempt when blocked — + loud skips: undeclared scope, "
           "remote tracker — + attribution, 17 positive / 12 negative: leading key "
           "attributed (bare/`type:`-prefixed/`feat(KEY):`/multi-scope "
           "`feat(a,KEY):`/`[KEY]`/`Revert \"…\"`), prose mention + longer key + "

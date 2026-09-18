@@ -1,6 +1,6 @@
 # VT-8: BDD human report — AI reports in Given/When/Then anyone can read
 
-- status: In Progress
+- status: In Review
 - assignee: Connor Pham
 - estimate: 0.5d
 - labels: workflow, no UI

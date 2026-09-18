@@ -1,6 +1,6 @@
 # VT-9: /qa output layer from ai-qa — readable evidence, exact boxing, Excel test cases
 
-- status: In Progress
+- status: In Review
 - assignee: Connor Pham
 - estimate: 1d
 - labels: qa, no UI

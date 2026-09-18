@@ -1,6 +1,6 @@
 # VT-6: Peer coordination — /team DEV agents talk directly, decisions become artifacts
 
-- status: In Progress
+- status: In Review
 - assignee: Connor Pham
 - estimate: 1d
 - labels: workflow, no UI

@@ -299,6 +299,29 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
     check("every wave-0 item carries the lane it is owed",
       plan.waves[0].batches.flat().every((x) => x.next_lane === "dev" || x.next_lane === "qa"),
       JSON.stringify(plan.waves[0].batches.flat().map((x) => [x.key, x.next_lane])));
+    // VT-38: a MERGED branch is history. Leftovers made this repo report 21 tickets
+    // in flight when one was running, so the planner reads --no-merged, not --list.
+    run("git", ["-C", dir, "checkout", "-qb", "feat/DEMO-10-x"]);
+    run("git", ["-C", dir, "checkout", "-q", "main"]);
+    const pMerged = JSON.parse(vteam(dir, "graph", "--plan", "--json").stdout || "{}");
+    check("a branch already merged into the protected branch is NOT in flight",
+      (pMerged.in_flight || []).every((f) => f.key !== "DEMO-10"),
+      JSON.stringify(pMerged.in_flight));
+    run("git", ["-C", dir, "checkout", "-qb", "feat/DEMO-12-y"]);
+    fs.writeFileSync(path.join(dir, "unmerged.txt"), "work in flight\n");
+    // add ONLY this file: `add -A` would sweep the untracked fixture tickets onto the
+    // branch, and checking main out again would then delete them from the worktree
+    run("git", ["-C", dir, "add", "unmerged.txt"]);
+    run("git", ["-C", dir, "commit", "-qm", "wip(DEMO-12): in flight"]);
+    run("git", ["-C", dir, "checkout", "-q", "main"]);
+    const pLive = JSON.parse(vteam(dir, "graph", "--plan", "--json").stdout || "{}");
+    check("an UNMERGED branch is in flight and leaves the waves",
+      (pLive.in_flight || []).some((f) => f.key === "DEMO-12")
+      && !pLive.waves.flatMap((w) => w.batches.flat()).some((x) => x.key === "DEMO-12"),
+      JSON.stringify(pLive.in_flight));
+    run("git", ["-C", dir, "branch", "-D", "feat/DEMO-10-x"]);
+    run("git", ["-C", dir, "branch", "-D", "feat/DEMO-12-y"]);
+
     const human = vteam(dir, "graph", "--plan");
     check("graph --plan prints a human plan with the critical path",
       human.status === 0 && /EXECUTION PLAN/.test(human.stdout) && /CRITICAL PATH/.test(human.stdout),
