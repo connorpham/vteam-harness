@@ -20,8 +20,14 @@ args: "<TICKET: {project.key}-nnn | tracker URL> [assignee=<name>] [branch=feat|
 4. **Never commit on the protected branch.** Branch `feat/<TICKET>-<slug>` (or
    `fix/…`) from its up-to-date tip.
 5. **"Done" is machine-checked AND peer-checked.** The /verify gate must be green
-   with exact result lines recorded, AND every review card T4b requires (R1 + R2,
-   plus R3 when triggered) must approve BEFORE any commit/push/PR/comment. UI
+   with exact result lines recorded, AND every review card T4b requires must
+   approve BEFORE any commit/push/PR/comment. How many cards is not your call:
+   `python3 .vteam/scripts/change_class.py --sha WORKTREE` reads the diff and
+   names the class — `docs` (no card), `surface` (one card, one real bullet),
+   `logic` (R1 + R2), `high-stakes` (one more). Run it BEFORE you brief reviewers,
+   quote its line in the task sheet, and brief for what the class actually is: on a
+   surface change the useful bullet is "I grepped the old string out of the BUILT
+   artifact and found the test that asserted it", not three invented attacks. UI
    change → headed browser evidence under `{paths.evidence}/<TICKET>/dev/` (the
    root layer `{paths.evidence}/<TICKET>/` belongs to the QA lane). A claim
    without recorded output is not a claim.

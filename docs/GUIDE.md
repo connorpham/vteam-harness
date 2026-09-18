@@ -353,6 +353,8 @@ ba:
 review:
   reviewers: 2
   max_rounds: 1                                           # fix rounds per ticket; SECURITY or high-stakes lifts it
+  proportional: true                                      # risk class picks the review shape (docs → no card)
+  surface_max_lines: 40                                   # a text-only change bigger than this is logic again
   high_stakes_paths: ["prisma/schema.prisma"]             # a diff here gets an extra reviewer
   high_stakes_terms: [wallet, refund, payout]             # your project's risk vocabulary
 docs:
@@ -599,7 +601,7 @@ Stated plainly, because a framework about honest reporting should be honest abou
 
 ## Status
 
-Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **221 checks**
+Working, and the proof ships with it: `npm test` runs [tests/e2e.mjs](https://github.com/connorpham/vteam-harness/blob/main/tests/e2e.mjs) — **227 checks**
 
  (the suite's own last check verifies this number against the run, so it cannot go stale again) plus a 17-fixture parser-conformance suite
  and a 10-row ledger-grammar fence (the Python, Node and shell config readers must agree byte-for-byte, the Python and Node ledger parsers row-for-row, and configs they must reject must die in all of them) covering fresh repo → `init` → **doctor green**, manifest-guarded `update`, invalid input writing nothing, the board's read-only fence, and the pre-push fence and secret scan actually going red. CI runs it on every push. Also dogfooded against a real project's artifacts: 500+ verbatim spec rows, a 41-row ledger and real review dossiers all pass the ported gates. And 0.17.0 was **field-tested before it shipped**: a full `/team` day on a pnpm/Turborepo Next 15 + Prisma monorepo — BA shards, mockups, two parallel workers, four tickets merged, four QA verdicts with challengers — and every gap that day found is a ticket in this repo (`VT-11`, `VT-12`), not a footnote.

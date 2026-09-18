@@ -269,6 +269,49 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
   check("gate.sh names its transcript file and the file carries the GATE line",
     !!tr && fs.existsSync(tr[1]) && /GATE: GREEN/.test(fs.readFileSync(tr[1], "utf8")), g0.stdout.slice(-300));
 
+  // VT-36: the risk class is measured from the diff, and a docs-only change needs no
+  // reviewer card — the fence stops charging a README typo what it charges a rewrite
+  {
+    const rc = (...a) => run("python3", [path.join(dir, ".vteam", "scripts", "review_check.py"), ...a], { cwd: dir });
+    const cc = (...a) => run("python3", [path.join(dir, ".vteam", "scripts", "change_class.py"), ...a], { cwd: dir });
+    // the install itself commits on main first — otherwise switching back would take
+    // .vteam/ with it and every later check in this section would lose its runtime
+    run("git", ["-C", dir, "add", "-A"]);
+    run("git", ["-C", dir, "commit", "-qm", "chore: vteam init"]);
+    run("git", ["-C", dir, "checkout", "-qb", "feat/DEMO-7-copy"]);
+    fs.appendFileSync(path.join(dir, "README.md"), "\na documentation line\n");
+    run("git", ["-C", dir, "add", "-A"]);
+    run("git", ["-C", dir, "commit", "-qm", "docs(DEMO-7): a line"]);
+    const cls = cc("--base", "main", "--sha", "HEAD");
+    check("change_class calls a docs-only diff `docs`", /change-class: docs/.test(cls.stdout), cls.stdout + cls.stderr);
+    const r = rc("DEMO-7", "--base", "main", "--sha", "HEAD");
+    check("review_check needs NO dossier for a docs-only diff, and says why",
+      r.status === 0 && /No reviewer card required/.test(r.stdout) && /change class `docs`/.test(r.stdout),
+      r.stdout + r.stderr);
+
+    // the knob is the whole reversal: one config line puts the uniform fence back
+    const cfgPath = path.join(dir, "vteam.config.yaml");
+    const cfg0 = fs.readFileSync(cfgPath, "utf8");
+    fs.writeFileSync(cfgPath, cfg0.replace("proportional: true", "proportional: false"));
+    const rOff = rc("DEMO-7", "--base", "main", "--sha", "HEAD");
+    check("review.proportional: false restores the uniform fence on the same docs-only diff",
+      rOff.status === 1 && /review\.md NOT in commit/.test(rOff.stdout), rOff.stdout + rOff.stderr);
+    fs.writeFileSync(cfgPath, cfg0);
+
+    // …and a code file's skeleton moving is `logic` again: two cards, three bullets
+    fs.mkdirSync(path.join(dir, "src"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "src", "app.ts"), "export const MAX = 5;\n");
+    run("git", ["-C", dir, "add", "-A"]);
+    run("git", ["-C", dir, "commit", "-qm", "feat(DEMO-7): a constant"]);
+    const cls2 = cc("--base", "main", "--sha", "HEAD");
+    check("change_class calls a new code file `logic` (nothing to compare a skeleton against)",
+      /change-class: logic/.test(cls2.stdout), cls2.stdout);
+    const r2 = rc("DEMO-7", "--base", "main", "--sha", "HEAD");
+    check("review_check demands the dossier again once code moves",
+      r2.status === 1 && /review\.md NOT in commit/.test(r2.stdout), r2.stdout + r2.stderr);
+    run("git", ["-C", dir, "checkout", "-q", "main"]);
+  }
+
   // E1: a repo with NO origin remote is a legitimate local-only shape — preflight
   // says how push/PR change (local --no-ff merge, review_check by hand), it does not RED
   run("git", ["-C", dir, "remote", "remove", "origin"]);

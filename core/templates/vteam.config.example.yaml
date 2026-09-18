@@ -109,6 +109,10 @@ ba:
 review:
   reviewers: 2           # machine-enforced: review_check requires cards R1..RN (+1 high-stakes)
   max_rounds: 1          # fix rounds per ticket (`## Round N` headings); SECURITY or a high-stakes diff lifts it
+  proportional: true     # the diff's risk class picks the review shape (change_class.py:
+                         #   docs = no reviewer card · surface (strings/comments/JSX text
+                         #   only) = one card, one bullet · logic / high-stakes = unchanged)
+  surface_max_lines: 40  # more changed lines than this and volume is its own risk
   high_stakes_paths: []          # e.g. ["prisma/schema.prisma", "src/lib/"]
   high_stakes_terms: []          # project vocabulary that means money/irreversibility
   # external:                    # OPTIONAL — cross-model reviewers, by card id.
