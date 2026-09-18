@@ -17,6 +17,14 @@ Everything here came from running the lanes on a real second repo and then revie
 the result. Nothing in it was designed from the armchair, and several entries are
 corrections to things 0.18.0 shipped.
 
+### Fixed before publish (2026-09-17): the gate's first step made PR clones shallow (VT-29)
+
+`docs_shrink_check` fetched the PR base with `--depth=1`. Into a full clone that writes
+`.git/shallow` with the base tip as a boundary, so six steps later `graph_check` read the
+base-tip commit as a root and flagged it for "touching" every file in the tree — a
+deterministic false RED on every stacked ticket branch. The fetch no longer limits depth,
+and the selftest now proves a full clone stays full through PR mode.
+
 ### Added before publish (2026-09-17): the first benchmark result — a loss (VT-27)
 
 The vteam-vs-BMAD run from 2026-09-03 was finally judged. **BMAD 91/91, vteam 84/91 (92.3 %),
