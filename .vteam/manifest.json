@@ -63,7 +63,7 @@
     ".vteam/scripts/comment_check.py": "fa12d92d67fdd0fd91047b6d9cead2a3d42305466b59d451b841e5ecce851275",
     ".vteam/scripts/competency_check.py": "996c44d0bdf02a69bbdc16fa76f1e4e6ca7661e9bbfddb9357e6f4429ff59911",
     ".vteam/scripts/coord_check.py": "3f7591d5512b1927e04551d63e435333ff19e10df74189210ac867758deab3cc",
-    ".vteam/scripts/docs_shrink_check.sh": "63ce7e4098dfffc2c0fabf5a9a91ff084f1f1ccffe3705d6a105f5dd64c4be9f",
+    ".vteam/scripts/docs_shrink_check.sh": "a7019f8546bf803c5f8027b3b045294517d4ec05101b331d2343e806c505ab06",
     ".vteam/scripts/dor_check.py": "04aeff6deb93dc6d702a82b318129c039810e61bc48c839b2e3af3a0a81e81a0",
     ".vteam/scripts/evd_check.py": "d2b4c9f7de4f10bd7c9e6de709e2863f595c2e7f8cf4dc880ac3da0cc5d2dacd",
     ".vteam/scripts/evd_index.py": "a85209362c96e95bffcb72a1dfccde9944da65a639c40caa38d9d9431488bc00",
