@@ -88,6 +88,18 @@ high-stakes diff lifts it; `--ba <feature>` does the same for the challenger fil
 the dossier, do not open another round — and a brief is now a prioritised attack list. Absent knob
 = no ceiling, printed on the green line, so no existing repository goes red on upgrade.
 
+### Added: the doctrine a lane loads at start is now measured, not argued (VT-33)
+
+`context_budget.py --lane <lane>` / `--all` reads the rendered skill, resolves the files it
+tells the agent to read before any ticket work (role playbook, identity, competency INDEX and
+every competency the INDEX marks `always`) and prints bytes and ≈tokens (bytes/4) per file,
+with everything else the skill names listed apart as on demand. Measured on this repo on
+2026-09-18: dev ≈ 16.8k tokens mandatory (8.9k of it the skill itself, 4.1k the four `always`
+competencies), qa ≈ 17.5k, ba ≈ 10.3k, pm ≈ 9.4k — no lane near the 40k default budget
+(`team.context_budget_tokens`). The "31 competencies bloat the context" claim has a number now:
+a lane loads four or five of them by default; the rest wait for a matching ticket. Runs as an
+advisory gate step (`context-budget`) and never blocks.
+
 ### Added: a session that ends mid-ticket leaves a stop state behind (VT-34)
 
 The benchmark arm stopped with 11 uncommitted files, a red unit suite and no closing entry;

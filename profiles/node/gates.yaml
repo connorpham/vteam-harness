@@ -53,6 +53,11 @@ steps:
     run: "python3 .vteam/scripts/verbatim_gate.py"
   competencies:
     run: "python3 .vteam/scripts/competency_check.py"
+  context-budget:
+    # VT-33: how much doctrine each lane loads before any ticket work — a measurement
+    # that answers "the competencies bloat the context" with a number; never a fence
+    run: "python3 .vteam/scripts/context_budget.py --all"
+    advisory: true
   doctrine-source:
     # VT-19 shipped a doctrine change whose INDEX was never regenerated AT THE SOURCE,
     # and a consuming repo's gate went RED the moment it ran `vteam update`: the
