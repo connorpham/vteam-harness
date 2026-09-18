@@ -257,6 +257,11 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
     g0.stdout.slice(-1200));
   check("the stale-verdict step RAN (it was named by 5 workflows and wired into 0 profiles)",
     /▶ stale-verdict:/.test(g0.stdout) && /no stale verdicts|no evidence dirs with key/.test(g0.stdout), g0.stdout.slice(-800));
+  // VT-39: the cost audit runs everywhere, and on a repo that never synced usage it says
+  // so in ONE line and stays out of the way — a check that shouts at a new repo gets removed
+  check("the cost step RAN and is quiet on a repo with no measured record",
+    /▶ cost:/.test(g0.stdout) && /no measured record to audit against/.test(g0.stdout)
+    && !/advisory cost: FAILED/.test(g0.stdout), g0.stdout.slice(-1200));
 
   // and preflight's driver probe no longer executes the whole gate
   const help = run("python3", [path.join(dir, ".vteam", "scripts", "gate.py"), "--help"], { cwd: dir });

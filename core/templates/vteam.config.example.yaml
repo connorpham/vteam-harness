@@ -90,6 +90,16 @@ team:
   coord_budget: 3        # max peer-coordination rounds between parallel DEV agents before
                          # the PM steps in (coord_check reds a round past this)
 
+ledger:
+  cost_tolerance_factor: 10   # the ledger's `tok ≈` is an ESTIMATE, `usage --sync` is the
+                              # MEASUREMENT; cost_check compares them PER DAY (a session log
+                              # never knows which ticket a token belonged to) and warns past
+                              # this factor. Advisory: a divergence is a finding about the
+                              # estimate — never edit the row to match the measurement
+  usage_max_stale_days: 7     # ledger rows this many days newer than the newest measured row
+                              # means nobody is running `usage --sync` any more: the louder
+                              # finding, because an unkept record hides what a divergence shows
+
 autonomy:
   level: assisted
   # level — off: every gate waits for you · assisted: asks at merge/close ·

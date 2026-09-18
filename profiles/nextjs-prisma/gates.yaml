@@ -9,6 +9,13 @@ steps:
     run: "bash .vteam/scripts/docs_shrink_check.sh"
   ledger:
     run: "python3 .vteam/scripts/log_check.py"
+  cost:
+    # Advisory by design, like `schedule`. The ledger's `tok ≈` is an ESTIMATE and the
+    # session logs are a MEASUREMENT; they differ by construction, and a gate that reds
+    # on that teaches people to inflate the estimate until it stops reding. What this
+    # step is really watching is whether the measured record is being kept at all.
+    run: "python3 .vteam/scripts/cost_check.py"
+    advisory: true
   schedule:
     # Advisory by design. A stale sprint plan or an overdue decision is a fact about the
     # PROJECT, not a defect in the change being gated — blocking a commit on it teaches
