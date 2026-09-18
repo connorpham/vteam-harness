@@ -184,7 +184,7 @@ def main() -> int:
                  f"{', '.join(advisory_failed)}" if advisory_failed else "")
     BOOKKEEPING = {"docs-shrink", "ledger", "verbatim", "lockfile", "graph", "competencies",
                    "parallel", "coord", "bdd-report", "evd", "evd-ui", "schedule",
-                   "doctrine-source", "stale-verdict"}
+                   "doctrine-source", "stale-verdict", "context-budget"}
 
     skipped_names = {s for s, _ in skipped}
     if all(s in BOOKKEEPING for s in ran):

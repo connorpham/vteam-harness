@@ -252,6 +252,9 @@ console.log("5b. update: providers follow config, orphans pruned, agents manifes
   const g0 = run("bash", [path.join(dir, ".vteam", "scripts", "gate.sh")], { cwd: dir });
   check("gate.sh on a fresh install is GREEN", g0.status === 0 && /GATE: GREEN/.test(g0.stdout),
     g0.stdout.slice(-800) + g0.stderr);
+  check("the context-budget step RAN as an advisory measurement and printed a lane total",
+    /▶ context-budget:/.test(g0.stdout) && /= mandatory total/.test(g0.stdout) && /context_budget:|over budget/.test(g0.stdout),
+    g0.stdout.slice(-1200));
   check("the stale-verdict step RAN (it was named by 5 workflows and wired into 0 profiles)",
     /▶ stale-verdict:/.test(g0.stdout) && /no stale verdicts|no evidence dirs with key/.test(g0.stdout), g0.stdout.slice(-800));
 
